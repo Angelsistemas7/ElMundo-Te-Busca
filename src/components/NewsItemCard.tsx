@@ -28,7 +28,7 @@ export const NewsItemCard = memo(function NewsItemCard({
     <article className="tap-card rounded-3xl border border-zinc-200 bg-white p-4 sm:p-5">
       <div className="flex items-start gap-3">
         {item.photoUrl && (
-          <PhotoView src={item.photoUrl} className="h-16 w-16 shrink-0 rounded-lg object-cover" />
+          <PhotoView src={item.photoUrl} className="h-16 w-16 shrink-0 rounded-lg" />
         )}
         <div className="min-w-0 flex-1">
           <h3 className="font-bold text-zinc-900">{item.title}</h3>

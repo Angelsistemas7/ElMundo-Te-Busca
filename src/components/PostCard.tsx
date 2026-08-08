@@ -116,7 +116,7 @@ export const PostCard = memo(function PostCard({ post, comments }: { post: Post;
       <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-800">{post.body}</p>
 
       {post.photoUrl && (
-        <PhotoView src={post.photoUrl} className="mt-3 max-h-96 w-full rounded-xl object-cover" />
+        <PhotoView src={post.photoUrl} className="mt-3 h-64 w-full rounded-xl sm:h-80" />
       )}
 
       {post.linkUrl && (

@@ -44,7 +44,7 @@ export const HeroCard = memo(function HeroCard({ hero, comments }: { hero: Hero;
       <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-700">{hero.body}</p>
 
       {hero.photoUrl && (
-        <PhotoView src={hero.photoUrl} className="mt-3 max-h-96 w-full rounded-xl object-cover" />
+        <PhotoView src={hero.photoUrl} className="mt-3 h-64 w-full rounded-xl sm:h-80" />
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">

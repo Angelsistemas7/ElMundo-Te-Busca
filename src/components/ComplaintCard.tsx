@@ -52,7 +52,7 @@ export const ComplaintCard = memo(function ComplaintCard({ complaint, comments }
       <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-800">{complaint.body}</p>
 
       {complaint.photoUrl && (
-        <PhotoView src={complaint.photoUrl} className="mt-3 max-h-96 w-full rounded-xl object-cover" />
+        <PhotoView src={complaint.photoUrl} className="mt-3 h-64 w-full rounded-xl sm:h-80" />
       )}
 
       <div className="mt-2 text-xs text-zinc-500">

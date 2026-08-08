@@ -204,7 +204,7 @@ export function CommentSection({
             )}
             {c.body && <p className="mt-0.5 whitespace-pre-wrap text-sm text-zinc-600">{c.body}</p>}
             {c.photoUrl && (
-              <PhotoView src={c.photoUrl} alt="Evidencia" className="mt-2 max-h-72 rounded-lg object-cover" />
+              <PhotoView src={c.photoUrl} alt="Evidencia" className="mt-2 h-48 w-48 rounded-lg" />
             )}
           </div>
           <div className="mt-1 flex items-center gap-3 pl-1">
