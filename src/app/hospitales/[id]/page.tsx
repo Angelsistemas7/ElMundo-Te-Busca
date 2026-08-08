@@ -32,7 +32,7 @@ export default async function HospitalPage({ params }: { params: Promise<{ id: s
       <div className="rounded-2xl border border-zinc-200 bg-white p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{hospital.name}</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-navy-700">{hospital.name}</h1>
             {(hospital.locationText || hospital.estado) && (
               <p className="mt-1 flex items-center gap-1.5 text-sm text-zinc-500">
                 <MapPin className="h-4 w-4 text-zinc-400" />

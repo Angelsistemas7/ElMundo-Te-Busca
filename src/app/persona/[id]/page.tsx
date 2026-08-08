@@ -122,7 +122,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         <div className="space-y-6">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight text-zinc-900">{displayName}</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-navy-700">{displayName}</h1>
               {person.verified && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                   <BadgeCheck className="h-4 w-4" />

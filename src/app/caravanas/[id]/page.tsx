@@ -30,7 +30,7 @@ export default async function CaravanaPage({ params }: { params: Promise<{ id: s
 
       <article className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{march.title}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-navy-700">{march.title}</h1>
           <span
             className={
               isPast

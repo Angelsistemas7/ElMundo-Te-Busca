@@ -56,7 +56,7 @@ export default async function AidPointPage({ params }: { params: Promise<{ id: s
             </span>
           </div>
 
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{point.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-navy-700">{point.name}</h1>
 
           <p className="flex items-start gap-1.5 text-sm text-zinc-600">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
