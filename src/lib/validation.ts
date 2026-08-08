@@ -29,18 +29,31 @@ const httpUrl = (msg: string) =>
 // `actions.ts`. Sin este chequeo, cualquiera podría llamar la Server Action
 // directamente con una URL arbitraria; esa URL luego se pasa a `fetch()` en
 // el servidor (src/lib/ogImage.ts, para la tarjeta de compartir), lo que
-// permitiría SSRF contra la red interna. Solo se acepta lo que el propio
-// bucket de Storage pudo haber generado.
-const PHOTO_HOST_RE = /\.(supabase\.co|supabase\.in)$/i;
+// permitiría SSRF contra la red interna. Solo se acepta el bucket del PROPIO
+// proyecto de Supabase (por su host exacto), no el de cualquier proyecto
+// *.supabase.co ajeno.
+const PHOTO_HOST_FALLBACK_RE = /\.(supabase\.co|supabase\.in)$/i;
+
+function ownSupabaseHost(): string | null {
+  const configured = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!configured) return null;
+  try {
+    return new URL(configured).hostname;
+  } catch {
+    return null;
+  }
+}
 
 export function isSafePhotoUrl(url: string): boolean {
   try {
     const u = new URL(url);
-    return (
-      u.protocol === "https:" &&
-      PHOTO_HOST_RE.test(u.hostname) &&
-      u.pathname.startsWith("/storage/v1/object/public/photos/")
-    );
+    if (u.protocol !== "https:") return false;
+    if (!u.pathname.startsWith("/storage/v1/object/public/photos/")) return false;
+
+    const ownHost = ownSupabaseHost();
+    // Con el proyecto configurado, exige ese host exacto. Sin configurar
+    // (p. ej. en pruebas locales), cae al patrón genérico de dominio Supabase.
+    return ownHost ? u.hostname === ownHost : PHOTO_HOST_FALLBACK_RE.test(u.hostname);
   } catch {
     return false;
   }
