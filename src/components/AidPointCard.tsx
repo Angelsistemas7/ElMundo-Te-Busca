@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { memo } from "react";
 import { BadgeCheck, Clock3, MapPin, MessageCircle, Phone, ShieldQuestion } from "lucide-react";
 import type { AidPoint, AidPointType } from "@/lib/types";
@@ -32,8 +33,15 @@ export const AidPointCard = memo(function AidPointCard({ point }: { point: AidPo
         </div>
       )}
       {point.photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={point.photoUrl} alt={point.name} className="h-40 w-full object-cover" />
+        <div className="relative h-40 w-full">
+          <Image
+            src={point.photoUrl}
+            alt={point.name}
+            fill
+            sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 100vw"
+            className="object-cover"
+          />
+        </div>
       ) : (
         <div className="flex h-28 items-center justify-center gap-1 bg-gradient-to-br from-brand-50 to-amber-100 text-5xl">
           {point.types.map((t) => (

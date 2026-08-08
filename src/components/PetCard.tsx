@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { memo } from "react";
 import { MapPin, MessageCircle, Phone } from "lucide-react";
 import type { Pet, PetStatus } from "@/lib/types";
@@ -17,8 +18,15 @@ export const PetCard = memo(function PetCard({ pet, commentCount }: { pet: Pet; 
   return (
     <article className="tap-card overflow-hidden rounded-3xl border border-zinc-200 bg-white">
       {pet.photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={pet.photoUrl} alt={pet.name || "Mascota"} className="h-44 w-full object-cover" />
+        <div className="relative h-44 w-full">
+          <Image
+            src={pet.photoUrl}
+            alt={pet.name || "Mascota"}
+            fill
+            sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 100vw"
+            className="object-cover"
+          />
+        </div>
       ) : (
         <div className="flex h-28 items-center justify-center bg-gradient-to-br from-zinc-50 to-amber-50 text-5xl">
           {pet.species === "gato" ? "🐈" : pet.species === "perro" ? "🐕" : "🐾"}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Bookmark, FileText, HeartHandshake, MessageCircle, ThumbsUp, UserCircle2 } from "lucide-react";
 import { getPublicProfileByUsername } from "@/lib/auth";
@@ -26,10 +27,9 @@ export default async function PublicVolunteerProfilePage({
 
   return (
     <div className="mx-auto max-w-lg px-4 py-10 text-center">
-      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-zinc-100 ring-4 ring-emerald-100 mx-auto">
+      <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-zinc-100 ring-4 ring-emerald-100 mx-auto">
         {profile.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+          <Image src={profile.avatarUrl} alt="" fill sizes="80px" className="object-cover" />
         ) : (
           <UserCircle2 className="h-12 w-12 text-zinc-400" />
         )}

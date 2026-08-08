@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { ExternalLinkGuard } from "./ExternalLinkGuard";
 
@@ -39,16 +40,17 @@ export function NewsCarouselTrack({ items }: { items: CarouselItem[] }) {
           >
             <div className="relative aspect-[16/10] w-full overflow-hidden bg-zinc-100">
               {item.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={item.image}
                   alt=""
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                  fill
+                  unoptimized
+                  sizes="(min-width: 640px) 16rem, 14rem"
+                  className="object-cover transition duration-300 group-hover:scale-105"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-brand-50 to-gold-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo-icon.svg" alt="" className="h-10 w-10 opacity-40" />
+                  <Image src="/logo-icon.svg" alt="" width={40} height={40} className="h-10 w-10 opacity-40" />
                 </div>
               )}
               <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-semibold text-white">

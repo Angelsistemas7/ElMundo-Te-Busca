@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   ChevronDown,
@@ -78,8 +79,14 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="flex shrink-0 items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-icon.svg" alt="El Mundo Te Busca" className="h-10 w-10 shrink-0 object-contain" />
+          <Image
+            src="/logo-icon.svg"
+            alt="El Mundo Te Busca"
+            width={40}
+            height={40}
+            priority
+            className="h-10 w-10 shrink-0 object-contain"
+          />
           {/* "El Mundo" encima de "Te Busca": compacto y no se estira en una línea larga.
               whitespace-nowrap evita que, si el header se aprieta, cada palabra caiga en su
               propia línea (pasaba porque el Link podía encogerse por debajo del ancho del texto). */}

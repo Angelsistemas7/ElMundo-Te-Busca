@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { BadgeCheck, Clock3, MapPin, Phone, ShieldQuestion, Settings } from "lucide-react";
 import { canManageAidPoint, getAidPointById, getComments } from "@/lib/data";
@@ -26,8 +27,16 @@ export default async function AidPointPage({ params }: { params: Promise<{ id: s
 
       <article className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
         {point.photoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={point.photoUrl} alt={point.name} className="max-h-72 w-full object-cover" />
+          <div className="relative h-72 w-full">
+            <Image
+              src={point.photoUrl}
+              alt={point.name}
+              fill
+              sizes="(min-width: 640px) 42rem, 100vw"
+              className="object-cover"
+              priority
+            />
+          </div>
         )}
         <div className="space-y-3 p-5">
           <div className="flex flex-wrap items-center gap-2">

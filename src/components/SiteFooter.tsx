@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ShareWhatsApp } from "./ShareWhatsApp";
 
 export function SiteFooter() {
@@ -7,8 +8,13 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-2">
         <div>
           <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-icon.svg" alt="El Mundo Te Busca" className="h-14 w-14 shrink-0 object-contain" />
+            <Image
+              src="/logo-icon.svg"
+              alt="El Mundo Te Busca"
+              width={56}
+              height={56}
+              className="h-14 w-14 shrink-0 object-contain"
+            />
             <span className="text-lg font-bold text-navy-700">El Mundo Te Busca</span>
           </div>
           <p className="mt-3 max-w-md text-sm leading-relaxed text-zinc-600">
@@ -77,8 +83,13 @@ export function SiteFooter() {
                 rel="noopener noreferrer"
                 className="transition hover:opacity-80"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo-light.webp" alt="Sentra Labs" className="h-9 w-auto object-contain" />
+                <Image
+                  src="/logo-light.webp"
+                  alt="Sentra Labs"
+                  width={256}
+                  height={90}
+                  className="h-9 w-auto object-contain"
+                />
               </a>
               <p className="text-xs leading-relaxed text-zinc-500">
                 Estudio de desarrollo de software en Cartagena. Convertimos ideas en productos
@@ -87,8 +98,13 @@ export function SiteFooter() {
             </div>
             {/* INN Clusion — sin enlace (no tiene sitio), con su descripción. */}
             <div className="flex flex-1 flex-col items-center gap-2 px-4 text-center sm:px-6">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/INNClusion.jpeg" alt="INN Clusion" className="h-9 w-auto object-contain" />
+              <Image
+                src="/INNClusion.jpeg"
+                alt="INN Clusion"
+                width={1598}
+                height={1106}
+                className="h-9 w-auto object-contain"
+              />
               <p className="text-xs leading-relaxed text-zinc-500">
                 INN Clusion trabaja desde 2010, creada por Fundación Conceptos. Voluntarios digitales
                 con más de 15 años apoyando causas sociales.

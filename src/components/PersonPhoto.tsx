@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { cn, initials } from "@/lib/utils";
 import { PhotoLightbox } from "./PhotoLightbox";
 
@@ -34,14 +35,14 @@ export function PersonPhoto({
   if (showImage) {
     return (
       <>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={src}
           alt={alt}
-          loading="lazy"
+          fill
+          sizes="(min-width: 1024px) 400px, (min-width: 640px) 45vw, 100vw"
           onError={() => setFailed(true)}
           onClick={zoomable ? () => setOpen(true) : undefined}
-          className={cn("h-full w-full object-cover", zoomable && "cursor-zoom-in", className)}
+          className={cn("object-cover", zoomable && "cursor-zoom-in", className)}
         />
         {zoomable && (
           <PhotoLightbox src={src} alt={alt} open={open} onClose={() => setOpen(false)} />

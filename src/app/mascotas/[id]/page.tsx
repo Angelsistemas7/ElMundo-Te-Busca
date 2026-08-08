@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Clock3, MapPin, Phone, Settings } from "lucide-react";
 import { canManagePet, getComments, getPetById } from "@/lib/data";
@@ -30,8 +31,16 @@ export default async function PetPage({ params }: { params: Promise<{ id: string
 
       <article className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
         {pet.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={pet.photoUrl} alt={pet.name || "Mascota"} className="max-h-72 w-full object-cover" />
+          <div className="relative h-72 w-full">
+            <Image
+              src={pet.photoUrl}
+              alt={pet.name || "Mascota"}
+              fill
+              sizes="(min-width: 640px) 42rem, 100vw"
+              className="object-cover"
+              priority
+            />
+          </div>
         ) : (
           <div className="flex h-40 items-center justify-center bg-gradient-to-br from-zinc-50 to-amber-50 text-6xl">
             {pet.species === "gato" ? "🐈" : pet.species === "perro" ? "🐕" : "🐾"}

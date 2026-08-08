@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { LogOut, Settings, UserCircle2, UserRound } from "lucide-react";
 import { getMyProfileAction, signOutAction } from "@/app/actions";
@@ -58,8 +59,7 @@ export function ProfileMenu({ user }: { user: BasicUser }) {
         className="press flex items-center gap-1.5 rounded-full bg-zinc-100 py-1 pl-1 pr-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-200"
       >
         {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+          <Image src={avatarUrl} alt="" width={28} height={28} className="h-7 w-7 rounded-full object-cover" />
         ) : (
           <UserCircle2 className="h-7 w-7 text-zinc-500" />
         )}

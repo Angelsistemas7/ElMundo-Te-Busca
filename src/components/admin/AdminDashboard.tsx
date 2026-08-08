@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
@@ -654,8 +655,7 @@ function ResourceRow({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 gap-3">
           {photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photoUrl} alt={name} className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+            <Image src={photoUrl} alt={name} width={56} height={56} className="h-14 w-14 shrink-0 rounded-lg object-cover" />
           ) : null}
           <div className="min-w-0">
             <Link href={href} className="font-semibold text-zinc-900 hover:underline">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import nextDynamic from "next/dynamic";
 import { HandHeart, Mail, MapPin, Phone, Search } from "lucide-react";
 import { getVolunteersPage, type VolunteerSort } from "@/lib/data";
@@ -167,11 +168,11 @@ export default async function VoluntariosPage({ searchParams }: { searchParams: 
           {volunteers.map((v) => (
             <li key={v.id} className="flex gap-3 rounded-2xl border border-zinc-200 bg-white p-4">
               {v.photoUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={v.photoUrl}
                   alt=""
-                  loading="lazy"
+                  width={56}
+                  height={56}
                   className="h-14 w-14 shrink-0 rounded-full object-cover"
                 />
               )}
