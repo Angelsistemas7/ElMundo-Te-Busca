@@ -277,6 +277,21 @@ h6 {
 .animate-backdrop {
   animation: backdrop-in 0.2s ease-out;
 }
+
+/* Transición "hero" tarjeta→ficha (persona) con la View Transitions API
+   nativa: la foto morphea de tamaño/posición en vez de cortar en seco. Ver
+   src/lib/viewTransition.ts y Card.tsx (`viewTransition`). */
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 0.32s;
+  animation-timing-function: var(--ease-ios);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01s;
+  }
+}
 @keyframes backdrop-out {
   from {
     opacity: 1;

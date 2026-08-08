@@ -53,7 +53,10 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         {/* Columna izquierda: foto + acciones */}
         <div className="space-y-4">
-          <div className="relative aspect-square overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">
+          <div
+            className="relative aspect-square overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100"
+            style={{ viewTransitionName: `person-photo-${person.id}` } as React.CSSProperties}
+          >
             <PersonPhoto
               src={person.photoUrl}
               firstName={person.firstName}

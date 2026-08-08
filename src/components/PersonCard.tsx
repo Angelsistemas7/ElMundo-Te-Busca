@@ -18,8 +18,11 @@ export const PersonCard = memo(function PersonCard({ person }: { person: Person 
     .join(" · ");
 
   return (
-    <Card href={`/persona/${person.id}`}>
-      <div className="relative aspect-square w-full overflow-hidden bg-zinc-100">
+    <Card href={`/persona/${person.id}`} viewTransition>
+      <div
+        className="relative aspect-square w-full overflow-hidden bg-zinc-100"
+        style={{ viewTransitionName: `person-photo-${person.id}` } as React.CSSProperties}
+      >
         <PersonPhoto
           src={person.photoUrl}
           firstName={person.firstName}
