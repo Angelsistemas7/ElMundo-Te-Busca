@@ -22,7 +22,7 @@ export function PinnedPostCard({ post, comments, tone }: { post: Post; comments:
     <>
       <button
         onClick={() => setOpen(true)}
-        className={`tap-card flex w-64 shrink-0 flex-col gap-1.5 rounded-xl border p-3 text-left ${toneClass}`}
+        className={`tap-card flex w-64 shrink-0 flex-col gap-1.5 rounded-2xl border p-3 text-left ${toneClass}`}
       >
         <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500">
           <span>{POST_TYPE_EMOJI[post.type]}</span>

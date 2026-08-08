@@ -67,7 +67,7 @@ export function DigitalVolunteerCard({ username, stats }: { username: string; st
   ];
 
   return (
-    <section className="mt-6 overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+    <section className="mt-6 overflow-hidden rounded-3xl border border-success-200 bg-gradient-to-br from-success-50 to-white">
       <div className="flex items-center gap-2.5 border-b border-emerald-100 px-5 py-4">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
           <HeartHandshake className="h-4.5 w-4.5" />

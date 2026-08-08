@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { memo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2, MessageCircle, Trash2 } from "lucide-react";
 import type { Comment, NewsItem } from "@/lib/types";
@@ -11,7 +11,7 @@ import { CommentSection } from "./CommentSection";
 import { ExternalLinkGuard } from "./ExternalLinkGuard";
 import { PhotoView } from "./PhotoView";
 
-export function NewsItemCard({
+export const NewsItemCard = memo(function NewsItemCard({
   item,
   comments,
   isAdmin = false,
@@ -25,7 +25,7 @@ export function NewsItemCard({
   const [pending, startTransition] = useTransition();
 
   return (
-    <article className="tap-card rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">
+    <article className="tap-card rounded-3xl border border-zinc-200 bg-white p-4 sm:p-5">
       <div className="flex items-start gap-3">
         {item.photoUrl && (
           <PhotoView src={item.photoUrl} className="h-16 w-16 shrink-0 rounded-lg object-cover" />
@@ -91,4 +91,4 @@ export function NewsItemCard({
       )}
     </article>
   );
-}
+});

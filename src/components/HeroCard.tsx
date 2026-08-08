@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { BadgeCheck, Clock, ExternalLink, MapPin, MessageCircle } from "lucide-react";
 import type { Comment, Hero } from "@/lib/types";
 import { HERO_CATEGORY_EMOJI, HERO_CATEGORY_LABEL } from "@/lib/types";
@@ -11,14 +11,14 @@ import { ExternalLinkGuard } from "./ExternalLinkGuard";
 import { PhotoView } from "./PhotoView";
 import { SaveButton } from "./SaveButton";
 
-export function HeroCard({ hero, comments }: { hero: Hero; comments: Comment[] }) {
+export const HeroCard = memo(function HeroCard({ hero, comments }: { hero: Hero; comments: Comment[] }) {
   const [showComments, setShowComments] = useState(false);
 
   return (
     <article
       className={cn(
-        "tap-card rounded-2xl border bg-white p-4 shadow-sm sm:p-5",
-        hero.verified ? "border-zinc-200" : "border-dashed border-amber-300",
+        "tap-card rounded-3xl border bg-white p-4 sm:p-5",
+        hero.verified ? "border-zinc-200" : "border-dashed border-warning-300",
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -94,4 +94,4 @@ export function HeroCard({ hero, comments }: { hero: Hero; comments: Comment[] }
       )}
     </article>
   );
-}
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, MapPin, MessageCircle, Pin } from "lucide-react";
 import type { Comment, Post, ReactionKind } from "@/lib/types";
@@ -27,7 +27,7 @@ const TYPE_STYLE: Record<Post["type"], string> = {
 
 const REACTIONS: ReactionKind[] = ["apoyo", "corazon", "hecho"];
 
-export function PostCard({ post, comments }: { post: Post; comments: Comment[] }) {
+export const PostCard = memo(function PostCard({ post, comments }: { post: Post; comments: Comment[] }) {
   const [counts, setCounts] = useState(post.reactions);
   const [reacted, setReacted] = useState<Record<string, boolean>>({});
   const [showComments, setShowComments] = useState(false);
@@ -61,8 +61,8 @@ export function PostCard({ post, comments }: { post: Post; comments: Comment[] }
   return (
     <article
       className={cn(
-        "tap-card rounded-2xl border bg-white p-4 shadow-sm sm:p-5",
-        urgent ? "border-red-300 ring-1 ring-red-200" : "border-zinc-200",
+        "tap-card rounded-3xl border bg-white p-4 sm:p-5",
+        urgent ? "border-danger-300 ring-1 ring-danger-200" : "border-zinc-200",
       )}
     >
       <div className="flex items-start gap-3">
@@ -184,4 +184,4 @@ export function PostCard({ post, comments }: { post: Post; comments: Comment[] }
       )}
     </article>
   );
-}
+});

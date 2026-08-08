@@ -1,11 +1,12 @@
-import Link from "next/link";
+import { memo } from "react";
 import { MapPin, IdCard, Clock, BadgeCheck, Eye } from "lucide-react";
 import type { Person } from "@/lib/types";
 import { PERSON_STATUS_LABEL } from "@/lib/types";
 import { cn, statusStyle, timeAgo } from "@/lib/utils";
 import { PersonPhoto } from "./PersonPhoto";
+import { Card } from "./Card";
 
-export function PersonCard({ person }: { person: Person }) {
+export const PersonCard = memo(function PersonCard({ person }: { person: Person }) {
   const s = statusStyle(person.status);
   const fullName = `${person.firstName} ${person.lastName}`.trim();
   const meta = [
@@ -17,10 +18,7 @@ export function PersonCard({ person }: { person: Person }) {
     .join(" · ");
 
   return (
-    <Link
-      href={`/persona/${person.id}`}
-      className="tap-card group flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white"
-    >
+    <Card href={`/persona/${person.id}`}>
       <div className="relative aspect-square w-full overflow-hidden bg-zinc-100">
         <PersonPhoto
           src={person.photoUrl}
@@ -86,6 +84,6 @@ export function PersonCard({ person }: { person: Person }) {
           })()}
         </div>
       </div>
-    </Link>
+    </Card>
   );
-}
+});

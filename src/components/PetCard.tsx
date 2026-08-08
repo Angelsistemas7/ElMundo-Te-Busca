@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { memo } from "react";
 import { MapPin, MessageCircle, Phone } from "lucide-react";
 import type { Pet, PetStatus } from "@/lib/types";
 import { PET_SPECIES_LABEL, PET_STATUS_EMOJI, PET_STATUS_LABEL } from "@/lib/types";
@@ -12,9 +13,9 @@ const STATUS_STYLE: Record<PetStatus, string> = {
   veterinario: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
-export function PetCard({ pet, commentCount }: { pet: Pet; commentCount: number }) {
+export const PetCard = memo(function PetCard({ pet, commentCount }: { pet: Pet; commentCount: number }) {
   return (
-    <article className="tap-card overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+    <article className="tap-card overflow-hidden rounded-3xl border border-zinc-200 bg-white">
       {pet.photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={pet.photoUrl} alt={pet.name || "Mascota"} className="h-44 w-full object-cover" />
@@ -82,4 +83,4 @@ export function PetCard({ pet, commentCount }: { pet: Pet; commentCount: number 
       </div>
     </article>
   );
-}
+});

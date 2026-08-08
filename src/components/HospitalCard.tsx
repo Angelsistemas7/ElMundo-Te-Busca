@@ -1,8 +1,9 @@
-import Link from "next/link";
+import { memo } from "react";
 import { BadgeCheck, Clock3, MapPin, PackageCheck, PackageX, Phone, ShieldQuestion, Stethoscope, Users } from "lucide-react";
 import type { Hospital, HospitalStatus } from "@/lib/types";
 import { HOSPITAL_STATUS_LABEL } from "@/lib/types";
 import { cn, timeAgo } from "@/lib/utils";
+import { Card } from "./Card";
 
 export const HOSPITAL_STATUS_STYLE: Record<HospitalStatus, { dot: string; chip: string }> = {
   operativo: { dot: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
@@ -11,14 +12,11 @@ export const HOSPITAL_STATUS_STYLE: Record<HospitalStatus, { dot: string; chip: 
   cerrado: { dot: "bg-zinc-400", chip: "bg-zinc-100 text-zinc-600 border-zinc-200" },
 };
 
-export function HospitalCard({ hospital, patientCount }: { hospital: Hospital; patientCount: number }) {
+export const HospitalCard = memo(function HospitalCard({ hospital, patientCount }: { hospital: Hospital; patientCount: number }) {
   const s = HOSPITAL_STATUS_STYLE[hospital.status];
 
   return (
-    <Link
-      href={`/hospitales/${hospital.id}`}
-      className="tap-card flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5"
-    >
+    <Card href={`/hospitales/${hospital.id}`} className="gap-3 p-5">
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-zinc-900">{hospital.name}</h3>
         <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold", s.chip)}>
@@ -99,6 +97,6 @@ export function HospitalCard({ hospital, patientCount }: { hospital: Hospital; p
           </span>
         </span>
       </div>
-    </Link>
+    </Card>
   );
-}
+});

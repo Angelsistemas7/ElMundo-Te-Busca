@@ -1,15 +1,16 @@
 import Link from "next/link";
+import { memo } from "react";
 import { CalendarClock, MapPin, MessageCircle, MessageSquare, Navigation, Users } from "lucide-react";
 import type { March } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import { LikeButton } from "./LikeButton";
 import { SaveButton } from "./SaveButton";
 
-export function MarchCard({ march }: { march: March }) {
+export const MarchCard = memo(function MarchCard({ march }: { march: March }) {
   const isPast = new Date(march.departAt).getTime() < Date.now();
 
   return (
-    <article className={`tap-card flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 ${isPast ? "opacity-70" : ""}`}>
+    <article className={`tap-card flex flex-col gap-3 rounded-3xl border border-zinc-200 bg-white p-5 ${isPast ? "opacity-70" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-zinc-900">{march.title}</h3>
         {isPast ? (
@@ -76,4 +77,4 @@ export function MarchCard({ march }: { march: March }) {
       </div>
     </article>
   );
-}
+});

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { memo } from "react";
 import { BadgeCheck, Clock3, MapPin, MessageCircle, Phone, ShieldQuestion } from "lucide-react";
 import type { AidPoint, AidPointType } from "@/lib/types";
 import { AID_POINT_TYPE_LABEL } from "@/lib/types";
@@ -17,11 +18,11 @@ const TYPE_EMOJI: Record<AidPointType, string> = {
   otro: "📦",
 };
 
-export function AidPointCard({ point }: { point: AidPoint }) {
+export const AidPointCard = memo(function AidPointCard({ point }: { point: AidPoint }) {
   return (
     <article
       className={cn(
-        "tap-card relative flex flex-col overflow-hidden rounded-2xl border bg-white",
+        "tap-card relative flex flex-col overflow-hidden rounded-3xl border bg-white",
         point.available ? "border-zinc-200" : "border-zinc-200 opacity-75",
       )}
     >
@@ -126,4 +127,4 @@ export function AidPointCard({ point }: { point: AidPoint }) {
       </div>
     </article>
   );
-}
+});

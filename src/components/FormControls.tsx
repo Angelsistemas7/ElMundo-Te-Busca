@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 // automático al enfocar el campo (el "acercamiento brusco" al abrir el teclado).
 // De sm en adelante vuelve a text-sm, más compacto para escritorio.
 const baseInput =
-  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:text-sm";
+  "w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-base text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:text-sm";
 
 export function Field({
   label,
@@ -27,11 +27,11 @@ export function Field({
     <div className="space-y-1">
       <label htmlFor={htmlFor} className="block text-sm font-medium text-zinc-700">
         {label}
-        {required && <span className="text-rose-500"> *</span>}
+        {required && <span className="text-danger-500"> *</span>}
       </label>
       {children}
       {hint && !error && <p className="text-xs text-zinc-400">{hint}</p>}
-      {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
+      {error && <p className="text-xs font-medium text-danger-600">{error}</p>}
     </div>
   );
 }

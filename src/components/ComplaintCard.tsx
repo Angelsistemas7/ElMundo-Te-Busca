@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { MapPin, MessageCircle } from "lucide-react";
 import type { Comment, Complaint, ComplaintCategory } from "@/lib/types";
 import { COMPLAINT_CATEGORY_EMOJI, COMPLAINT_CATEGORY_LABEL } from "@/lib/types";
@@ -19,15 +19,15 @@ const CATEGORY_STYLE: Record<ComplaintCategory, string> = {
   otra: "bg-zinc-100 text-zinc-700 border-zinc-200",
 };
 
-export function ComplaintCard({ complaint, comments }: { complaint: Complaint; comments: Comment[] }) {
+export const ComplaintCard = memo(function ComplaintCard({ complaint, comments }: { complaint: Complaint; comments: Comment[] }) {
   const [showComments, setShowComments] = useState(false);
   const sensitive = complaint.category === "riesgo_ninos" || complaint.category === "abuso_autoridad";
 
   return (
     <article
       className={cn(
-        "tap-card rounded-2xl border bg-white p-4 shadow-sm sm:p-5",
-        sensitive ? "border-rose-200" : "border-zinc-200",
+        "tap-card rounded-3xl border bg-white p-4 sm:p-5",
+        sensitive ? "border-danger-200" : "border-zinc-200",
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -84,4 +84,4 @@ export function ComplaintCard({ complaint, comments }: { complaint: Complaint; c
       )}
     </article>
   );
-}
+});
