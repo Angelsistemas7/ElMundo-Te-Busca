@@ -17,6 +17,7 @@ import { FaqAccordion } from "@/components/FaqAccordion";
 import { CommunityIllustration } from "@/components/illustrations/CommunityIllustration";
 import { HandsIllustration } from "@/components/illustrations/HandsIllustration";
 import { PageHeader } from "@/components/PageHeader";
+import { PullToRefresh } from "@/components/PullToRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -128,6 +129,7 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
   if (pageSize !== 10) currentParams.pageSize = String(pageSize);
 
   return (
+    <PullToRefresh>
     <div className="mx-auto max-w-2xl px-4 py-6">
       <CommunityTabs />
       <div className="mb-5 flex items-start justify-between gap-3">
@@ -281,5 +283,6 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }

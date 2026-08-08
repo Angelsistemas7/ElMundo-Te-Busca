@@ -27,6 +27,7 @@ import { FeaturedSections } from "@/components/FeaturedSections";
 import { EstadoChips } from "@/components/EstadoChips";
 import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { PageHeader } from "@/components/PageHeader";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { clampPageSize } from "@/lib/utils";
 // El aviso de "modo demostración" (DevModeNotice) ya se muestra en el home
 // (/) — no se repite en cada página.
@@ -124,6 +125,7 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
     : (result?.total ?? 0);
 
   return (
+    <PullToRefresh>
     <div className="mx-auto max-w-6xl px-4 py-6">
       <FieldVolunteerBar alreadyVolunteered={alreadyVolunteered} />
 
@@ -246,5 +248,6 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
         )}
       </div>
     </div>
+    </PullToRefresh>
   );
 }
