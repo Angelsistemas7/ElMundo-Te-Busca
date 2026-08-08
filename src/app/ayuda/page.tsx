@@ -1,4 +1,5 @@
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 import { HeartHandshake } from "lucide-react";
 import { getAidPointsPage, getCommentsForEntities, getHeroes, getNewsItems } from "@/lib/data";
 import { getRecentQuakes } from "@/lib/usgs";
@@ -6,7 +7,9 @@ import { isAdmin } from "@/lib/admin";
 import { AID_POINT_TYPE_LABEL, ESTADOS, type AidPointType } from "@/lib/types";
 import { cn, clampPageSize } from "@/lib/utils";
 import { AidPointCard } from "@/components/AidPointCard";
-import { RegisterAidPointButton } from "@/components/RegisterAidPointButton";
+const RegisterAidPointButton = nextDynamic(() =>
+  import("@/components/RegisterAidPointButton").then((m) => m.RegisterAidPointButton),
+);
 import { SwipeHintRow } from "@/components/SwipeHint";
 import { Pagination } from "@/components/Pagination";
 import { PageSizeSelect } from "@/components/PageSizeSelect";

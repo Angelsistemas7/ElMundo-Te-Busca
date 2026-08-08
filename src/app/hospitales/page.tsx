@@ -1,10 +1,13 @@
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 import { Building2 } from "lucide-react";
 import { getHospitals, getHospitalsPage, getPatientCounts, type HospitalSort } from "@/lib/data";
 import { ESTADOS, HOSPITAL_STATUS_LABEL, type HospitalStatus } from "@/lib/types";
 import { cn, clampPageSize } from "@/lib/utils";
 import { HospitalCard, HOSPITAL_STATUS_STYLE } from "@/components/HospitalCard";
-import { RegisterHospitalButton } from "@/components/RegisterHospitalButton";
+const RegisterHospitalButton = nextDynamic(() =>
+  import("@/components/RegisterHospitalButton").then((m) => m.RegisterHospitalButton),
+);
 import { Pagination } from "@/components/Pagination";
 import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { FilterModal, type FilterField } from "@/components/FilterModal";

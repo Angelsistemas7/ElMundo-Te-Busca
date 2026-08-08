@@ -1,3 +1,4 @@
+import nextDynamic from "next/dynamic";
 import { Search } from "lucide-react";
 import {
   getDashboardStats,
@@ -18,7 +19,9 @@ import { PersonGrid } from "@/components/PersonGrid";
 import { PersonGroups } from "@/components/PersonGroups";
 import { RecognizeDeck } from "@/components/RecognizeDeck";
 import { Pagination } from "@/components/Pagination";
-import { RegisterPersonButton } from "@/components/RegisterPersonButton";
+const RegisterPersonButton = nextDynamic(() =>
+  import("@/components/RegisterPersonButton").then((m) => m.RegisterPersonButton),
+);
 import { FieldVolunteerBar } from "@/components/FieldVolunteerBar";
 import { FeaturedSections } from "@/components/FeaturedSections";
 import { EstadoChips } from "@/components/EstadoChips";

@@ -1,9 +1,12 @@
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 import { MapPinned } from "lucide-react";
 import { getMarchesPage } from "@/lib/data";
 import { cn, clampPageSize } from "@/lib/utils";
 import { MarchCard } from "@/components/MarchCard";
-import { RegisterMarchButton } from "@/components/RegisterMarchButton";
+const RegisterMarchButton = nextDynamic(() =>
+  import("@/components/RegisterMarchButton").then((m) => m.RegisterMarchButton),
+);
 import { CommunityTabs } from "@/components/CommunityTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { Pagination } from "@/components/Pagination";

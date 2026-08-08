@@ -1,9 +1,12 @@
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 import { HandHeart, Mail, MapPin, Phone, Search } from "lucide-react";
 import { getVolunteersPage, type VolunteerSort } from "@/lib/data";
 import { ESTADOS, VOLUNTEER_TYPE_EMOJI, VOLUNTEER_TYPE_LABEL, type VolunteerType } from "@/lib/types";
 import { cn, clampPageSize, timeAgo } from "@/lib/utils";
-import { RegisterVolunteerButton } from "@/components/RegisterVolunteerButton";
+const RegisterVolunteerButton = nextDynamic(() =>
+  import("@/components/RegisterVolunteerButton").then((m) => m.RegisterVolunteerButton),
+);
 import { CommunityTabs } from "@/components/CommunityTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { Pagination } from "@/components/Pagination";

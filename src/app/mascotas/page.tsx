@@ -1,10 +1,13 @@
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 import { PawPrint, Search } from "lucide-react";
 import { getCommentsForEntities, getPets, type PetSort } from "@/lib/data";
 import { ESTADOS, PET_STATUS_EMOJI, PET_STATUS_LABEL, type PetStatus } from "@/lib/types";
 import { cn, clampPageSize } from "@/lib/utils";
 import { PetCard } from "@/components/PetCard";
-import { RegisterPetButton } from "@/components/RegisterPetButton";
+const RegisterPetButton = nextDynamic(() =>
+  import("@/components/RegisterPetButton").then((m) => m.RegisterPetButton),
+);
 import { EmptyState } from "@/components/EmptyState";
 import { SwipeHintRow } from "@/components/SwipeHint";
 import { Pagination } from "@/components/Pagination";
