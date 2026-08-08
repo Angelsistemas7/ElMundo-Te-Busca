@@ -15,6 +15,15 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { IconButton } from "./IconButton";
+
+// Vibración muy sutil al cambiar de sección (si el dispositivo la soporta).
+// Mejora progresiva: en iOS Safari `vibrate` no existe y no pasa nada.
+function tapHaptic() {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate(8);
+  }
+}
 
 // Barra inferior (solo móvil): 5 secciones clave de la emergencia con el pulgar
 // + un botón "Más" que abre una hoja con el resto. Más legible que apretar 8.
@@ -45,10 +54,15 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
+const TAB_COUNT = PRIMARY.length + 1; // + "Más"
+
 export function MobileNav() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreActive = MORE.some((t) => isActive(pathname, t.href));
+  const activeIndex = moreOpen || moreActive
+    ? PRIMARY.length
+    : Math.max(0, PRIMARY.findIndex((t) => isActive(pathname, t.href)));
 
   return (
     <>
@@ -58,14 +72,15 @@ export function MobileNav() {
           onClick={() => setMoreOpen(false)}
         >
           <div
-            className="animate-sheet absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-zinc-200 bg-white p-3 pb-24"
+            className="animate-sheet pb-safe absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-zinc-200 bg-white p-3 pb-20"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-2 flex items-center justify-between px-2">
+            <div className="sheet-handle" />
+            <div className="mb-2 mt-2 flex items-center justify-between px-2">
               <span className="text-sm font-bold text-navy-700">Más secciones</span>
-              <button onClick={() => setMoreOpen(false)} aria-label="Cerrar" className="press rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100">
+              <IconButton onClick={() => setMoreOpen(false)} aria-label="Cerrar" size="sm">
                 <X className="h-5 w-5" />
-              </button>
+              </IconButton>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {MORE.map(({ href, label, icon: Icon }) => {
@@ -76,7 +91,7 @@ export function MobileNav() {
                     href={href}
                     onClick={() => setMoreOpen(false)}
                     className={cn(
-                      "tap-card flex items-center gap-2.5 rounded-xl border px-3 py-3 text-sm font-medium",
+                      "tap-card flex items-center gap-2.5 rounded-2xl border px-3 py-3 text-sm font-medium",
                       active ? "border-navy-700 bg-navy-700 text-white" : "border-zinc-200 bg-white text-zinc-700",
                     )}
                   >
@@ -90,15 +105,27 @@ export function MobileNav() {
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur md:hidden">
-        <ul className="mx-auto flex max-w-md items-stretch justify-around">
+      <nav className="pb-safe-nav fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur md:hidden">
+        <ul className="relative mx-auto flex max-w-md items-stretch justify-around">
+          {/* Indicador que se desliza al cambiar de sección, en vez de solo
+              cambiar el color del texto. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute top-1 h-8 rounded-2xl bg-brand-50 transition-transform duration-300"
+            style={{
+              width: `${100 / TAB_COUNT}%`,
+              transform: `translateX(${activeIndex * 100}%)`,
+              transitionTimingFunction: "var(--ease-ios)",
+            }}
+          />
           {PRIMARY.map(({ href, label, icon: Icon }) => {
             const active = isActive(pathname, href);
             return (
-              <li key={href} className="min-w-0 flex-1">
+              <li key={href} className="relative min-w-0 flex-1">
                 <Link
                   href={href}
                   aria-current={active ? "page" : undefined}
+                  onClick={tapHaptic}
                   className={cn(
                     "press flex min-h-[3rem] flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium leading-none transition",
                     active ? "text-brand-700" : "text-zinc-500",
@@ -110,9 +137,12 @@ export function MobileNav() {
               </li>
             );
           })}
-          <li className="min-w-0 flex-1">
+          <li className="relative min-w-0 flex-1">
             <button
-              onClick={() => setMoreOpen((v) => !v)}
+              onClick={() => {
+                tapHaptic();
+                setMoreOpen((v) => !v);
+              }}
               aria-expanded={moreOpen}
               className={cn(
                 "press flex min-h-[3rem] w-full flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium leading-none transition",
