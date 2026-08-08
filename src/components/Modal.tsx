@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { IconButton } from "./IconButton";
+import { useDragDismiss } from "@/lib/useDragDismiss";
 
 export function Modal({
   open,
@@ -40,7 +42,7 @@ export function Modal({
     }
     if (!visible) return;
     setClosing(true);
-    const t = setTimeout(() => setVisible(false), 200);
+    const t = setTimeout(() => setVisible(false), 220);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -56,6 +58,8 @@ export function Modal({
     };
   }, [open, onClose]);
 
+  const { dragY, dragging, dragHandlers } = useDragDismiss(onClose);
+
   if (!visible || !mounted) return null;
 
   return createPortal(
@@ -69,27 +73,32 @@ export function Modal({
       {/* Un poco de aire a los 4 lados incluso en móvil (antes tocaba los
           bordes y el fondo de la pantalla). */}
       <div
-        className={`flex max-h-[85dvh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl sm:max-h-[88dvh] ${closing ? "animate-sheet-out" : "animate-sheet"}`}
+        className={`flex max-h-[85dvh] w-full max-w-lg flex-col rounded-t-3xl bg-white shadow-[var(--shadow-sheet)] sm:rounded-3xl sm:max-h-[88dvh] ${closing ? "animate-sheet-out" : "animate-sheet"}`}
         onClick={(e) => e.stopPropagation()}
+        style={{
+          transform: dragY ? `translateY(${dragY}px)` : undefined,
+          transition: dragging ? "none" : undefined,
+        }}
       >
+        {/* Manija de arrastre: solo visible/activa en móvil, tipo hoja iOS. */}
+        <div className="cursor-grab touch-none pb-1 sm:hidden" {...dragHandlers}>
+          <div className="sheet-handle" />
+        </div>
+
         <div className="flex items-start justify-between gap-4 border-b border-zinc-100 p-5">
           <div>
             <h2 className="text-lg font-bold text-zinc-900">{title}</h2>
             {subtitle && <p className="mt-0.5 text-sm text-zinc-500">{subtitle}</p>}
           </div>
-          <button
-            onClick={onClose}
-            className="press rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-            aria-label="Cerrar"
-          >
+          <IconButton onClick={onClose} aria-label="Cerrar" size="sm">
             <X className="h-5 w-5" />
-          </button>
+          </IconButton>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t border-zinc-100 p-4">
+          <div className="pb-safe flex items-center justify-end gap-3 border-t border-zinc-100 p-4">
             {footer}
           </div>
         )}
