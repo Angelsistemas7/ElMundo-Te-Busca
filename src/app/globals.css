@@ -38,9 +38,53 @@
   --color-gold-800: #7a481f;
   --color-gold-900: #543216;
 
+  /* Set semántico oficial: en vez de que cada componente improvise con
+     rose-500/emerald-500/amber-500/sky-500 sueltos, se declaran una vez y se
+     referencian como bg-success-500, text-danger-600, etc. Los tonos son los
+     mismos que ya circulaban por el código (no se inventa paleta nueva). */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-200: #a7f3d0;
+  --color-success-300: #6ee7b7;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-danger-50: #fff1f2;
+  --color-danger-100: #ffe4e6;
+  --color-danger-200: #fecdd3;
+  --color-danger-300: #fda4af;
+  --color-danger-500: #f43f5e;
+  --color-danger-600: #e11d48;
+  --color-danger-700: #be123c;
+  --color-info-50: #f0f9ff;
+  --color-info-100: #e0f2fe;
+  --color-info-200: #bae6fd;
+  --color-info-300: #7dd3fc;
+  --color-info-500: #0ea5e9;
+  --color-info-600: #0284c7;
+  --color-info-700: #0369a1;
+
   --font-sans: var(--font-figtree), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-heading: var(--font-signika), var(--font-sans);
+
+  /* Curva spring usada por Apple en hojas/paneles (UIKit). Sustituye el
+     ease-out genérico en las animaciones de hoja para que el cierre/apertura
+     se sienta "iOS" de verdad. */
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Sombras en capas (borde de luz difuso + contacto cercano), más suaves que
+     un shadow-2xl plano — el lenguaje "widget" de iOS. */
+  --shadow-widget: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -8px rgba(16, 24, 40, 0.12);
+  --shadow-widget-hover: 0 2px 4px rgba(16, 24, 40, 0.06), 0 16px 32px -12px rgba(16, 24, 40, 0.18);
+  --shadow-sheet: 0 -4px 24px rgba(16, 24, 40, 0.08), 0 -1px 2px rgba(16, 24, 40, 0.04);
 }
 
 :root {
@@ -191,6 +235,7 @@ h6 {
 /* Tarjeta interactiva: leve elevación al pasar el cursor (escritorio) y
    "presión" táctil al tocar (móvil). Mejora la sensación sin recargar nada. */
 .tap-card {
+  box-shadow: var(--shadow-widget);
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
@@ -200,7 +245,7 @@ h6 {
 @media (hover: hover) {
   .tap-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--shadow-widget-hover);
   }
 }
 .tap-card:active {
@@ -219,7 +264,7 @@ h6 {
   }
 }
 .animate-sheet {
-  animation: slide-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: slide-up 0.32s var(--ease-ios);
 }
 @keyframes backdrop-in {
   from {
@@ -254,7 +299,26 @@ h6 {
   }
 }
 .animate-sheet-out {
-  animation: slide-down 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: slide-down 0.22s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Manija de arrastre arriba de la hoja (look iOS: barra gris redondeada). */
+.sheet-handle {
+  width: 36px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--color-zinc-300, #d4d4d8);
+  margin: 8px auto 0;
+  flex-shrink: 0;
+}
+
+/* Relleno real para el borde inferior en iPhones con Face ID/Dynamic Island,
+   en vez de un padding fijo que deja hueco de más o de menos según el equipo. */
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+.pb-safe-nav {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Visor de fotos a pantalla completa: la imagen aparece con un leve "zoom". */
