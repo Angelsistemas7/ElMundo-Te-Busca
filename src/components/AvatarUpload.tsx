@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2, UserCircle2 } from "lucide-react";
 import { updateAvatarAction } from "@/app/actions";
@@ -63,8 +64,7 @@ export function AvatarUpload({ initialUrl }: { initialUrl: string | null }) {
         {busy ? (
           <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
         ) : url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt="" className="h-full w-full object-cover" />
+          <Image src={url} alt="" fill sizes="64px" className="object-cover" />
         ) : (
           <UserCircle2 className="h-10 w-10 text-zinc-400" />
         )}
