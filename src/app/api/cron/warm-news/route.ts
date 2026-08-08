@@ -9,6 +9,14 @@ import { getVerifiedNews, getWorldPress } from "@/lib/news";
 // script standalone calentaría la memoria de OTRO proceso que nadie lee.
 export async function GET(request: Request) {
   const expected = process.env.CRON_SECRET;
+
+  // En producción es obligatorio: este endpoint dispara traducción por OpenAI
+  // (de pago) además de consumir la cuota gratis de GNews (100/día), así que
+  // dejarlo abierto sin clave permite que cualquiera lo llame a lo loco.
+  if (!expected && process.env.NODE_ENV === "production") {
+    return NextResponse.json({ ok: false, error: "CRON_SECRET no configurado" }, { status: 500 });
+  }
+
   if (expected) {
     const provided = new URL(request.url).searchParams.get("secret");
     if (provided !== expected) {
