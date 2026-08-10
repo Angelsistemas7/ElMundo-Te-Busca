@@ -5,6 +5,38 @@ coordinar ayuda tras el **terremoto de Venezuela 2026**. En producción en
 `elmundotebusca.com` (VPS propio, Next.js + Supabase, deploy automático por
 GitHub Actions + PM2 en cada push a `main`). Español, `npm run build` siempre verde.
 
+## 📌 Continuación misma sesión (2026-08-10) — pulido iOS: transición hero + skeletons
+
+Seguido del pedido explícito "pulido tipo iOS: transiciones, fluidez,
+optimización". Se extendió lo ya empezado:
+- `HospitalCard`/`MarchCard` ahora navegan con `ViewTransitionLink`
+  (crossfade nativo, no morphea foto porque `Hospital`/`March` no tienen
+  `photoUrl` en `types.ts` — a diferencia de persona/ayuda/mascotas). Con
+  esto las 5 entidades con ficha propia (persona, ayuda, mascota, hospital,
+  caravana) usan la View Transitions API de forma consistente.
+- Nuevo `src/components/ListSkeletons.tsx` + `loading.tsx` propio en
+  `/ayuda`, `/hospitales`, `/caravanas`, `/mascotas`, `/se-busca`,
+  `/voluntarios`, `/denuncias`, `/comunidad` — antes esas 8 rutas caían en
+  el `loading.tsx` genérico de la raíz (solo un spinner, sin la forma de
+  la tarjeta real), lo que se sentía más "app nativa a medias" que iOS.
+  Sigue el mismo patrón que `HomeSkeletons.tsx` (ya existía solo para el
+  inicio).
+
+**Verificación**: `npm run typecheck` y `npm run build` en verde. La
+verificación visual en navegador quedó bloqueada por el mismo problema de
+entorno ya documentado abajo (migración SQL de `country` sin correr en el
+Supabase real conectado en `.env.local`, y sin salida a internet en este
+sandbox hacia GDELT) — **no es causado por este cambio**: se confirmó que
+hasta la portada (`/`), sin tocar, se queda igual de colgada en
+"Cargando…" en este entorno. Recomendado: probar visualmente cuando se
+corra la migración pendiente / desde un entorno con salida a internet
+normal.
+
+**Siguiente candidato de pulido** (no se llegó): revisar `FeaturedSections`/
+carruseles (`SwipeStaticRow`/`SwipeHintRow`) para inercia tipo iOS
+(`scroll-snap-type`), y animación de entrada (`animate-rise`) en las
+tarjetas fijadas/destacadas de Comunidad si no la tienen ya.
+
 ## 📌 Cierre de sesión (2026-08-10) — MULTI-PAÍS: leer esto primero
 
 El mismo día del terremoto de Colombia (M7,4, 10 ago. 2026, epicentro cerca
