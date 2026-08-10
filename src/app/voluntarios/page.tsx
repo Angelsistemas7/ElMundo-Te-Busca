@@ -15,6 +15,7 @@ import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { SwipeStaticRow } from "@/components/SwipeHint";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
 import { PageHeader } from "@/components/PageHeader";
+import { PullToRefresh } from "@/components/PullToRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,7 @@ export default async function VoluntariosPage({ searchParams }: { searchParams: 
   if (pageSize !== 10) currentParams.pageSize = String(pageSize);
 
   return (
+    <PullToRefresh>
     <div className="mx-auto max-w-3xl px-4 py-6">
       <CommunityTabs />
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -222,5 +224,6 @@ export default async function VoluntariosPage({ searchParams }: { searchParams: 
         <Pagination page={page} pageSize={pageSize} total={total} />
       </div>
     </div>
+    </PullToRefresh>
   );
 }

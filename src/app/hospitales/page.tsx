@@ -15,6 +15,7 @@ import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
 import { AyudaTabs } from "@/components/AyudaTabs";
 import { PageHeader } from "@/components/PageHeader";
+import { PullToRefresh } from "@/components/PullToRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,7 @@ export default async function HospitalesPage({ searchParams }: { searchParams: S
   if (pageSize !== 10) currentParams.pageSize = String(pageSize);
 
   return (
+    <PullToRefresh>
     <div className="mx-auto max-w-6xl px-4 py-6">
       <AyudaTabs />
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -146,5 +148,6 @@ export default async function HospitalesPage({ searchParams }: { searchParams: S
         </>
       )}
     </div>
+    </PullToRefresh>
   );
 }
