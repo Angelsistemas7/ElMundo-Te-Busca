@@ -5,6 +5,58 @@ coordinar ayuda tras el **terremoto de Venezuela 2026**. En producción en
 `elmundotebusca.com` (VPS propio, Next.js + Supabase, deploy automático por
 GitHub Actions + PM2 en cada push a `main`). Español, `npm run build` siempre verde.
 
+## 📌 Cierre de sesión (2026-08-10) — MULTI-PAÍS: leer esto primero
+
+El mismo día del terremoto de Colombia (M7,4, 10 ago. 2026, epicentro cerca
+de San José del Palmar, Chocó — Pereira y Cali las más afectadas), el dueño
+pidió arrancar la arquitectura multi-país que quedó anotada como "idea a
+futuro, NO construir todavía" en `docs/PLAN-TINDER-Y-ROLES.md` §4.4. Se
+decidió el modelo ahí planteado como pendiente: **un solo código y una sola
+base de datos**, con una columna `country` por tabla (no instancias
+separadas por país). Build y typecheck verdes en cada paso.
+
+**⚠️ Acción pendiente del dueño, antes de desplegar**: volver a correr
+`supabase/schema.sql` completo en el SQL Editor de Supabase (agrega la
+columna `country` a `persons`/`aid_points`/`posts`/`hospitals`, con
+`default 've'` — migración aditiva e idempotente, no borra nada). Sin esto,
+el sitio en producción sigue funcionando exactamente igual que antes (todo
+cae en 've' por el default), pero las consultas nuevas del código fallarán
+si Supabase real no tiene la columna. En memoria/demo no hace falta nada.
+
+**Lo que quedó funcionando** (ver `src/lib/countries.ts` como fuente única
+de verdad por país — regiones, coordenadas, datos del sismo con fuente,
+teléfono de emergencia, bbox de USGS):
+- Selector de banderas (`CountrySwitcher`) en la portada, cookie `emb_country`
+  (Server Action `setActiveCountryAction`, país siempre resuelto del lado del
+  servidor — nunca se confía en el país que mande un formulario del cliente).
+- Filtrado real por país (memoria + Supabase) en las 4 entidades núcleo:
+  personas, puntos de ayuda, posts de comunidad, hospitales — listados,
+  paginación, agrupaciones, dashboard, "recientemente localizados", mapa.
+- `/mapa` y `/emergencias` (este último pasó a `force-dynamic`, a propósito:
+  el teléfono único nacional SÍ cambia por país — 911 en Venezuela, 123 en
+  Colombia — y el costo de leer la cookie ahí es mínimo) muestran datos del
+  país activo.
+- Los 4 formularios de registro núcleo y sus paneles de gestión
+  (`OwnerManagePanel`, `PostManagePanel`, `AidPointManagePanel`) usan las
+  regiones del país correspondiente, no la lista fija de estados de Venezuela.
+
+**Lo que quedó PENDIENTE (a propósito, por alcance/tiempo — próxima ronda)**:
+- **Mascotas, Voluntarios, Caravanas, Denuncias, Héroes, Noticias curadas**:
+  sus tablas no tienen columna `country` todavía; todo lo existente y nuevo
+  cae en 've' implícito. Mismo patrón que las 4 entidades ya migradas —
+  replicar: columna en `schema.sql`, campo en `types.ts`, filtro en
+  `data.ts` (mem + Supabase), `country` en el formulario/Server Action.
+- **`src/lib/news.ts`** (GDELT/GNews/ReliefWeb/Google Noticias RSS) sigue
+  filtrando solo con `VE_TERMS` — las noticias/cifras de prensa en el inicio
+  y `/ayuda` siguen siendo de Venezuela aunque el país activo sea Colombia
+  (por eso el hero oculta esa fila y muestra en su lugar la cifra fuente de
+  `countries.ts` cuando el país no es 've' — ver `HomeHero.tsx`). Para
+  arreglarlo de raíz: parametrizar cada función de `news.ts` con el
+  `NewsConfig` que ya existe por país en `countries.ts` (`matchPattern`,
+  `searchQuery`, `gl`).
+- `getMarches()`/`getVolunteers()` (usados en `/mapa`) tampoco filtran por
+  país todavía — mismo motivo (sin columna `country` aún).
+
 ## 📌 Cierre de sesión (2026-07-10) — leer esto primero
 
 **La carpeta del proyecto se renombró** de `venezuelatebusca` a
