@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Image from "next/image";
 import { memo } from "react";
 import { MapPin, MessageCircle, Phone } from "lucide-react";
@@ -6,6 +5,7 @@ import type { Pet, PetStatus } from "@/lib/types";
 import { PET_SPECIES_LABEL, PET_STATUS_EMOJI, PET_STATUS_LABEL } from "@/lib/types";
 import { cn, timeAgo } from "@/lib/utils";
 import { SaveButton } from "./SaveButton";
+import { ViewTransitionLink } from "./ViewTransitionLink";
 
 const STATUS_STYLE: Record<PetStatus, string> = {
   perdida: "bg-rose-50 text-rose-700 border-rose-200",
@@ -18,7 +18,10 @@ export const PetCard = memo(function PetCard({ pet, commentCount }: { pet: Pet; 
   return (
     <article className="tap-card overflow-hidden rounded-3xl border border-zinc-200 bg-white">
       {pet.photoUrl ? (
-        <div className="relative h-44 w-full">
+        <div
+          className="relative h-44 w-full"
+          style={{ viewTransitionName: `pet-photo-${pet.id}` } as React.CSSProperties}
+        >
           <Image
             src={pet.photoUrl}
             alt={pet.name || "Mascota"}
@@ -79,13 +82,13 @@ export const PetCard = memo(function PetCard({ pet, commentCount }: { pet: Pet; 
               showLabel={false}
               className="border-0 px-1.5 py-1"
             />
-            <Link
+            <ViewTransitionLink
               href={`/mascotas/${pet.id}`}
               className="press flex items-center gap-1.5 text-sm font-medium text-zinc-600 transition hover:text-zinc-900"
             >
               <MessageCircle className="h-4 w-4" />
               {commentCount > 0 ? `${commentCount}` : "Ver y comentar"}
-            </Link>
+            </ViewTransitionLink>
           </div>
         </div>
       </div>

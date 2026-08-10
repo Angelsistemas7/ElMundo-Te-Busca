@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Image from "next/image";
 import { memo } from "react";
 import { BadgeCheck, Clock3, MapPin, MessageCircle, Phone, ShieldQuestion } from "lucide-react";
@@ -8,6 +7,7 @@ import { cn, timeAgo } from "@/lib/utils";
 import { AidConsensusVote } from "./AidConsensusVote";
 import { LikeButton } from "./LikeButton";
 import { SaveButton } from "./SaveButton";
+import { ViewTransitionLink } from "./ViewTransitionLink";
 
 const TYPE_EMOJI: Record<AidPointType, string> = {
   comida: "🍲",
@@ -33,7 +33,10 @@ export const AidPointCard = memo(function AidPointCard({ point }: { point: AidPo
         </div>
       )}
       {point.photoUrl ? (
-        <div className="relative h-40 w-full">
+        <div
+          className="relative h-40 w-full"
+          style={{ viewTransitionName: `aid-photo-${point.id}` } as React.CSSProperties}
+        >
           <Image
             src={point.photoUrl}
             alt={point.name}
@@ -124,13 +127,13 @@ export const AidPointCard = memo(function AidPointCard({ point }: { point: AidPo
             <LikeButton kind="aid" id={point.id} likes={point.likes} />
             <SaveButton type="aid_point" id={point.id} title={point.name} showLabel={false} />
           </div>
-          <Link
+          <ViewTransitionLink
             href={`/ayuda/${point.id}`}
             className="press flex items-center gap-1.5 text-sm font-medium text-zinc-600 transition hover:text-zinc-900"
           >
             <MessageCircle className="h-4 w-4" />
             Ver y comentar
-          </Link>
+          </ViewTransitionLink>
         </div>
       </div>
     </article>

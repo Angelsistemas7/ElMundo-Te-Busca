@@ -31,7 +31,10 @@ export default async function PetPage({ params }: { params: Promise<{ id: string
 
       <article className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
         {pet.photoUrl ? (
-          <div className="relative h-72 w-full">
+          <div
+            className="relative h-72 w-full"
+            style={{ viewTransitionName: `pet-photo-${pet.id}` } as React.CSSProperties}
+          >
             <Image
               src={pet.photoUrl}
               alt={pet.name || "Mascota"}

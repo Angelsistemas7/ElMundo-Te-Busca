@@ -27,7 +27,10 @@ export default async function AidPointPage({ params }: { params: Promise<{ id: s
 
       <article className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
         {point.photoUrl && (
-          <div className="relative h-72 w-full">
+          <div
+            className="relative h-72 w-full"
+            style={{ viewTransitionName: `aid-photo-${point.id}` } as React.CSSProperties}
+          >
             <Image
               src={point.photoUrl}
               alt={point.name}
