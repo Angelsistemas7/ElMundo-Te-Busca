@@ -19,7 +19,7 @@ export function RecentlyLocated({ persons }: { persons: Person[] }) {
       </p>
       {/* Una sola fila que se desliza de lado — antes era una cuadrícula que se
           partía en 1/2/3 columnas (varias filas) según el tamaño de pantalla. */}
-      <ul className="no-scrollbar mt-3 flex snap-x gap-2 overflow-x-auto pb-1">
+      <ul className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-smooth pb-1">
         {persons.map((p) => {
           const name = `${p.firstName} ${p.lastName}`.trim() || "Persona sin identificar";
           const hospital = p.status === "hospitalizado";

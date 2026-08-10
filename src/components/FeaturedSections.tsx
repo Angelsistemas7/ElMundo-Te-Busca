@@ -104,7 +104,7 @@ async function Section({ def, country }: { def: SectionDef; country: string }) {
       </div>
       {/* Carrusel horizontal: ~2 tarjetas visibles en móvil; el resto se ve
           deslizando hacia la derecha. "Ver todos" lleva al listado completo. */}
-      <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+      <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-1 sm:mx-0 sm:px-0">
         {items.map((person) => (
           <div
             key={person.id}

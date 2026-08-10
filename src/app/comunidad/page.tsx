@@ -242,7 +242,7 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
                   </span>
                 )}
               </h2>
-              <SwipeStaticRow className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
+              <SwipeStaticRow className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-1">
                 {withComments(pinned).map((post) => (
                   <PinnedPostCard key={post.id} post={post} comments={post.comments} tone="red" />
                 ))}
