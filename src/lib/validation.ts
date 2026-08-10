@@ -1,10 +1,14 @@
 import { z } from "zod";
-import { ESTADOS } from "./types";
+import { ALL_REGIONS, COUNTRY_CODES } from "./countries";
 
 // Validación compartida por formularios (cliente) y acciones de servidor.
 // Mantener aquí evita que datos basura entren a la base de datos.
 
-const estadoEnum = z.enum(ESTADOS);
+// Unión de las regiones (estados/departamentos) de TODOS los países activos:
+// sigue siendo un enum cerrado (no texto libre), solo que ahora cubre varios
+// países en vez de solo los 24 estados de Venezuela. Ver `countries.ts`.
+const estadoEnum = z.enum(ALL_REGIONS as [string, ...string[]]);
+const countryEnum = z.enum(COUNTRY_CODES);
 
 const phone = z
   .string()
@@ -61,6 +65,7 @@ export function isSafePhotoUrl(url: string): boolean {
 
 export const personSchema = z
   .object({
+    country: countryEnum.optional(),
     // El nombre es obligatorio solo si SE SABE quién es la persona. En un
     // avistamiento de alguien "sin identificar" puede no conocerse (ver refine).
     firstName: z.string().trim().max(80).optional().or(z.literal("")),
@@ -117,6 +122,7 @@ export const statusReportSchema = z.object({
 export type StatusReportInput = z.infer<typeof statusReportSchema>;
 
 export const aidPointSchema = z.object({
+  country: countryEnum.optional(),
   name: z.string().trim().min(2, "Nombre del punto obligatorio").max(120),
   types: z
     .array(z.enum(["comida", "agua", "medicina", "refugio", "alojamiento", "ropa", "otro"]))
@@ -153,6 +159,7 @@ export const marchSchema = z.object({
 export type MarchInput = z.infer<typeof marchSchema>;
 
 export const postSchema = z.object({
+  country: countryEnum.optional(),
   type: z.enum(["necesito", "ofrezco", "rescate", "medico", "caravana", "identificar", "info"]),
   body: z.string().trim().min(5, "Escribe tu mensaje (mín. 5 caracteres)").max(1500),
   estado: estadoEnum.optional(),
@@ -165,6 +172,7 @@ export const postSchema = z.object({
 export type PostInput = z.infer<typeof postSchema>;
 
 export const hospitalSchema = z.object({
+  country: countryEnum.optional(),
   name: z.string().trim().min(2, "Nombre del hospital obligatorio").max(140),
   estado: estadoEnum.optional(),
   locationText: z.string().trim().max(160).optional().or(z.literal("")),

@@ -20,7 +20,12 @@ export const PERSON_STATUS_LABEL: Record<PersonStatus, string> = {
   fallecido: "Confirmado sin vida",
 };
 
-/** Estados de Venezuela más afectados (lista completa del país). */
+/** Código de país activo en la plataforma. Ver `countries.ts` para su configuración completa. */
+export type Country = "ve" | "co";
+
+/** Estados de Venezuela (lista completa del país). Se mantiene por compatibilidad
+ *  (dropdowns/seed de VE); para el resto de países usa `COUNTRIES[code].regions`
+ *  en `countries.ts`. */
 export const ESTADOS = [
   "Amazonas",
   "Anzoátegui",
@@ -48,7 +53,13 @@ export const ESTADOS = [
   "Zulia",
 ] as const;
 
-export type Estado = (typeof ESTADOS)[number];
+/**
+ * Región administrativa de primer nivel (estado/departamento). Antes era una
+ * unión estricta de los 24 estados de Venezuela; ahora que la plataforma sirve
+ * varios países, es texto libre validado por país contra `COUNTRIES[code].regions`
+ * (ver `validation.ts`) en vez de un enum fijo a nivel de tipo.
+ */
+export type Estado = string;
 
 /** Reacciones de la comunidad a la ficha de una persona. */
 export type PersonReaction = "fuerza" | "corazon" | "difundir";
@@ -67,6 +78,8 @@ export const PERSON_REACTION_LABEL: Record<PersonReaction, string> = {
 
 export interface Person {
   id: string;
+  /** País/instancia de desastre al que pertenece el registro. Ausente = 've' (Venezuela). */
+  country?: Country;
   firstName: string;
   lastName: string;
   cedula: string | null;
@@ -139,6 +152,8 @@ export const AID_POINT_TYPE_LABEL: Record<AidPointType, string> = {
 /** Punto físico de ayuda: donatón de comida, refugio, agua, etc. */
 export interface AidPoint {
   id: string;
+  /** País/instancia de desastre al que pertenece el registro. Ausente = 've' (Venezuela). */
+  country?: Country;
   name: string;
   /** Un mismo punto puede ofrecer varios recursos a la vez. */
   types: AidPointType[];
@@ -249,6 +264,8 @@ export type PostModerationStatus = "pending" | "approved" | "rejected";
 
 export interface Post {
   id: string;
+  /** País/instancia de desastre al que pertenece el registro. Ausente = 've' (Venezuela). */
+  country?: Country;
   type: PostType;
   body: string;
   estado: Estado | null;
@@ -284,6 +301,8 @@ export const HOSPITAL_STATUS_LABEL: Record<HospitalStatus, string> = {
 
 export interface Hospital {
   id: string;
+  /** País/instancia de desastre al que pertenece el registro. Ausente = 've' (Venezuela). */
+  country?: Country;
   name: string;
   estado: Estado | null;
   locationText: string;

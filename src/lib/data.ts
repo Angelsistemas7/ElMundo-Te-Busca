@@ -74,6 +74,8 @@ import { isSafePhotoUrl } from "./validation";
 export type PersonSort = "recent" | "name" | "estado";
 
 export interface PersonQuery {
+  /** País/instancia de desastre activo. Ausente = 've' (Venezuela, compatibilidad). */
+  country?: string;
   search?: string;
   status?: PersonStatus | "all";
   estado?: string | "all";
@@ -164,6 +166,7 @@ async function deleteStoragePhoto(url: string | null | undefined): Promise<void>
 function rowToPerson(r: any): Person {
   return {
     id: r.id,
+    country: r.country ?? "ve",
     firstName: r.first_name,
     lastName: r.last_name ?? "",
     cedula: r.cedula,
@@ -208,7 +211,8 @@ function rowToReport(r: any): StatusReport {
 function queryMemoryPersons(q: PersonQuery): PersonResult {
   const page = q.page ?? 1;
   const pageSize = q.pageSize ?? 24;
-  let items = mem.persons.slice();
+  const country = q.country ?? "ve";
+  let items = mem.persons.filter((p) => (p.country ?? "ve") === country);
 
   if (q.unidentifiedOnly) items = items.filter((p) => p.isUnidentified);
   if (q.excludeUnidentified) items = items.filter((p) => !p.isUnidentified);
@@ -257,7 +261,7 @@ export async function getPersons(q: PersonQuery = {}): Promise<PersonResult> {
 
   const page = q.page ?? 1;
   const pageSize = q.pageSize ?? 24;
-  let query = sb.from("persons").select("*", { count: "exact" });
+  let query = sb.from("persons").select("*", { count: "exact" }).eq("country", q.country ?? "ve");
 
   if (q.unidentifiedOnly) query = query.eq("is_unidentified", true);
   if (q.excludeUnidentified) query = query.eq("is_unidentified", false);
@@ -398,10 +402,13 @@ export interface DashboardStats {
 export const getDashboardStats = unstable_cache(getDashboardStatsImpl, ["dashboard-stats"], {
   revalidate: 60,
 });
-async function getDashboardStatsImpl(): Promise<DashboardStats> {
+// NOTA: `denuncias`/`voluntarios` aún no tienen columna `country` (pendiente
+// de una próxima ronda) — esos dos conteos siguen siendo globales entre
+// países por ahora; el resto (personas, "necesito ayuda") ya está filtrado.
+async function getDashboardStatsImpl(country = "ve"): Promise<DashboardStats> {
   const sb = getSupabase();
   if (!sb) {
-    const p = mem.persons;
+    const p = mem.persons.filter((x) => (x.country ?? "ve") === country);
     return {
       registered: p.length,
       desaparecidos: p.filter((x) => x.status === "por_localizar").length,
@@ -410,17 +417,17 @@ async function getDashboardStatsImpl(): Promise<DashboardStats> {
       fallecidos: p.filter((x) => x.status === "fallecido").length,
       ninos: p.filter((x) => x.age != null && x.age < 18).length,
       denuncias: mem.complaints.length,
-      necesidades: mem.posts.filter((x) => x.type === "necesito").length,
+      necesidades: mem.posts.filter((x) => (x.country ?? "ve") === country && x.type === "necesito").length,
       voluntarios: mem.volunteers.length,
     };
   }
-  const { data: persons } = await sb.from("persons").select("status,age");
+  const { data: persons } = await sb.from("persons").select("status,age").eq("country", country);
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const rows = (persons ?? []) as any[];
   const tally = (s: string) => rows.filter((r) => r.status === s).length;
   const [{ count: denuncias }, { count: necesidades }, { count: voluntarios }] = await Promise.all([
     sb.from("complaints").select("*", { count: "exact", head: true }),
-    sb.from("posts").select("*", { count: "exact", head: true }).eq("type", "necesito"),
+    sb.from("posts").select("*", { count: "exact", head: true }).eq("type", "necesito").eq("country", country),
     sb.from("volunteers").select("*", { count: "exact", head: true }),
   ]);
   return {
@@ -443,17 +450,18 @@ async function getDashboardStatsImpl(): Promise<DashboardStats> {
 export const getRecentlyLocated = unstable_cache(getRecentlyLocatedImpl, ["recently-located"], {
   revalidate: 60,
 });
-async function getRecentlyLocatedImpl(limit = 12): Promise<Person[]> {
+async function getRecentlyLocatedImpl(limit = 12, country = "ve"): Promise<Person[]> {
   const sb = getSupabase();
   if (!sb) {
     return mem.persons
-      .filter((p) => p.status === "localizado" || p.status === "hospitalizado")
+      .filter((p) => (p.country ?? "ve") === country && (p.status === "localizado" || p.status === "hospitalizado"))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .slice(0, limit);
   }
   const { data, error } = await sb
     .from("persons")
     .select("*")
+    .eq("country", country)
     .in("status", ["localizado", "hospitalizado"])
     .order("updated_at", { ascending: false })
     .limit(limit);
@@ -487,16 +495,17 @@ export const getFeaturedPersons = unstable_cache(
  * diferencia de las alertas de rescate, un retraso corto aquí es aceptable.
  */
 export const getPersonsWithLocation = unstable_cache(
-  async (limit = 200): Promise<Person[]> => {
+  async (limit = 200, country = "ve"): Promise<Person[]> => {
     const sb = getSupabase();
     if (!sb) {
       return mem.persons
-        .filter((p) => p.lat != null && p.lng != null)
+        .filter((p) => (p.country ?? "ve") === country && p.lat != null && p.lng != null)
         .slice(0, limit);
     }
     const { data, error } = await sb
       .from("persons")
       .select("*")
+      .eq("country", country)
       .not("lat", "is", null)
       .not("lng", "is", null)
       .order("created_at", { ascending: false })
@@ -534,9 +543,12 @@ export async function createPerson(
       : "localizado"
     : "por_localizar";
 
+  const country = input.country ?? "ve";
+
   if (!sb) {
     const person: Person = {
       id: uid("person"),
+      country,
       firstName,
       lastName: input.lastName || "",
       cedula: input.cedula || null,
@@ -567,6 +579,7 @@ export async function createPerson(
   const { data, error } = await sb
     .from("persons")
     .insert({
+      country,
       first_name: firstName,
       last_name: input.lastName || "",
       cedula: input.cedula || null,
@@ -1044,40 +1057,27 @@ export async function removeAppRole(userId: string, role: AppRole): Promise<void
 
 // ── Puntos de ayuda ─────────────────────────────────────────────────────────
 export const getAidPoints = unstable_cache(getAidPointsImpl, ["aid-points"], { revalidate: 60 });
-async function getAidPointsImpl(): Promise<AidPoint[]> {
+async function getAidPointsImpl(country = "ve"): Promise<AidPoint[]> {
   const sb = getSupabase();
-  if (!sb) return mem.aidPoints.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const { data, error } = await sb.from("aid_points").select("*").order("created_at", { ascending: false });
+  if (!sb)
+    return mem.aidPoints
+      .filter((p) => (p.country ?? "ve") === country)
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const { data, error } = await sb
+    .from("aid_points")
+    .select("*")
+    .eq("country", country)
+    .order("created_at", { ascending: false });
   if (error) throw error;
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  return (data ?? []).map((r: any) => ({
-    id: r.id,
-    name: r.name,
-    types: r.types ?? (r.type ? [r.type] : []),
-    estado: r.estado,
-    locationText: r.location_text,
-    lat: r.lat ?? null,
-    lng: r.lng ?? null,
-    scheduleText: r.schedule_text ?? "",
-    description: r.description ?? "",
-    photoUrl: r.photo_url,
-    contactName: r.contact_name,
-    contactPhone: r.contact_phone,
-    verified: r.verified,
-    available: r.available ?? true,
-    votesAvailable: r.votes_available ?? 0,
-    votesDepleted: r.votes_depleted ?? 0,
-    likes: r.likes ?? 0,
-    updatedAt: r.updated_at ?? r.created_at,
-    createdAt: r.created_at,
-  }));
-  /* eslint-enable @typescript-eslint/no-explicit-any */
+  return (data ?? []).map(rowToAidPoint);
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function rowToAidPoint(r: any): AidPoint {
   return {
     id: r.id,
+    country: r.country ?? "ve",
     name: r.name,
     types: r.types ?? (r.type ? [r.type] : []),
     estado: r.estado,
@@ -1124,6 +1124,7 @@ export interface AidPointResult {
  */
 export async function getAidPointsPage(
   filter: {
+    country?: string;
     type?: AidPointType | "all";
     availOnly?: boolean;
     estado?: string | "all";
@@ -1133,9 +1134,10 @@ export async function getAidPointsPage(
   page = 1,
   pageSize = 10,
 ): Promise<AidPointResult> {
+  const country = filter.country ?? "ve";
   const sb = getSupabase();
   if (!sb) {
-    let items = mem.aidPoints.slice();
+    let items = mem.aidPoints.filter((p) => (p.country ?? "ve") === country);
     if (filter.type && filter.type !== "all") {
       const t = filter.type;
       items = items.filter((p) => p.types.includes(t));
@@ -1149,7 +1151,11 @@ export async function getAidPointsPage(
     const start = (page - 1) * pageSize;
     return { items: items.slice(start, start + pageSize), total, page, pageSize };
   }
-  let query = sb.from("aid_points").select("*", { count: "exact" }).order("created_at", { ascending: false });
+  let query = sb
+    .from("aid_points")
+    .select("*", { count: "exact" })
+    .eq("country", country)
+    .order("created_at", { ascending: false });
   if (filter.type && filter.type !== "all") query = query.contains("types", [filter.type]);
   if (filter.availOnly) query = query.eq("available", true);
   if (filter.estado && filter.estado !== "all") query = query.eq("estado", filter.estado);
@@ -1177,9 +1183,11 @@ export async function createAidPoint(
   const now = new Date().toISOString();
   const ownerToken = newToken();
   const sb = getSupabaseAdmin() ?? getSupabase();
+  const country = input.country ?? "ve";
   if (!sb) {
     const point: AidPoint = {
       id: uid("aid"),
+      country,
       name: input.name,
       types: input.types,
       estado: input.estado ?? null,
@@ -1206,6 +1214,7 @@ export async function createAidPoint(
   const { data, error } = await sb
     .from("aid_points")
     .insert({
+      country,
       name: input.name,
       types: input.types,
       estado: input.estado ?? null,
@@ -1983,16 +1992,17 @@ export const getCountsByEstado = unstable_cache(
   ["counts-by-estado"],
   { revalidate: 60 },
 );
-async function getCountsByEstadoImpl(): Promise<Record<string, number>> {
+async function getCountsByEstadoImpl(country = "ve"): Promise<Record<string, number>> {
   const sb = getSupabase();
   if (!sb) {
     const counts: Record<string, number> = {};
     for (const p of mem.persons) {
+      if ((p.country ?? "ve") !== country) continue;
       if (p.estado) counts[p.estado] = (counts[p.estado] ?? 0) + 1;
     }
     return counts;
   }
-  const { data, error } = await sb.from("persons").select("estado");
+  const { data, error } = await sb.from("persons").select("estado").eq("country", country);
   if (error) throw error;
   const counts: Record<string, number> = {};
   for (const r of data ?? []) {
@@ -2006,6 +2016,7 @@ async function getCountsByEstadoImpl(): Promise<Record<string, number>> {
 function rowToPost(r: any): Post {
   return {
     id: r.id,
+    country: r.country ?? "ve",
     type: r.type,
     body: r.body,
     estado: r.estado,
@@ -2024,13 +2035,20 @@ function rowToPost(r: any): Post {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export async function getPosts(
-  filter: { type?: PostType | "all"; estado?: string | "all"; search?: string; pinnedOnly?: boolean } = {},
+  filter: {
+    country?: string;
+    type?: PostType | "all";
+    estado?: string | "all";
+    search?: string;
+    pinnedOnly?: boolean;
+  } = {},
 ): Promise<Post[]> {
+  const country = filter.country ?? "ve";
   const sb = getSupabase();
   if (!sb) {
     // Lo importado por hashtag (Bluesky/Mastodon) nace "pending": nunca se ve
     // en el muro hasta que un moderador le da el visto bueno en /admin.
-    let items = mem.posts.filter((p) => p.moderationStatus !== "pending");
+    let items = mem.posts.filter((p) => (p.country ?? "ve") === country && p.moderationStatus !== "pending");
     if (filter.type && filter.type !== "all") items = items.filter((p) => p.type === filter.type);
     if (filter.estado && filter.estado !== "all")
       items = items.filter((p) => p.estado === filter.estado);
@@ -2050,6 +2068,7 @@ export async function getPosts(
   let query = sb
     .from("posts")
     .select("*")
+    .eq("country", country)
     .neq("moderation_status", "pending")
     .order("created_at", { ascending: false })
     .limit(100);
@@ -2096,6 +2115,7 @@ function postPopularity(p: Post): number {
  */
 export async function getPostsPage(
   filter: {
+    country?: string;
     type?: PostType | "all";
     search?: string;
     estado?: string | "all";
@@ -2106,9 +2126,10 @@ export async function getPostsPage(
   pageSize = 20,
   sort: PostSort = "recent",
 ): Promise<PostResult> {
+  const country = filter.country ?? "ve";
   const sb = getSupabase();
   if (!sb) {
-    let items = mem.posts.filter((p) => p.moderationStatus !== "pending");
+    let items = mem.posts.filter((p) => (p.country ?? "ve") === country && p.moderationStatus !== "pending");
     if (filter.type && filter.type !== "all") items = items.filter((p) => p.type === filter.type);
     if (filter.estado && filter.estado !== "all") items = items.filter((p) => p.estado === filter.estado);
     if (filter.dateFrom) items = items.filter((p) => p.createdAt >= filter.dateFrom!);
@@ -2131,7 +2152,11 @@ export async function getPostsPage(
     const start = (page - 1) * pageSize;
     return { items: items.slice(start, start + pageSize), total, page, pageSize };
   }
-  let query = sb.from("posts").select("*", { count: "exact" }).neq("moderation_status", "pending");
+  let query = sb
+    .from("posts")
+    .select("*", { count: "exact" })
+    .eq("country", country)
+    .neq("moderation_status", "pending");
   query =
     sort === "oldest"
       ? query.order("created_at", { ascending: true })
@@ -2164,7 +2189,7 @@ export async function getPostsPage(
  * siguen consultando en vivo (ver getPosts en mapa/page.tsx).
  */
 export const getMapPosts = unstable_cache(
-  async (type: "necesito" | "ofrezco"): Promise<Post[]> => getPosts({ type }),
+  async (type: "necesito" | "ofrezco", country = "ve"): Promise<Post[]> => getPosts({ type, country }),
   ["map-posts"],
   { revalidate: 60 },
 );
@@ -2233,9 +2258,11 @@ export async function createPost(
   const now = new Date().toISOString();
   const ownerToken = newToken();
   const sb = getSupabaseAdmin() ?? getSupabase();
+  const country = input.country ?? "ve";
   if (!sb) {
     const post: Post = {
       id: uid("post"),
+      country,
       type: input.type,
       body: input.body,
       estado: input.estado ?? null,
@@ -2255,6 +2282,7 @@ export async function createPost(
   const { data, error } = await sb
     .from("posts")
     .insert({
+      country,
       type: input.type,
       body: input.body,
       estado: input.estado ?? null,
@@ -3330,6 +3358,7 @@ export async function deleteNewsItem(id: string): Promise<void> {
 function rowToHospital(r: any): Hospital {
   return {
     id: r.id,
+    country: r.country ?? "ve",
     name: r.name,
     estado: r.estado,
     locationText: r.location_text ?? "",
@@ -3370,10 +3399,14 @@ function splitSpecialties(s: string | undefined): string[] {
 }
 
 export const getHospitals = unstable_cache(getHospitalsImpl, ["hospitals"], { revalidate: 60 });
-async function getHospitalsImpl(): Promise<Hospital[]> {
+async function getHospitalsImpl(country = "ve"): Promise<Hospital[]> {
   const sb = getSupabase();
-  if (!sb) return mem.hospitals.slice().sort((a, b) => a.name.localeCompare(b.name));
-  const { data, error } = await sb.from("hospitals").select("*").order("name");
+  if (!sb)
+    return mem.hospitals
+      .filter((h) => (h.country ?? "ve") === country)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
+  const { data, error } = await sb.from("hospitals").select("*").eq("country", country).order("name");
   if (error) throw error;
   return (data ?? []).map(rowToHospital);
 }
@@ -3393,6 +3426,7 @@ export interface HospitalResult {
 // intacta para `/mapa` y `/admin`.
 export async function getHospitalsPage(
   filter: {
+    country?: string;
     status?: HospitalStatus;
     estado?: string | "all";
     dateFrom?: string;
@@ -3402,9 +3436,10 @@ export async function getHospitalsPage(
   pageSize = 10,
   sort: HospitalSort = "name",
 ): Promise<HospitalResult> {
+  const country = filter.country ?? "ve";
   const sb = getSupabase();
   if (!sb) {
-    let items = mem.hospitals.slice();
+    let items = mem.hospitals.filter((h) => (h.country ?? "ve") === country);
     if (filter.status) items = items.filter((h) => h.status === filter.status);
     if (filter.estado && filter.estado !== "all") items = items.filter((h) => h.estado === filter.estado);
     if (filter.dateFrom) items = items.filter((h) => h.createdAt >= filter.dateFrom!);
@@ -3419,7 +3454,7 @@ export async function getHospitalsPage(
     const start = (page - 1) * pageSize;
     return { items: items.slice(start, start + pageSize), total, page, pageSize };
   }
-  let query = sb.from("hospitals").select("*", { count: "exact" });
+  let query = sb.from("hospitals").select("*", { count: "exact" }).eq("country", country);
   query =
     sort === "recent"
       ? query.order("created_at", { ascending: false })
@@ -3451,9 +3486,11 @@ export async function createHospital(
   const now = new Date().toISOString();
   const specialties = splitSpecialties(input.specialties);
   const sb = getSupabaseAdmin() ?? getSupabase();
+  const country = input.country ?? "ve";
   if (!sb) {
     const hospital: Hospital = {
       id: uid("hosp"),
+      country,
       name: input.name,
       estado: input.estado ?? null,
       locationText: input.locationText || "",
@@ -3477,6 +3514,7 @@ export async function createHospital(
   const { data, error } = await sb
     .from("hospitals")
     .insert({
+      country,
       name: input.name,
       estado: input.estado ?? null,
       location_text: input.locationText || "",

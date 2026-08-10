@@ -1,38 +1,20 @@
 // Coordenadas aproximadas para ubicar registros en el mapa. No pretende ser
 // catastral: sirve para visualizar concentraciones y puntos de ayuda. Cuando
 // haya datos con lat/lng reales, se usarán esos en su lugar.
+//
+// Los datos por país (regiones, epicentro, info del sismo) viven en
+// `countries.ts`; este módulo mantiene los nombres históricos (`ESTADO_COORDS`,
+// `EPICENTER`, `QUAKE_INFO`) apuntando a Venezuela por compatibilidad con el
+// código existente, y añade `geocodeFor`/`getCountryGeo` para el resto de países.
+
+import { COUNTRIES, DEFAULT_COUNTRY, getCountry, type CountryCode } from "./countries";
 
 export type LatLng = [number, number];
 
-// Centroides aproximados de los estados de Venezuela.
-export const ESTADO_COORDS: Record<string, LatLng> = {
-  Amazonas: [4.0, -65.5],
-  Anzoátegui: [9.3, -64.4],
-  Apure: [7.0, -68.5],
-  Aragua: [10.2, -67.4],
-  Barinas: [8.6, -70.2],
-  Bolívar: [6.0, -63.0],
-  Carabobo: [10.2, -68.0],
-  Cojedes: [9.4, -68.4],
-  "Delta Amacuro": [9.0, -61.3],
-  "Distrito Capital": [10.5, -66.92],
-  Falcón: [11.2, -69.8],
-  Guárico: [9.0, -66.5],
-  "La Guaira": [10.6, -66.93],
-  Lara: [10.0, -69.8],
-  Mérida: [8.6, -71.1],
-  Miranda: [10.2, -66.4],
-  Monagas: [9.5, -63.0],
-  "Nueva Esparta": [11.0, -63.9],
-  Portuguesa: [9.0, -69.7],
-  Sucre: [10.45, -63.5],
-  Táchira: [7.8, -72.2],
-  Trujillo: [9.3, -70.4],
-  Yaracuy: [10.3, -68.8],
-  Zulia: [10.0, -72.0],
-};
-
-// Sectores conocidos (sobre todo de La Guaira, la zona más afectada).
+// Sectores conocidos (sobre todo de La Guaira, la zona más afectada de VE).
+// El texto libre de ubicación no está atado a un país: si el texto menciona un
+// sector conocido, se usa sin importar el país activo (p. ej. puntos de
+// acopio en el exterior).
 export const SECTOR_COORDS: Record<string, LatLng> = {
   macuto: [10.601, -66.888],
   "catia la mar": [10.595, -67.025],
@@ -56,7 +38,7 @@ export const SECTOR_COORDS: Record<string, LatLng> = {
   caracas: [10.5, -66.92],
   "el junquito": [10.435, -67.05],
   junquito: [10.435, -67.05],
-  "catia": [10.52, -66.93],
+  catia: [10.52, -66.93],
   petare: [10.47, -66.8],
   guarenas: [10.47, -66.61],
   guatire: [10.47, -66.54],
@@ -65,6 +47,13 @@ export const SECTOR_COORDS: Record<string, LatLng> = {
   maracay: [10.25, -67.6],
   valencia: [10.17, -68.0],
   "la floresta": [10.25, -67.59],
+  // Sismo de Colombia (10 ago. 2026): zona del epicentro y ciudades más afectadas.
+  "san josé del palmar": [4.98, -76.24],
+  "san jose del palmar": [4.98, -76.24],
+  pereira: [4.81, -75.69],
+  manizales: [5.07, -75.52],
+  quibdó: [5.69, -76.66],
+  quibdo: [5.69, -76.66],
   // Puntos de acopio en el exterior (diáspora que reúne y envía ayuda).
   cartagena: [10.4, -75.49],
   medellín: [6.25, -75.57],
@@ -90,22 +79,14 @@ export const SECTOR_COORDS: Record<string, LatLng> = {
   mexico: [19.43, -99.13],
 };
 
-// ── Datos oficiales del terremoto (fuentes públicas, jun. 2026) ─────────────
-// Doble sismo M7,2 + M7,5 (~39 s), epicentro ~28 km al SE de Yumare (Yaracuy),
-// profundidad 10 km. Zona más afectada: La Guaira (Caraballeda, Catia La Mar).
-export const EPICENTER: LatLng = [10.45, -68.5];
+/** @deprecated usa `getCountry(code).regionCoords`. Se mantiene por compatibilidad (apunta a Venezuela). */
+export const ESTADO_COORDS: Record<string, LatLng> = COUNTRIES[DEFAULT_COUNTRY].regionCoords;
 
-export const QUAKE_INFO = {
-  magnitude: "7,2 y 7,5",
-  depthKm: 10,
-  epicenterText: "≈28 km al SE de Yumare (Yaracuy)",
-  date: "24–25 de junio de 2026",
-  deaths: 1719,
-  injured: 5034,
-  mostAffected: "La Guaira (Caraballeda, Catia La Mar)",
-  alsoAffected: ["Falcón", "Miranda", "Carabobo (Valencia)", "Aragua (Maracay)", "Distrito Capital (Caracas)"],
-  sourceName: "Infobae, Telemundo (29 jun. 2026)",
-};
+/** @deprecated usa `getCountry(code).epicenter`. Se mantiene por compatibilidad (apunta a Venezuela). */
+export const EPICENTER: LatLng = COUNTRIES[DEFAULT_COUNTRY].epicenter;
+
+/** @deprecated usa `getCountry(code).quakeInfo`. Se mantiene por compatibilidad (apunta a Venezuela). */
+export const QUAKE_INFO = COUNTRIES[DEFAULT_COUNTRY].quakeInfo;
 
 /**
  * Pequeño desplazamiento determinista para que los puntos no se solapen.
@@ -123,8 +104,9 @@ function jitter(coord: LatLng, seed: string): LatLng {
   return [coord[0] + dy, coord[1] + dx];
 }
 
-/** Resuelve coordenadas a partir de texto de ubicación y/o estado. */
-export function geocode(
+/** Resuelve coordenadas a partir de texto de ubicación y/o estado/región de un país. */
+export function geocodeFor(
+  country: CountryCode | string | null | undefined,
   locationText: string | null | undefined,
   estado: string | null | undefined,
   seed = "",
@@ -133,6 +115,16 @@ export function geocode(
   for (const [name, coord] of Object.entries(SECTOR_COORDS)) {
     if (text.includes(name)) return jitter(coord, seed || name);
   }
-  if (estado && ESTADO_COORDS[estado]) return jitter(ESTADO_COORDS[estado], seed || estado);
+  const coords = getCountry(country ?? undefined).regionCoords;
+  if (estado && coords[estado]) return jitter(coords[estado], seed || estado);
   return null;
+}
+
+/** @deprecated usa `geocodeFor(country, locationText, estado, seed)`. Asume Venezuela. */
+export function geocode(
+  locationText: string | null | undefined,
+  estado: string | null | undefined,
+  seed = "",
+): LatLng | null {
+  return geocodeFor(DEFAULT_COUNTRY, locationText, estado, seed);
 }

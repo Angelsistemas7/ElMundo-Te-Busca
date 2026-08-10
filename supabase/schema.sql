@@ -89,6 +89,13 @@ create index if not exists persons_created_idx       on persons (created_at desc
 create index if not exists persons_search_idx        on persons using gin (search_doc);
 create index if not exists persons_name_trgm_idx     on persons using gin ((first_name || ' ' || last_name) gin_trgm_ops);
 
+-- Migración multi-país (ago. 2026): además del terremoto de Venezuela (jun.
+-- 2026), la plataforma ahora también sirve el terremoto de Colombia (10 ago.
+-- 2026). `country` filtra cada tabla por instancia de desastre/país; las filas
+-- existentes (todas de Venezuela) quedan en 've' por el default.
+alter table persons add column if not exists country text not null default 've';
+create index if not exists persons_country_idx on persons (country);
+
 -- Migración para bases ya creadas: `posts`, `complaints`, `pets` y
 -- `volunteers` buscan con `ILIKE '%texto%'` en varias columnas (comunidad,
 -- denuncias, mascotas, voluntarios) SIN ningún índice que lo respalde —
@@ -207,6 +214,10 @@ create table if not exists aid_points (
 create index if not exists aid_points_estado_idx on aid_points (estado);
 create index if not exists aid_points_type_idx   on aid_points using gin (types);
 
+-- Migración multi-país (ago. 2026): ver nota en `persons` más arriba.
+alter table aid_points add column if not exists country text not null default 've';
+create index if not exists aid_points_country_idx on aid_points (country);
+
 -- ── Marchas / caravanas ─────────────────────────────────────────────────────
 create table if not exists marches (
   id uuid primary key default uuid_generate_v4(),
@@ -244,6 +255,10 @@ create table if not exists hospitals (
 );
 create index if not exists hospitals_estado_idx on hospitals (estado);
 create index if not exists hospitals_status_idx on hospitals (status);
+
+-- Migración multi-país (ago. 2026): ver nota en `persons` más arriba.
+alter table hospitals add column if not exists country text not null default 've';
+create index if not exists hospitals_country_idx on hospitals (country);
 
 create table if not exists hospital_patients (
   id uuid primary key default uuid_generate_v4(),
@@ -310,6 +325,10 @@ alter table posts add column if not exists moderation_status text not null defau
 alter table posts add column if not exists external_id text;
 create unique index if not exists posts_external_id_idx on posts (external_id);
 create index if not exists posts_moderation_status_idx on posts (moderation_status, created_at);
+
+-- Migración multi-país (ago. 2026): ver nota en `persons` más arriba.
+alter table posts add column if not exists country text not null default 've';
+create index if not exists posts_country_idx on posts (country);
 
 -- ── Denuncias de irregularidades ────────────────────────────────────────────
 -- Reportes ciudadanos de irregularidades. Publicar requiere sesión (la app lo
