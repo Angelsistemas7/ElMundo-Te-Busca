@@ -20,8 +20,10 @@ import {
   type AidPointType,
   type HospitalStatus,
 } from "@/lib/types";
-import { EPICENTER, ESTADO_COORDS, QUAKE_INFO, geocode } from "@/lib/geo";
+import { geocodeFor } from "@/lib/geo";
 import { getRecentQuakes } from "@/lib/usgs";
+import { getActiveCountry } from "@/lib/country-server";
+import { getCountry } from "@/lib/countries";
 import { directionsLink, formatDateTime, whatsappLink } from "@/lib/utils";
 import { CrisisMap } from "@/components/map/CrisisMap";
 import { RecentQuakes } from "@/components/RecentQuakes";
@@ -57,27 +59,29 @@ const HOSPITAL_COLOR: Record<HospitalStatus, string> = {
 };
 
 export default async function MapaPage() {
+  const country = await getActiveCountry();
+  const active = getCountry(country);
   const [breakdown, aid, marches, hospitals, rescuePosts, needPosts, offerPosts, volunteers, mappablePersons, quakes] =
     await Promise.all([
-      getEstadoBreakdown(),
-      getAidPoints(),
+      getEstadoBreakdown(country),
+      getAidPoints(country),
       getMarches(),
-      getHospitals(),
+      getHospitals(country),
       // Rescate queda en vivo (sin caché): una alerta de rescate es urgente y no
       // debe esperar hasta 60s en aparecer. Necesito/ofrezco sí toleran el retraso.
-      getPosts({ type: "rescate" }),
-      getMapPosts("necesito"),
-      getMapPosts("ofrezco"),
+      getPosts({ country, type: "rescate" }),
+      getMapPosts("necesito", country),
+      getMapPosts("ofrezco", country),
       getVolunteers(),
       // Si la columna lat aún no existe (esquema sin migrar), no rompemos el mapa.
-      getPersonsWithLocation().catch(() => []),
-      getRecentQuakes(),
+      getPersonsWithLocation(200, country).catch(() => []),
+      getRecentQuakes(country),
     ]);
 
   const zones: Zone[] = Object.entries(breakdown)
-    .filter(([estado]) => ESTADO_COORDS[estado])
+    .filter(([estado]) => active.regionCoords[estado])
     .map(([estado, b]) => {
-      const [lat, lng] = ESTADO_COORDS[estado];
+      const [lat, lng] = active.regionCoords[estado];
       return {
         key: estado,
         name: estado,
@@ -95,7 +99,7 @@ export default async function MapaPage() {
     .map((p) => {
       // Coordenada exacta marcada por quien publicó; si no, aproximación por texto.
       const coord: [number, number] | null =
-        p.lat != null && p.lng != null ? [p.lat, p.lng] : geocode(p.locationText, p.estado, p.id);
+        p.lat != null && p.lng != null ? [p.lat, p.lng] : geocodeFor(country, p.locationText, p.estado, p.id);
       if (!coord) return null;
       return {
         id: p.id,
@@ -112,7 +116,7 @@ export default async function MapaPage() {
 
   const marchMarkers: MarchMarker[] = marches
     .map((m) => {
-      const coord = geocode(m.originText, null, m.id);
+      const coord = geocodeFor(country, m.originText, null, m.id);
       if (!coord) return null;
       return {
         id: m.id,
@@ -128,7 +132,7 @@ export default async function MapaPage() {
   const hospitalMarkers: HospitalMarker[] = hospitals
     .map((h) => {
       const coord: [number, number] | null =
-        h.lat != null && h.lng != null ? [h.lat, h.lng] : geocode(h.locationText, h.estado, h.id);
+        h.lat != null && h.lng != null ? [h.lat, h.lng] : geocodeFor(country, h.locationText, h.estado, h.id);
       if (!coord) return null;
       return {
         id: h.id,
@@ -144,7 +148,7 @@ export default async function MapaPage() {
 
   const rescues: RescueMarker[] = rescuePosts
     .map((p) => {
-      const coord = geocode(p.locationText, p.estado, p.id);
+      const coord = geocodeFor(country, p.locationText, p.estado, p.id);
       if (!coord) return null;
       return {
         id: p.id,
@@ -161,7 +165,7 @@ export default async function MapaPage() {
   // Capa "Necesito ayuda": publicaciones tipo `necesito` con ubicación.
   const needs: NeedMarker[] = needPosts
     .map((p) => {
-      const coord = geocode(p.locationText, p.estado, p.id);
+      const coord = geocodeFor(country, p.locationText, p.estado, p.id);
       if (!coord) return null;
       return {
         id: p.id,
@@ -189,7 +193,7 @@ export default async function MapaPage() {
       // dónde vive/está exactamente, con su nombre y WhatsApp al lado.
       // Siempre aproximado (mismo sector/estado, con variación aleatoria),
       // nunca la coordenada exacta que haya dado al registrarse.
-      const coord = geocode(v.locationText, v.estado, v.id);
+      const coord = geocodeFor(country, v.locationText, v.estado, v.id);
       if (!coord) return null;
       const detail = [v.skillsText, v.availabilityText].filter(Boolean).join(" · ");
       return {
@@ -209,7 +213,7 @@ export default async function MapaPage() {
       } satisfies HelpMarker;
     }),
     ...offerPosts.map((p) => {
-      const coord = geocode(p.locationText, p.estado, p.id);
+      const coord = geocodeFor(country, p.locationText, p.estado, p.id);
       if (!coord) return null;
       return {
         id: `post-${p.id}`,
@@ -318,25 +322,25 @@ export default async function MapaPage() {
         <h2 className="text-sm font-bold text-zinc-900">Datos del sismo (fuentes públicas)</h2>
         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-zinc-600 sm:grid-cols-4">
           <div>
-            <span className="block text-xs text-zinc-400">Magnitud</span>M {QUAKE_INFO.magnitude}
+            <span className="block text-xs text-zinc-400">Magnitud</span>M {active.quakeInfo.magnitude}
           </div>
           <div>
-            <span className="block text-xs text-zinc-400">Profundidad</span>{QUAKE_INFO.depthKm} km
+            <span className="block text-xs text-zinc-400">Profundidad</span>{active.quakeInfo.depthKm} km
           </div>
           <div>
-            <span className="block text-xs text-zinc-400">Fallecidos</span>{QUAKE_INFO.deaths}
+            <span className="block text-xs text-zinc-400">Fallecidos</span>{active.quakeInfo.deaths}
           </div>
           <div>
-            <span className="block text-xs text-zinc-400">Heridos</span>+{QUAKE_INFO.injured.toLocaleString("es-VE")}
+            <span className="block text-xs text-zinc-400">Heridos</span>+{active.quakeInfo.injured.toLocaleString("es-VE")}
           </div>
         </div>
         <p className="mt-2 text-sm text-zinc-600">
           <span className="text-xs text-zinc-400">Epicentro: </span>
-          {QUAKE_INFO.epicenterText} · <span className="text-xs text-zinc-400">Más afectada: </span>
-          {QUAKE_INFO.mostAffected}.
+          {active.quakeInfo.epicenterText} · <span className="text-xs text-zinc-400">Más afectada: </span>
+          {active.quakeInfo.mostAffected}.
         </p>
         <p className="mt-1 text-xs text-zinc-400">
-          También afectados: {QUAKE_INFO.alsoAffected.join(", ")}. Fuentes: {QUAKE_INFO.sourceName}.
+          También afectados: {active.quakeInfo.alsoAffected.join(", ")}. Fuentes: {active.quakeInfo.sourceName}.
         </p>
       </div>
 
@@ -349,8 +353,8 @@ export default async function MapaPage() {
         needs={needs}
         helps={helps}
         persons={personMarkers}
-        epicenter={EPICENTER}
-        center={[10.52, -67.7]}
+        epicenter={active.epicenter}
+        center={active.epicenter}
         zoom={8}
       />
 

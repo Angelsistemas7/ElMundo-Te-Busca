@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Check, Copy, Share2 } from "lucide-react";
 
 const MESSAGE =
-  "🆘 *El Mundo Te Busca* — necesitamos voluntarios digitales para esta plataforma ciudadana y sin fines de lucro, en respuesta al terremoto de Venezuela 2026:\n\n" +
+  "🆘 *El Mundo Te Busca* — necesitamos voluntarios digitales para esta plataforma ciudadana y sin fines de lucro, en respuesta a los terremotos de Venezuela y Colombia de 2026:\n\n" +
   "🔍 Se busca — reporta y localiza desaparecidos\n" +
   "👁️ ¿La reconoces? — ponle nombre a quien no se identifica\n" +
   "💬 Comunidad — pide u ofrece ayuda\n" +

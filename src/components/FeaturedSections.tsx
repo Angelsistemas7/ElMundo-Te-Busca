@@ -77,8 +77,8 @@ function buildSections(unidentified: boolean): SectionDef[] {
   ];
 }
 
-async function Section({ def }: { def: SectionDef }) {
-  const items = await getFeaturedPersons(def.query);
+async function Section({ def, country }: { def: SectionDef; country: string }) {
+  const items = await getFeaturedPersons({ ...def.query, country });
   if (items.length === 0) return null;
   const Icon = def.icon;
 
@@ -118,7 +118,13 @@ async function Section({ def }: { def: SectionDef }) {
   );
 }
 
-export async function FeaturedSections({ unidentified = false }: { unidentified?: boolean }) {
+export async function FeaturedSections({
+  unidentified = false,
+  country = "ve",
+}: {
+  unidentified?: boolean;
+  country?: string;
+}) {
   const sections = buildSections(unidentified);
   return (
     <div className="space-y-8">
@@ -127,7 +133,7 @@ export async function FeaturedSections({ unidentified = false }: { unidentified?
         Secciones destacadas
       </div>
       {sections.map((def) => (
-        <Section key={def.key} def={def} />
+        <Section key={def.key} def={def} country={country} />
       ))}
     </div>
   );

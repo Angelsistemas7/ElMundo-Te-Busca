@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { COUNTRY_COOKIE, getActiveCountry } from "@/lib/country-server";
+import { isCountryCode } from "@/lib/countries";
 import {
   addHospitalPatient,
   canManageHospital,
@@ -103,6 +106,19 @@ import {
 export type ActionResult =
   | { ok: true; message: string; id?: string; ownerToken?: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
+/** Cambia el país activo (portada, listados, formularios). Ver `country-server.ts`. */
+export async function setActiveCountryAction(country: string): Promise<void> {
+  if (!isCountryCode(country)) return;
+  const store = await cookies();
+  store.set(COUNTRY_COOKIE, country, {
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+  revalidatePath("/", "layout");
+}
 
 function zodToFieldErrors(error: { issues: { path: (string | number)[]; message: string }[] }) {
   const fieldErrors: Record<string, string> = {};
@@ -418,7 +434,7 @@ export async function registerPersonAction(form: FormData): Promise<ActionResult
 
   try {
     const { person, ownerToken } = await createPerson(
-      parsed.data,
+      { ...parsed.data, country: await getActiveCountry() },
       photoUrl,
       (await getCurrentUser())?.id ?? null,
     );
@@ -501,7 +517,7 @@ export async function registerAidPointAction(form: FormData): Promise<ActionResu
 
   try {
     const { point, ownerToken } = await createAidPoint(
-      parsed.data,
+      { ...parsed.data, country: await getActiveCountry() },
       photoUrl,
       (await getCurrentUser())?.id ?? null,
     );
@@ -675,7 +691,7 @@ export async function getMorePostsAction(
   pageSize: number,
   sort: PostSort,
 ): Promise<{ items: (Post & { comments: Comment[] })[]; hasMore: boolean }> {
-  const pageResult = await getPostsPage(filter, page, pageSize, sort);
+  const pageResult = await getPostsPage({ ...filter, country: await getActiveCountry() }, page, pageSize, sort);
   const commentsByPost = await getCommentsForEntities("post", pageResult.items.map((p) => p.id));
   const items = pageResult.items.map((post) => ({ ...post, comments: commentsByPost[post.id] ?? [] }));
   const hasMore = page * pageSize < pageResult.total;
@@ -706,7 +722,7 @@ export async function createPostAction(form: FormData): Promise<ActionResult> {
 
   try {
     const { post, ownerToken } = await createPost(
-      parsed.data,
+      { ...parsed.data, country: await getActiveCountry() },
       photoUrl,
       (await getCurrentUser())?.id ?? null,
     );
@@ -1299,7 +1315,10 @@ export async function registerHospitalAction(form: FormData): Promise<ActionResu
   }
 
   try {
-    const hospital = await createHospital(parsed.data, (await getCurrentUser())?.id ?? null);
+    const hospital = await createHospital(
+      { ...parsed.data, country: await getActiveCountry() },
+      (await getCurrentUser())?.id ?? null,
+    );
     revalidatePath("/hospitales");
     revalidatePath("/mapa");
     return { ok: true, id: hospital.id, message: "Hospital publicado. Aparecerá como 'por verificar' hasta que se confirme." };

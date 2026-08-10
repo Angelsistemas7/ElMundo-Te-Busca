@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Building2, HeartHandshake, MapPin } from "lucide-react";
 import { getAidPoints, getEstadoBreakdown, getHospitals } from "@/lib/data";
-import { EPICENTER, ESTADO_COORDS, geocode } from "@/lib/geo";
+import { geocodeFor } from "@/lib/geo";
+import { getActiveCountry } from "@/lib/country-server";
+import { getCountry } from "@/lib/countries";
 import { MiniMap } from "./map/MiniMap";
 import type { MiniPoint, MiniZone } from "./map/MiniMapView";
 
@@ -9,30 +11,32 @@ import type { MiniPoint, MiniZone } from "./map/MiniMapView";
 // capas ni controles) en vez de reconstruir todo lo que arma /mapa — así se
 // ve un mapa de verdad sin duplicar su pipeline completo de geocodificación.
 export async function MapPreviewCard() {
+  const country = await getActiveCountry();
+  const active = getCountry(country);
   const [breakdown, aidPoints, hospitals] = await Promise.all([
-    getEstadoBreakdown(),
-    getAidPoints(),
-    getHospitals(),
+    getEstadoBreakdown(country),
+    getAidPoints(country),
+    getHospitals(country),
   ]);
 
   const zones: MiniZone[] = Object.entries(breakdown)
-    .filter(([estado]) => ESTADO_COORDS[estado])
+    .filter(([estado]) => active.regionCoords[estado])
     .map(([estado, b]) => {
-      const [lat, lng] = ESTADO_COORDS[estado];
+      const [lat, lng] = active.regionCoords[estado];
       return { key: estado, name: estado, lat, lng, count: b.total };
     });
 
   const aidMarkers: MiniPoint[] = aidPoints
     .filter((p) => p.available)
     .map((p) => {
-      const coord = p.lat != null && p.lng != null ? [p.lat, p.lng] : geocode(p.locationText, p.estado, p.id);
+      const coord = p.lat != null && p.lng != null ? [p.lat, p.lng] : geocodeFor(country, p.locationText, p.estado, p.id);
       return coord ? { id: p.id, lat: coord[0], lng: coord[1], label: p.name } : null;
     })
     .filter((x): x is MiniPoint => x !== null);
 
   const hospitalMarkers: MiniPoint[] = hospitals
     .map((h) => {
-      const coord = h.lat != null && h.lng != null ? [h.lat, h.lng] : geocode(h.locationText, h.estado, h.id);
+      const coord = h.lat != null && h.lng != null ? [h.lat, h.lng] : geocodeFor(country, h.locationText, h.estado, h.id);
       return coord ? { id: h.id, lat: coord[0], lng: coord[1], label: h.name } : null;
     })
     .filter((x): x is MiniPoint => x !== null);
@@ -48,7 +52,7 @@ export async function MapPreviewCard() {
       </div>
 
       <div className="mt-4 h-48 w-full overflow-hidden sm:h-56">
-        <MiniMap zones={zones} aidPoints={aidMarkers} hospitals={hospitalMarkers} center={EPICENTER} zoom={7} />
+        <MiniMap zones={zones} aidPoints={aidMarkers} hospitals={hospitalMarkers} center={active.epicenter} zoom={7} />
       </div>
 
       <div className="flex flex-col gap-4 p-5 pt-4 sm:p-6 sm:pt-4">

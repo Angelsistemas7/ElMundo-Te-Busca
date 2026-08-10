@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Pencil, Trash2, TriangleAlert } from "lucide-react";
 import type { Person, PersonStatus } from "@/lib/types";
-import { ESTADOS, PERSON_STATUS_LABEL } from "@/lib/types";
+import { PERSON_STATUS_LABEL } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import { cn, statusStyle } from "@/lib/utils";
 import {
   ownerDeleteAction,
@@ -17,6 +18,7 @@ import { Field, Input, Select, Textarea } from "./FormControls";
 const STATUSES: PersonStatus[] = ["por_localizar", "localizado", "hospitalizado", "fallecido"];
 
 export function OwnerManagePanel({ person, token }: { person: Person; token: string }) {
+  const regions = getCountry(person.country).regions;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<PersonStatus>(person.status);
@@ -140,7 +142,7 @@ export function OwnerManagePanel({ person, token }: { person: Person; token: str
               <Field label="Estado (región)" htmlFor="estado">
                 <Select id="estado" name="estado" defaultValue={person.estado ?? ""}>
                   <option value="">Seleccionar</option>
-                  {ESTADOS.map((e) => (
+                  {regions.map((e) => (
                     <option key={e} value={e}>
                       {e}
                     </option>

@@ -5,7 +5,7 @@ import { join } from "node:path";
 // Tarjeta que se ve al compartir el enlace (WhatsApp, redes). Sin acentos a
 // propósito: la fuente por defecto de ImageResponse no incluye glifos
 // acentuados y saldrían cuadros. Next la cablea como og:image y twitter:image.
-export const alt = "El Mundo Te Busca — Terremoto de Venezuela 2026";
+export const alt = "El Mundo Te Busca — Terremotos de Venezuela y Colombia 2026";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -62,7 +62,7 @@ export default async function OpengraphImage() {
             style={{ display: "flex", width: "180px", height: "8px", borderRadius: "4px", background: "#d3824a", marginTop: "24px" }}
           />
           <div style={{ display: "flex", marginTop: "28px", fontSize: "34px", color: "#cbd5e1", lineHeight: 1.3 }}>
-            Localizar personas desaparecidas y coordinar ayuda tras el terremoto de Venezuela 2026
+            Localizar personas desaparecidas y coordinar ayuda tras los terremotos de Venezuela y Colombia 2026
           </div>
           <div style={{ display: "flex", marginTop: "26px", fontSize: "26px", fontWeight: 600, color: "#f2af5e" }}>
             Iniciativa ciudadana, voluntaria y sin fines de lucro

@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Trash2, TriangleAlert } from "lucide-react";
 import type { Post, PostType } from "@/lib/types";
-import { ESTADOS, POST_TYPE_EMOJI, POST_TYPE_LABEL } from "@/lib/types";
+import { POST_TYPE_EMOJI, POST_TYPE_LABEL } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import {
   ownerDeletePostAction,
   ownerUpdatePostAction,
@@ -15,6 +16,7 @@ import { Field, Input, Select, Textarea } from "./FormControls";
 const TYPES = Object.keys(POST_TYPE_LABEL) as PostType[];
 
 export function PostManagePanel({ post, token }: { post: Post; token: string }) {
+  const regions = getCountry(post.country).regions;
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
@@ -78,7 +80,7 @@ export function PostManagePanel({ post, token }: { post: Post; token: string }) 
             <Field label="Estado (región)" htmlFor="estado">
               <Select id="estado" name="estado" defaultValue={post.estado ?? ""}>
                 <option value="">Seleccionar</option>
-                {ESTADOS.map((e) => (
+                {regions.map((e) => (
                   <option key={e} value={e}>
                     {e}
                   </option>

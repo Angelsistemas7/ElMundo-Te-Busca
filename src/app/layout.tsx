@@ -25,29 +25,34 @@ const signika = Signika({
 // se detecta solo; si no, Next usa una URL relativa.
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
+// El título/descripción por defecto (SEO, compartir en redes) es neutral
+// entre países a propósito: la metadata del layout raíz no puede leer la
+// cookie de país sin forzar TODO el sitio a renderizado dinámico (ver el
+// bug ya documentado sobre convertir el layout en dinámico). El país activo
+// sí se refleja en el contenido de cada página (portada, mapa, emergencias).
 export const metadata: Metadata = {
   metadataBase: siteUrl ? new URL(siteUrl) : undefined,
   title: {
-    default: "El Mundo Te Busca — Personas desaparecidas tras el terremoto de Venezuela 2026",
+    default: "El Mundo Te Busca — Personas desaparecidas tras terremotos (Venezuela y Colombia, 2026)",
     template: "%s · El Mundo Te Busca",
   },
   applicationName: "El Mundo Te Busca",
   description:
-    "Iniciativa ciudadana, voluntaria y sin fines de lucro para localizar personas desaparecidas y coordinar ayuda tras el terremoto de Venezuela 2026.",
+    "Iniciativa ciudadana, voluntaria y sin fines de lucro para localizar personas desaparecidas y coordinar ayuda tras los terremotos de Venezuela (jun. 2026) y Colombia (ago. 2026).",
   robots: { index: true, follow: true },
   openGraph: {
-    title: "El Mundo Te Busca — Respuesta al terremoto de Venezuela 2026",
+    title: "El Mundo Te Busca — Respuesta a los terremotos de 2026",
     description:
-      "Plataforma ciudadana para localizar personas desaparecidas y coordinar ayuda tras el terremoto de Venezuela 2026.",
+      "Plataforma ciudadana para localizar personas desaparecidas y coordinar ayuda tras los terremotos de Venezuela y Colombia de 2026.",
     type: "website",
-    locale: "es_VE",
+    locale: "es_419",
     siteName: "El Mundo Te Busca",
   },
   twitter: {
     card: "summary_large_image",
-    title: "El Mundo Te Busca — Respuesta al terremoto de Venezuela 2026",
+    title: "El Mundo Te Busca — Respuesta a los terremotos de 2026",
     description:
-      "Plataforma ciudadana para localizar personas desaparecidas y coordinar ayuda tras el terremoto de Venezuela 2026.",
+      "Plataforma ciudadana para localizar personas desaparecidas y coordinar ayuda tras los terremotos de Venezuela y Colombia de 2026.",
   },
 };
 

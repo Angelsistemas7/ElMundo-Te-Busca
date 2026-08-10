@@ -20,7 +20,7 @@ export function SiteFooter() {
           <p className="mt-3 max-w-md text-sm leading-relaxed text-zinc-600">
             Iniciativa ciudadana, voluntaria y sin fines de lucro para ayudar a localizar personas
             desaparecidas y coordinar ayuda ante catástrofes en cualquier lugar del mundo. Hoy,
-            nuestra prioridad es la respuesta al terremoto de Venezuela de 2026.
+            respondemos a los terremotos de Venezuela (jun. 2026) y Colombia (ago. 2026).
           </p>
           <p className="mt-3 max-w-md text-xs leading-relaxed text-zinc-500">
             No vendemos ni compartimos tu información con terceros y solo la usamos para ayudar a

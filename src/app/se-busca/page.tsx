@@ -10,6 +10,7 @@ import {
   type PersonSort,
 } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
+import { getActiveCountry } from "@/lib/country-server";
 import type { PersonStatus } from "@/lib/types";
 import { DashboardStats } from "@/components/DashboardStats";
 import { RecentlyLocated } from "@/components/RecentlyLocated";
@@ -82,7 +83,10 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
         ? "estado"
         : null;
 
+  const country = await getActiveCountry();
+
   const baseQuery = {
+    country,
     // "Se busca" muestra a TODOS (con y sin información, cada tarjeta
     // etiquetada — ver PersonCard). "¿La reconoces?" muestra el mismo
     // universo completo, pero solo los casos AÚN NO resueltos (no tiene
@@ -111,12 +115,12 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
 
   const user = await getCurrentUser();
   const [stats, result, groups, recentlyLocated, alreadyVolunteered] = await Promise.all([
-    getDashboardStats(),
+    getDashboardStats(country),
     groupBy
       ? Promise.resolve(null)
       : getPersons({ ...baseQuery, page: num(sp.page) ?? 1, pageSize: isReconoces ? 60 : pageSize }),
     groupBy ? getPersonGroups(baseQuery, groupBy) : Promise.resolve(null),
-    showBuscaExtras ? getRecentlyLocated(12) : Promise.resolve([]),
+    showBuscaExtras ? getRecentlyLocated(12, country) : Promise.resolve([]),
     user ? hasVolunteered(user.id) : Promise.resolve(false),
   ]);
 
@@ -169,13 +173,13 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
       <div className="mt-8 flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1">
-            <SearchAndFilters unidentified={isReconoces} />
+            <SearchAndFilters unidentified={isReconoces} country={country} />
           </div>
           {/* Publicar solo vive en "Se busca" — "¿La reconoces?" es una forma
               de RECORRER lo ya publicado, no un lugar distinto para publicar. */}
           {!isReconoces && (
             <div className="shrink-0">
-              <RegisterPersonButton />
+              <RegisterPersonButton country={country} />
             </div>
           )}
         </div>
@@ -189,8 +193,8 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
 
         {!isReconoces && showAgeSections && (
           <div className="space-y-8 border-t border-zinc-100 pt-6">
-            {showBuscaExtras && <EstadoChips />}
-            <FeaturedSections unidentified={false} />
+            {showBuscaExtras && <EstadoChips country={country} />}
+            <FeaturedSections unidentified={false} country={country} />
             {/* Al final de todo, después de "Adultos mayores" — antes iba
                 primero y quedaba antes de que la gente llegara a explorar. */}
             {showBuscaExtras && <RecentlyLocated persons={recentlyLocated} />}

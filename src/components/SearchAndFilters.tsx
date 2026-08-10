@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
-import { ESTADOS, PERSON_STATUS_LABEL, type PersonStatus } from "@/lib/types";
+import { PERSON_STATUS_LABEL, type PersonStatus } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import { cn } from "@/lib/utils";
 import { FilterModal, type FilterField } from "./FilterModal";
 
@@ -26,13 +27,14 @@ const AGE_CHIPS: { label: string; min: string; max: string }[] = [
   { label: "🧓 Adultos mayores (60+)", min: "60", max: "" },
 ];
 
-const FILTER_FIELDS: FilterField[] = [
+function buildFilterFields(regions: readonly string[]): FilterField[] {
+  return [
   {
     kind: "select",
     key: "estado",
     label: "Estado (región)",
     placeholder: "Todos",
-    options: ESTADOS.map((e) => ({ value: e, label: e })),
+    options: regions.map((e) => ({ value: e, label: e })),
   },
   {
     kind: "select",
@@ -58,9 +60,15 @@ const FILTER_FIELDS: FilterField[] = [
     ],
   },
   { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Registrado entre" },
-];
+  ];
+}
 
-export function SearchAndFilters({ unidentified = false }: { unidentified?: boolean } = {}) {
+export function SearchAndFilters({
+  unidentified = false,
+  country = "ve",
+}: { unidentified?: boolean; country?: string } = {}) {
+  const regions = getCountry(country).regions;
+  const filterFields = buildFilterFields(regions);
   // En "¿La reconoces?" solo se listan casos AÚN NO resueltos (ver
   // `unresolvedOnly` en data.ts): "Localizado" y "Confirmado sin vida" no
   // aplican como filtro ahí, porque esos casos no aparecen en esa pestaña.
@@ -132,7 +140,7 @@ export function SearchAndFilters({ unidentified = false }: { unidentified?: bool
             </button>
           )}
         </div>
-        <FilterModal basePath={pathname} currentParams={currentParams} fields={FILTER_FIELDS} />
+        <FilterModal basePath={pathname} currentParams={currentParams} fields={filterFields} />
       </div>
 
       {/* Chips rápidos por estado de localización */}
@@ -187,7 +195,7 @@ export function SearchAndFilters({ unidentified = false }: { unidentified?: bool
         >
           Todos los estados
         </button>
-        {ESTADOS.map((e) => (
+        {regions.map((e) => (
           <button
             key={e}
             onClick={() => setParams({ estado: e })}

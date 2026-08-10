@@ -2,7 +2,9 @@ import Link from "next/link";
 import nextDynamic from "next/dynamic";
 import { Building2 } from "lucide-react";
 import { getHospitals, getHospitalsPage, getPatientCounts, type HospitalSort } from "@/lib/data";
-import { ESTADOS, HOSPITAL_STATUS_LABEL, type HospitalStatus } from "@/lib/types";
+import { HOSPITAL_STATUS_LABEL, type HospitalStatus } from "@/lib/types";
+import { getActiveCountry } from "@/lib/country-server";
+import { getCountry } from "@/lib/countries";
 import { cn, clampPageSize } from "@/lib/utils";
 import { HospitalCard, HOSPITAL_STATUS_STYLE } from "@/components/HospitalCard";
 const RegisterHospitalButton = nextDynamic(() =>
@@ -24,30 +26,34 @@ const num = (v: string | string[] | undefined) => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const FILTER_FIELDS: FilterField[] = [
-  {
-    kind: "select",
-    key: "estado",
-    label: "Estado (región)",
-    placeholder: "Todos",
-    options: ESTADOS.map((e) => ({ value: e, label: e })),
-  },
-  {
-    kind: "chips",
-    key: "sort",
-    label: "Ordenar por",
-    defaultValue: "name",
-    options: [
-      { value: "name", label: "Nombre (A–Z)" },
-      { value: "recent", label: "Más recientes" },
-      { value: "oldest", label: "Más antiguos" },
-    ],
-  },
-  { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Registrado entre" },
-];
+function buildFilterFields(regions: readonly string[]): FilterField[] {
+  return [
+    {
+      kind: "select",
+      key: "estado",
+      label: "Estado (región)",
+      placeholder: "Todos",
+      options: regions.map((e) => ({ value: e, label: e })),
+    },
+    {
+      kind: "chips",
+      key: "sort",
+      label: "Ordenar por",
+      defaultValue: "name",
+      options: [
+        { value: "name", label: "Nombre (A–Z)" },
+        { value: "recent", label: "Más recientes" },
+        { value: "oldest", label: "Más antiguos" },
+      ],
+    },
+    { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Registrado entre" },
+  ];
+}
 
 export default async function HospitalesPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
+  const country = await getActiveCountry();
+  const FILTER_FIELDS = buildFilterFields(getCountry(country).regions);
   const status = str(sp.status) as HospitalStatus | undefined;
   const estado = str(sp.estado) ?? "all";
   const sort = (str(sp.sort) as HospitalSort) ?? "name";
@@ -57,11 +63,11 @@ export default async function HospitalesPage({ searchParams }: { searchParams: S
   const pageSize = clampPageSize(num(sp.pageSize));
 
   const [{ items: shown, total }, counts, allHospitals] = await Promise.all([
-    getHospitalsPage({ status, estado, dateFrom, dateTo }, page, pageSize, sort),
+    getHospitalsPage({ country, status, estado, dateFrom, dateTo }, page, pageSize, sort),
     getPatientCounts(),
     // Conteos del resumen por estado: siempre sobre el total (cacheada 60s),
     // sin los demás filtros, para que sigan sirviendo de acceso rápido.
-    getHospitals(),
+    getHospitals(country),
   ]);
   const byStatus = (s: HospitalStatus) => allHospitals.filter((h) => h.status === s).length;
   const summary: HospitalStatus[] = ["operativo", "saturado", "lleno", "cerrado"];
@@ -89,7 +95,7 @@ export default async function HospitalesPage({ searchParams }: { searchParams: S
           title="Hospitales"
           description="Capacidad en tiempo real, especialidades e insumos que necesitan, para saber a dónde trasladar a cada persona. Abre un hospital para ver la lista de personas atendidas."
         />
-        <RegisterHospitalButton />
+        <RegisterHospitalButton country={country} />
       </div>
 
       {/* Resumen de capacidad: fila horizontal (antes iba en rejilla 2x2, se veía

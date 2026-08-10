@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ImagePlus, Loader2, MapPin, Plus, Search } from "lucide-react";
-import { ESTADOS } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import { registerPersonAction, type ActionResult } from "@/app/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
@@ -18,7 +18,8 @@ import { LocationPicker } from "./map/LocationPicker";
 //  • "sighting" → Vi / encontré a esta persona (sé dónde está, no sé bien quién es).
 type Intent = "search" | "sighting";
 
-export function RegisterPersonButton() {
+export function RegisterPersonButton({ country = "ve" }: { country?: string } = {}) {
+  const regions = getCountry(country).regions;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [intent, setIntent] = useState<Intent | null>(null);
@@ -252,7 +253,7 @@ export function RegisterPersonButton() {
               <Field label="Estado (región)" htmlFor="estado">
                 <Select id="estado" name="estado" defaultValue="">
                   <option value="">Seleccionar</option>
-                  {ESTADOS.map((e) => (
+                  {regions.map((e) => (
                     <option key={e} value={e}>
                       {e}
                     </option>

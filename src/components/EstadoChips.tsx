@@ -3,8 +3,8 @@ import { MapPin } from "lucide-react";
 import { getCountsByEstado } from "@/lib/data";
 
 // Acceso rápido por estado/región, con el conteo de personas registradas.
-export async function EstadoChips() {
-  const counts = await getCountsByEstado();
+export async function EstadoChips({ country = "ve" }: { country?: string }) {
+  const counts = await getCountsByEstado(country);
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   if (entries.length === 0) return null;
 

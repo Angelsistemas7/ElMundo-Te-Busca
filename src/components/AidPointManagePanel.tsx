@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Trash2, TriangleAlert, X } from "lucide-react";
 import type { AidPoint, AidPointType } from "@/lib/types";
-import { AID_POINT_TYPE_LABEL, ESTADOS } from "@/lib/types";
+import { AID_POINT_TYPE_LABEL } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import {
   ownerDeleteAidPointAction,
   ownerSetAidAvailabilityAction,
@@ -17,6 +18,7 @@ import { cn } from "@/lib/utils";
 const TYPES = Object.keys(AID_POINT_TYPE_LABEL) as AidPointType[];
 
 export function AidPointManagePanel({ point, token }: { point: AidPoint; token: string }) {
+  const regions = getCountry(point.country).regions;
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
@@ -94,7 +96,7 @@ export function AidPointManagePanel({ point, token }: { point: AidPoint; token: 
             <Field label="Estado (región)" htmlFor="estado">
               <Select id="estado" name="estado" defaultValue={point.estado ?? ""}>
                 <option value="">Seleccionar</option>
-                {ESTADOS.map((e) => (
+                {regions.map((e) => (
                   <option key={e} value={e}>
                     {e}
                   </option>

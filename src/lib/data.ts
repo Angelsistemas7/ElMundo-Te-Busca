@@ -353,11 +353,12 @@ export async function getPersonGroups(q: PersonQuery, groupBy: GroupBy): Promise
     .sort((a, b) => b.items.length - a.items.length || a.label.localeCompare(b.label));
 }
 
-export async function getStats(): Promise<Stats> {
+export async function getStats(country = "ve"): Promise<Stats> {
   const sb = getSupabase();
   if (!sb) {
-    const registered = mem.persons.length;
-    const located = mem.persons.filter(
+    const persons = mem.persons.filter((p) => (p.country ?? "ve") === country);
+    const registered = persons.length;
+    const located = persons.filter(
       (p) => p.status === "localizado" || p.status === "hospitalizado",
     ).length;
     return {
@@ -368,10 +369,11 @@ export async function getStats(): Promise<Stats> {
     };
   }
   const [{ count: registered }, { count: located }] = await Promise.all([
-    sb.from("persons").select("*", { count: "exact", head: true }),
+    sb.from("persons").select("*", { count: "exact", head: true }).eq("country", country),
     sb
       .from("persons")
       .select("*", { count: "exact", head: true })
+      .eq("country", country)
       .in("status", ["localizado", "hospitalizado"]),
   ]);
   return {
@@ -1960,7 +1962,7 @@ export interface EstadoBreakdown {
 export const getEstadoBreakdown = unstable_cache(getEstadoBreakdownImpl, ["estado-breakdown"], {
   revalidate: 60,
 });
-async function getEstadoBreakdownImpl(): Promise<Record<string, EstadoBreakdown>> {
+async function getEstadoBreakdownImpl(country = "ve"): Promise<Record<string, EstadoBreakdown>> {
   const tally = (rows: { estado: string | null; status: PersonStatus }[]) => {
     const out: Record<string, EstadoBreakdown> = {};
     for (const r of rows) {
@@ -1975,8 +1977,13 @@ async function getEstadoBreakdownImpl(): Promise<Record<string, EstadoBreakdown>
   };
 
   const sb = getSupabase();
-  if (!sb) return tally(mem.persons.map((p) => ({ estado: p.estado, status: p.status })));
-  const { data, error } = await sb.from("persons").select("estado,status");
+  if (!sb)
+    return tally(
+      mem.persons
+        .filter((p) => (p.country ?? "ve") === country)
+        .map((p) => ({ estado: p.estado, status: p.status })),
+    );
+  const { data, error } = await sb.from("persons").select("estado,status").eq("country", country);
   if (error) throw error;
   return tally((data ?? []) as { estado: string | null; status: PersonStatus }[]);
 }

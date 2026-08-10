@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ImagePlus, Loader2, Megaphone, PenLine } from "lucide-react";
-import { ESTADOS, POST_TYPE_EMOJI, POST_TYPE_LABEL, type PostType } from "@/lib/types";
+import { POST_TYPE_EMOJI, POST_TYPE_LABEL, type PostType } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import { createPostAction, getMyProfileAction, type ActionResult } from "@/app/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
@@ -18,11 +19,14 @@ const TYPES = Object.keys(POST_TYPE_LABEL) as PostType[];
 export function CreatePostButton({
   variant = "button",
   initialType,
+  country = "ve",
 }: {
   variant?: "button" | "bar" | "urgent";
   /** Preselecciona el tipo de publicación (p. ej. "rescate" desde "Reportar AHORA"). */
   initialType?: PostType;
+  country?: string;
 }) {
+  const regions = getCountry(country).regions;
   const router = useRouter();
   const isUrgent = variant === "urgent";
   const [open, setOpen] = useState(false);
@@ -195,7 +199,7 @@ export function CreatePostButton({
               <Field label="Estado (región)" htmlFor="estado">
                 <Select id="estado" name="estado" defaultValue="">
                   <option value="">Seleccionar</option>
-                  {ESTADOS.map((e) => (
+                  {regions.map((e) => (
                     <option key={e} value={e}>
                       {e}
                     </option>

@@ -2,9 +2,12 @@ import Link from "next/link";
 import { HeartHandshake, MapPinned, ShieldCheck, Users2 } from "lucide-react";
 import { getAidPoints, getDashboardStats, getStats } from "@/lib/data";
 import { getCrisisStats, type CrisisStat } from "@/lib/news";
+import { getActiveCountry } from "@/lib/country-server";
+import { COUNTRIES } from "@/lib/countries";
 import { formatDateTime, timeAgo } from "@/lib/utils";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { ExternalLinkGuard } from "./ExternalLinkGuard";
+import { CountrySwitcher } from "./CountrySwitcher";
 
 function StatRow({
   icon: Icon,
@@ -58,15 +61,25 @@ function CrisisStatLine({ stat }: { stat: CrisisStat }) {
 }
 
 export async function HomeHero() {
+  const country = await getActiveCountry();
   const [stats, dashboardStats, aidPoints, crisisStats] = await Promise.all([
-    getStats(),
-    getDashboardStats(),
-    getAidPoints(),
+    getStats(country),
+    getDashboardStats(country),
+    getAidPoints(country),
+    // TODO(multi-país): `news.ts` sigue filtrando solo contra Venezuela
+    // (VE_TERMS) — pendiente de una próxima ronda parametrizarlo por país.
     getCrisisStats(),
   ]);
-  const crisisRows = [crisisStats.fallecidos, crisisStats.heridos, crisisStats.desaparecidos, crisisStats.afectados].filter(
-    (s): s is CrisisStat => Boolean(s),
-  );
+  // Las cifras de prensa (GDELT/ReliefWeb) solo están afinadas para Venezuela
+  // por ahora (ver TODO arriba); en Colombia se muestran las cifras propias
+  // de `countries.ts` en su lugar, no las de otro país.
+  const crisisRows =
+    country === "ve"
+      ? [crisisStats.fallecidos, crisisStats.heridos, crisisStats.desaparecidos, crisisStats.afectados].filter(
+          (s): s is CrisisStat => Boolean(s),
+        )
+      : [];
+  const active = COUNTRIES[country];
 
   return (
     <section className="reveal-up relative overflow-hidden rounded-3xl border-2 border-navy-700 bg-white">
@@ -87,12 +100,15 @@ export async function HomeHero() {
 
       <div className="relative grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_320px] lg:gap-8">
         <div className="flex flex-col justify-center">
+          <div className="mb-4">
+            <CountrySwitcher active={country} />
+          </div>
           <h1 className="font-heading text-3xl font-bold leading-[1.1] tracking-tight text-navy-700 sm:text-4xl lg:text-[2.75rem]">
             Cuando el mundo se detiene,{" "}
             <span className="text-brand-500">la solidaridad nos encuentra.</span>
           </h1>
           <p className="mt-4 max-w-xl text-zinc-600">
-            Plataforma ciudadana de ayuda y búsqueda tras el terremoto en Venezuela 2026.
+            Plataforma ciudadana de ayuda y búsqueda tras el terremoto en {active.name}, {active.quakeInfo.date}.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -138,6 +154,18 @@ export async function HomeHero() {
               {crisisRows.map((stat) => (
                 <CrisisStatLine key={stat.label} stat={stat} />
               ))}
+            </div>
+          )}
+          {crisisRows.length === 0 && (
+            <div className="mt-4 space-y-1 border-t border-zinc-100 pt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                Sismo M{active.quakeInfo.magnitude}
+              </p>
+              <p className="text-xs leading-relaxed text-zinc-500">
+                <span className="font-semibold text-zinc-700">{active.quakeInfo.deaths.toLocaleString("es")}</span>{" "}
+                fallecidos, <span className="font-semibold text-zinc-700">{active.quakeInfo.injured.toLocaleString("es")}</span>{" "}
+                heridos — {active.quakeInfo.sourceName}
+              </p>
             </div>
           )}
         </div>

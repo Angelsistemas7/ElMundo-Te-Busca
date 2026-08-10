@@ -4,7 +4,9 @@ import { HeartHandshake } from "lucide-react";
 import { getAidPointsPage, getCommentsForEntities, getHeroes, getNewsItems } from "@/lib/data";
 import { getRecentQuakes } from "@/lib/usgs";
 import { isAdmin } from "@/lib/admin";
-import { AID_POINT_TYPE_LABEL, ESTADOS, type AidPointType } from "@/lib/types";
+import { getActiveCountry } from "@/lib/country-server";
+import { getCountry } from "@/lib/countries";
+import { AID_POINT_TYPE_LABEL, type AidPointType } from "@/lib/types";
 import { cn, clampPageSize } from "@/lib/utils";
 import { AidPointCard } from "@/components/AidPointCard";
 const RegisterAidPointButton = nextDynamic(() =>
@@ -46,19 +48,23 @@ const TYPE_CHIPS: { value: AidPointType | "all"; label: string }[] = [
   })),
 ];
 
-const FILTER_FIELDS: FilterField[] = [
-  {
-    kind: "select",
-    key: "estado",
-    label: "Estado (región)",
-    placeholder: "Todos",
-    options: ESTADOS.map((e) => ({ value: e, label: e })),
-  },
-  { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Registrado entre" },
-];
+function buildFilterFields(regions: readonly string[]): FilterField[] {
+  return [
+    {
+      kind: "select",
+      key: "estado",
+      label: "Estado (región)",
+      placeholder: "Todos",
+      options: regions.map((e) => ({ value: e, label: e })),
+    },
+    { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Registrado entre" },
+  ];
+}
 
 export default async function AyudaPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
+  const country = await getActiveCountry();
+  const FILTER_FIELDS = buildFilterFields(getCountry(country).regions);
   const type = (str(sp.type) as AidPointType | "all") ?? "all";
   const availOnly = str(sp.avail) === "1";
   const estado = str(sp.estado) ?? "all";
@@ -70,9 +76,9 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
   // Antes: `getAidPoints()` traía la tabla ENTERA sin límite ni paginación en
   // cada visita. Ahora pagina de verdad (10/20/50 a elegir), en vivo.
   const [{ items: points, total }, heroes, quakes, curatedAyuda, admin] = await Promise.all([
-    getAidPointsPage({ type, availOnly, estado, dateFrom, dateTo }, page, pageSize),
+    getAidPointsPage({ country, type, availOnly, estado, dateFrom, dateTo }, page, pageSize),
     getHeroes(),
-    getRecentQuakes(),
+    getRecentQuakes(country),
     // Si la tabla aún no existe (esquema sin migrar), no rompemos la página.
     getNewsItems("ayuda").catch(() => []),
     isAdmin(),
@@ -127,7 +133,7 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
           }
           description="Donatones de comida, agua, refugios y medicinas. Registra un punto físico real con foto y datos de contacto para que la comunidad lo verifique y la ayuda llegue a donde se necesita."
         />
-        <RegisterAidPointButton />
+        <RegisterAidPointButton country={country} />
       </div>
 
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

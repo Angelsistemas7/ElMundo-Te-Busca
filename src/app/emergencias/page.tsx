@@ -1,21 +1,26 @@
 import { ChevronDown, ExternalLink, Info, LayoutGrid, LifeBuoy, Phone, ShieldCheck } from "lucide-react";
-import { COMMUNITY_GUIDE, NATIONAL_LINE, PHONE_GROUPS } from "@/lib/emergency";
+import { COMMUNITY_GUIDE, getEmergency } from "@/lib/emergency";
 import { RECURSOS } from "@/lib/recursos";
 import { ShareWhatsApp } from "@/components/ShareWhatsApp";
 import { PageHeader } from "@/components/PageHeader";
+import { getActiveCountry } from "@/lib/country-server";
 
-// A diferencia de casi todo el resto del sitio, esta página NO consulta la
-// base de datos — todo es texto fijo (`lib/emergency.ts`). Forzarla a
-// renderizar en cada visita ("force-dynamic") no tenía ningún beneficio y
-// costaba trabajo de servidor de más. Al quitarlo, Next la genera UNA vez y
-// la sirve al instante desde caché para todo el mundo.
+// Los teléfonos de emergencia dependen del país activo (911 en Venezuela,
+// 123 en Colombia), así que esta página SÍ necesita leer la cookie de país
+// en cada visita — a diferencia del resto del texto fijo, que antes permitía
+// que Next generara la página una sola vez. El costo (una lectura de cookie,
+// sin consultas a la base de datos) es mínimo comparado con mostrar el
+// teléfono equivocado en una página de emergencias.
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Emergencia y seguridad",
   description: "Teléfonos de emergencia, guía rápida para la comunidad y cómo difundir la página.",
 };
 
-export default function EmergenciasPage() {
+export default async function EmergenciasPage() {
+  const country = await getActiveCountry();
+  const { nationalLine: NATIONAL_LINE, groups: PHONE_GROUPS } = getEmergency(country);
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
       <div className="mb-6">

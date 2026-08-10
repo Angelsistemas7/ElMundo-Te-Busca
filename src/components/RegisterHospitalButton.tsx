@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Plus } from "lucide-react";
-import { ESTADOS, HOSPITAL_STATUS_LABEL, type HospitalStatus } from "@/lib/types";
+import { HOSPITAL_STATUS_LABEL, type HospitalStatus } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import { registerHospitalAction, type ActionResult } from "@/app/actions";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
@@ -12,7 +13,8 @@ import { LocationPicker } from "./map/LocationPicker";
 
 const STATUSES = Object.keys(HOSPITAL_STATUS_LABEL) as HospitalStatus[];
 
-export function RegisterHospitalButton() {
+export function RegisterHospitalButton({ country = "ve" }: { country?: string } = {}) {
+  const regions = getCountry(country).regions;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -89,7 +91,7 @@ export function RegisterHospitalButton() {
               <Field label="Estado (región)" htmlFor="estado">
                 <Select id="estado" name="estado" defaultValue="">
                   <option value="">Seleccionar</option>
-                  {ESTADOS.map((e) => (
+                  {regions.map((e) => (
                     <option key={e} value={e}>
                       {e}
                     </option>

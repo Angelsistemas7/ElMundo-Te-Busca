@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Megaphone, Search, Users2 } from "lucide-react";
 import { getCommentsForEntities, getPosts, getPostsPage, type PostSort } from "@/lib/data";
-import { ESTADOS, POST_TYPE_EMOJI, POST_TYPE_LABEL, type PostType } from "@/lib/types";
+import { POST_TYPE_EMOJI, POST_TYPE_LABEL, type PostType } from "@/lib/types";
+import { getActiveCountry } from "@/lib/country-server";
+import { getCountry } from "@/lib/countries";
 import { cn, clampPageSize } from "@/lib/utils";
 import { CreatePostButton } from "@/components/CreatePostButton";
 import { CommunityTabs } from "@/components/CommunityTabs";
@@ -37,31 +39,35 @@ const FILTERS: { value: PostType | "all"; label: string }[] = [
   })),
 ];
 
-const FILTER_FIELDS: FilterField[] = [
-  {
-    kind: "chips",
-    key: "sort",
-    label: "Ordenar por",
-    defaultValue: "recent",
-    options: [
-      { value: "recent", label: "Recientes" },
-      { value: "popular", label: "Más apoyadas" },
-      { value: "least_popular", label: "Menos apoyadas" },
-      { value: "oldest", label: "Más antiguas" },
-    ],
-  },
-  {
-    kind: "select",
-    key: "estado",
-    label: "Estado (región)",
-    placeholder: "Todos",
-    options: ESTADOS.map((e) => ({ value: e, label: e })),
-  },
-  { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Publicado entre" },
-];
+function buildFilterFields(regions: readonly string[]): FilterField[] {
+  return [
+    {
+      kind: "chips",
+      key: "sort",
+      label: "Ordenar por",
+      defaultValue: "recent",
+      options: [
+        { value: "recent", label: "Recientes" },
+        { value: "popular", label: "Más apoyadas" },
+        { value: "least_popular", label: "Menos apoyadas" },
+        { value: "oldest", label: "Más antiguas" },
+      ],
+    },
+    {
+      kind: "select",
+      key: "estado",
+      label: "Estado (región)",
+      placeholder: "Todos",
+      options: regions.map((e) => ({ value: e, label: e })),
+    },
+    { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Publicado entre" },
+  ];
+}
 
 export default async function ComunidadPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
+  const country = await getActiveCountry();
+  const FILTER_FIELDS = buildFilterFields(getCountry(country).regions);
   const type = (str(sp.type) as PostType | "all") ?? "all";
   const q = str(sp.q);
   const sort = (str(sp.sort) as PostSort) ?? "recent";
@@ -84,12 +90,12 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
   // hasta que su autor (o el admin) lo borre — no hay límite de tiempo: un
   // rescate sigue siendo urgente mientras exista, sin importar cuánto lleve.
   const [featuredPosts, rescuePosts, pageResult] = await Promise.all([
-    type === "all" ? getPosts({ pinnedOnly: true, search: q }) : Promise.resolve([]),
-    type === "all" ? getPosts({ type: "rescate", search: q }) : Promise.resolve([]),
+    type === "all" ? getPosts({ country, pinnedOnly: true, search: q }) : Promise.resolve([]),
+    type === "all" ? getPosts({ country, type: "rescate", search: q }) : Promise.resolve([]),
     // Antes: hasta 100 publicaciones completas en cada visita, sin límite —
     // pasados los 100 posts no había forma de ver algo más antiguo. Ahora
     // pagina de verdad (10/20/50 a elegir), con orden real en la base de datos.
-    getPostsPage({ type, search: q, estado, dateFrom, dateTo }, page, pageSize, sort),
+    getPostsPage({ country, type, search: q, estado, dateFrom, dateTo }, page, pageSize, sort),
   ]);
   const featured = featuredPosts;
   const featuredIds = new Set(featured.map((p) => p.id));
@@ -146,7 +152,7 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
       </div>
 
       <div className="mb-5">
-        <CreatePostButton variant="bar" />
+        <CreatePostButton variant="bar" country={country} />
       </div>
 
       {!hasActiveQuery && (
@@ -278,7 +284,7 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
                 equipos de ayuda puedan actuar lo más rápido posible.
               </p>
             </div>
-            <CreatePostButton variant="urgent" initialType="rescate" />
+            <CreatePostButton variant="urgent" initialType="rescate" country={country} />
           </section>
         </div>
       )}

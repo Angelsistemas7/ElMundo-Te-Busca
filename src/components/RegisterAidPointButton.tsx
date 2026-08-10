@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ImagePlus, Loader2, Plus } from "lucide-react";
-import { AID_POINT_TYPE_LABEL, ESTADOS, type AidPointType } from "@/lib/types";
+import { AID_POINT_TYPE_LABEL, type AidPointType } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import { registerAidPointAction, type ActionResult } from "@/app/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
@@ -13,7 +14,8 @@ import { Turnstile } from "./Turnstile";
 import { ManageLinkBox } from "./ManageLinkBox";
 import { LocationPicker } from "./map/LocationPicker";
 
-export function RegisterAidPointButton() {
+export function RegisterAidPointButton({ country = "ve" }: { country?: string } = {}) {
+  const regions = getCountry(country).regions;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -144,7 +146,7 @@ export function RegisterAidPointButton() {
             <Field label="Estado (región)" htmlFor="estado">
               <Select id="estado" name="estado" defaultValue="">
                 <option value="">Seleccionar</option>
-                {ESTADOS.map((e) => (
+                {regions.map((e) => (
                   <option key={e} value={e}>
                     {e}
                   </option>
