@@ -123,7 +123,7 @@ export function SiteHeader() {
                 onClick={() => setMoreOpen((v) => !v)}
                 aria-expanded={moreOpen}
                 className={cn(
-                  "flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition",
+                  "press flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition",
                   moreOpen || moreActive
                     ? "bg-navy-700 text-white"
                     : "text-zinc-600 hover:bg-navy-50 hover:text-navy-700",
