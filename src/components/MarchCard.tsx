@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { memo } from "react";
 import { CalendarClock, MapPin, MessageCircle, MessageSquare, Navigation, Users } from "lucide-react";
 import type { March } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import { LikeButton } from "./LikeButton";
 import { SaveButton } from "./SaveButton";
+import { ViewTransitionLink } from "./ViewTransitionLink";
 
 export const MarchCard = memo(function MarchCard({ march }: { march: March }) {
   const isPast = new Date(march.departAt).getTime() < Date.now();
@@ -67,13 +67,13 @@ export const MarchCard = memo(function MarchCard({ march }: { march: March }) {
             {march.attendeesCount}
           </span>
         </div>
-        <Link
+        <ViewTransitionLink
           href={`/caravanas/${march.id}`}
           className="press flex items-center gap-1.5 text-sm font-medium text-zinc-600 transition hover:text-zinc-900"
         >
           <MessageCircle className="h-4 w-4" />
           Ver y comentar
-        </Link>
+        </ViewTransitionLink>
       </div>
     </article>
   );

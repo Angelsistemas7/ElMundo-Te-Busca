@@ -16,7 +16,7 @@ export const HospitalCard = memo(function HospitalCard({ hospital, patientCount 
   const s = HOSPITAL_STATUS_STYLE[hospital.status];
 
   return (
-    <Card href={`/hospitales/${hospital.id}`} className="gap-3 p-5">
+    <Card href={`/hospitales/${hospital.id}`} className="gap-3 p-5" viewTransition>
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-zinc-900">{hospital.name}</h3>
         <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold", s.chip)}>
