@@ -37,6 +37,31 @@ carruseles (`SwipeStaticRow`/`SwipeHintRow`) para inercia tipo iOS
 (`scroll-snap-type`), y animación de entrada (`animate-rise`) en las
 tarjetas fijadas/destacadas de Comunidad si no la tienen ya.
 
+**Continuación, misma sesión — ya resuelto lo de arriba y más**:
+- `snap-mandatory` + `scroll-smooth` en los 4 carruseles de tarjetas
+  (`FeaturedSections`, `RecentlyLocated`, `PinnedPostCard`/Destacado de
+  Comunidad) — antes solo `NewsCarouselTrack` tenía el patrón completo.
+- `PullToRefresh` (ya existía solo en Se busca/Comunidad) extendido a las
+  6 páginas de listado que faltaban: Ayuda, Hospitales, Caravanas,
+  Mascotas, Voluntarios, Denuncias — las 8 páginas de listado ahora
+  comparten el mismo gesto de "jalar para recargar".
+- Tap feedback (`.press`) en el botón "Más" del header de escritorio
+  (único botón sin él que quedó en el barrido).
+- Revisado sin hallazgos: `Modal.tsx` (ya tiene drag-to-dismiss, blur de
+  fondo, hoja tipo iOS — `FilterModal` lo reutiliza), `SiteHeader` (ya
+  sticky + `backdrop-blur`), `RecognizeDeck` (la baraja tipo Tinder ya
+  tiene rotación + `cubic-bezier` en el arrastre, stamps LIKE/NOPE).
+- **Idea para más adelante, NO construida** (requiere tocar el pipeline de
+  subida de fotos, no es solo CSS): miniaturas borrosas mientras carga la
+  foto real (`placeholder="blur"` de `next/image`) — hoy ninguna foto de
+  persona/mascota/ayuda tiene `blurDataURL`; para hacerlo bien habría que
+  generar y guardar una miniatura base64 chiquita al subir la foto
+  (`src/lib/upload.ts`/`image.ts`), no algo de una sola sesión.
+- Build/typecheck verdes en cada commit. La verificación visual en
+  navegador sigue bloqueada en este entorno por lo mismo de arriba
+  (migración pendiente + sin salida a GDELT) — probar en el teléfono
+  cuando se pueda.
+
 ## 📌 Cierre de sesión (2026-08-10) — MULTI-PAÍS: leer esto primero
 
 El mismo día del terremoto de Colombia (M7,4, 10 ago. 2026, epicentro cerca
