@@ -264,11 +264,11 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
       depthKm: 96,
       epicenterText: "cerca de San José del Palmar (Chocó)",
       date: "10 de agosto de 2026, 7:34 a.m.",
-      deaths: 111,
-      injured: 87,
+      deaths: 132,
+      injured: 570,
       mostAffected: "Risaralda (Pereira) y Valle del Cauca (Cali)",
       alsoAffected: ["Chocó (Quibdó)", "Caldas (Manizales)"],
-      sourceName: "CNN en Español, El Tiempo (10 ago. 2026) — cifras iniciales, en desarrollo",
+      sourceName: "El Tiempo (Asocapitales), CNN en Español (10 ago. 2026) — cifras corroboradas por 2+ fuentes, en desarrollo",
     },
     emergency: {
       // Colombia tiene una línea única nacional (a diferencia de VE, no hay
