@@ -4,6 +4,7 @@ import { useRef } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { ExternalLinkGuard } from "./ExternalLinkGuard";
+import { SwipeHintNestedOnce } from "./SwipeHint";
 
 export type CarouselItem = {
   id: string;
@@ -19,7 +20,7 @@ export function NewsCarouselTrack({ items }: { items: CarouselItem[] }) {
   function scrollByCard(dir: 1 | -1) {
     const track = trackRef.current;
     if (!track) return;
-    const card = track.firstElementChild as HTMLElement | null;
+    const card = track.querySelector(":scope > * > *") as HTMLElement | null;
     const step = (card?.offsetWidth ?? 240) + 16;
     track.scrollBy({ left: dir * step, behavior: "smooth" });
   }
@@ -28,9 +29,10 @@ export function NewsCarouselTrack({ items }: { items: CarouselItem[] }) {
 
   return (
     <div className="relative">
-      <div
+      <SwipeHintNestedOnce
         ref={trackRef}
-        className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1"
+        outerClassName="no-scrollbar snap-x snap-mandatory overflow-x-auto scroll-smooth pb-1"
+        innerClassName="flex w-max gap-4"
       >
         {items.map((item) => (
           <ExternalLinkGuard
@@ -68,7 +70,7 @@ export function NewsCarouselTrack({ items }: { items: CarouselItem[] }) {
             </div>
           </ExternalLinkGuard>
         ))}
-      </div>
+      </SwipeHintNestedOnce>
 
       {items.length > 3 && (
         <div className="mt-2 flex justify-end gap-2">

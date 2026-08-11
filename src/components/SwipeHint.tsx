@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,38 +47,55 @@ export function SwipeHintRow({
 }
 
 const ONE_SHOT_DURATION_MS = 5_200; // ~2 ciclos de `hint-swipe` (2.6s c/u)
+const VIEWPORT_THRESHOLD = 0.5; // la fila debe verse al menos a la mitad
 
 /**
- * Igual que `SwipeHintNested`, pero el vaivén corre UNA sola vez al montar
- * (un par de ciclos) y no se reactiva después, ni siquiera tras 10s de
- * inactividad — a diferencia de `SwipeHintNested`, que lo retoma sin parar.
- * Pensado para widgets que se ven todo el tiempo (cifras del inicio): el
- * vaivén continuo ahí se sentía como ruido visual permanente.
+ * Igual que `SwipeHintNested`, pero el vaivén corre UNA sola vez — ya no al
+ * montar (eso disparaba la animación aunque el widget todavía no estuviera a
+ * la vista, p.ej. más abajo en la pantalla de un celular), sino la primera
+ * vez que la fila entra de verdad en el viewport (IntersectionObserver), un
+ * par de ciclos, y no se reactiva después. Pensado para widgets que se ven
+ * todo el tiempo una vez visibles (cifras del inicio, noticias): el vaivén
+ * continuo ahí se sentía como ruido visual permanente.
  */
-export function SwipeHintNestedOnce({
-  outerClassName,
-  innerClassName,
-  children,
-}: {
+export const SwipeHintNestedOnce = forwardRef<HTMLDivElement, {
   outerClassName: string;
   innerClassName: string;
   children: React.ReactNode;
-}) {
-  const [active, setActive] = useState(true);
+}>(function SwipeHintNestedOnce({ outerClassName, innerClassName, children }, forwardedRef) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  useImperativeHandle(forwardedRef, () => outerRef.current as HTMLDivElement);
+
+  const [active, setActive] = useState(false);
+  const firedRef = useRef(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setActive(false), ONE_SHOT_DURATION_MS);
-    return () => clearTimeout(t);
+    const el = outerRef.current;
+    if (!el || firedRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting || firedRef.current) return;
+        firedRef.current = true;
+        setActive(true);
+        const t = setTimeout(() => setActive(false), ONE_SHOT_DURATION_MS);
+        observer.disconnect();
+        return () => clearTimeout(t);
+      },
+      { threshold: VIEWPORT_THRESHOLD }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   const stop = useCallback(() => setActive(false), []);
 
   return (
-    <div className={outerClassName} onPointerDown={stop} onTouchStart={stop} onScroll={stop}>
+    <div ref={outerRef} className={outerClassName} onPointerDown={stop} onTouchStart={stop} onScroll={stop}>
       <div className={cn(innerClassName, active && "hint-swipe")}>{children}</div>
     </div>
   );
-}
+});
 
 /**
  * Fila que se desliza a mano SIN el vaivén automático — en secciones con
