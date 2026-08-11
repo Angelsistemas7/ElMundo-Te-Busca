@@ -5,6 +5,56 @@ coordinar ayuda tras el **terremoto de Venezuela 2026**. En producción en
 `elmundotebusca.com` (VPS propio, Next.js + Supabase, deploy automático por
 GitHub Actions + PM2 en cada push a `main`). Español, `npm run build` siempre verde.
 
+## 🔴 SITIO CAÍDO ahora mismo (2026-08-10, tras el push de esta sesión) — LEE ESTO PRIMERO
+
+**Síntoma en vivo** (`elmundotebusca.com`): TODA página se queda colgada en
+"Cargando…" para siempre — incluida `/emergencias`, que es 100% estática y
+**no hace ninguna consulta a Supabase** (confirmado leyendo el código y en
+`docs/ESTADO-DEL-PROYECTO.md`). Tras un rato el navegador se rinde y el
+usuario ve en su lugar "Algo salió mal" o "Application error: a client-side
+exception has occurred" — es el mismo cuelgue, solo que cada intento expira
+en un momento distinto. Confirmado con el navegador (consola, red, HTML
+servido): el HTML llega bien (200 OK), pero el `<Suspense>` del contenido
+principal nunca se resuelve — el servidor se queda esperando algo que nunca
+responde.
+
+**El deploy en sí NO es el problema** — verificado con `gh run view` sobre
+el workflow "Deploy a VPS": build en verde, `rsync` subió el build al VPS,
+`pm2 startOrReload` reinició el proceso sin errores, el proceso queda
+`online`. El código que se subió compila y el proceso está vivo.
+
+**Hipótesis más probable — dos proyectos de Supabase distintos**: en el
+cierre de sesión anterior (ver sección de abajo, "Migración SQL corrida"),
+al abrir el SQL Editor de Supabase para correr `schema.sql` salió
+`relation "persons" does not exist` — es decir, esa base estaba
+**completamente vacía**. Pero el sitio en producción ya tenía datos reales
+(personas, puntos de ayuda, hospitales) antes de que Supabase se pausara.
+Eso solo es consistente si:
+- Se terminó en un **proyecto de Supabase nuevo/distinto** al que usa
+  realmente `elmundotebusca.com` en su `.env` del VPS, y el proyecto real
+  (el que tiene los datos) sigue pausado/inaccesible — el VPS se queda
+  "colgado" esperando una respuesta de un Supabase pausado, que no llega
+  nunca (no hay timeout corto configurado en las llamadas de `lib/supabase.ts`).
+
+**Falta verificar esto en el VPS** (el dueño no tenía acceso SSH a mano en
+este momento; queda para retomar con el compañero):
+```bash
+# En el VPS, dentro de /var/www/elmundotebusca:
+grep SUPABASE_URL .env
+```
+Comparar esa URL con la del proyecto de Supabase donde se corrió
+`schema.sql` en la sesión anterior (la que dio "success" tras el fix de
+orden de índices). **Si no coinciden**, ese es el bug: hay que decidir cuál
+de los dos proyectos es el real (el que tiene los datos de producción) y
+apuntar el `.env` del VPS a ese, o si el proyecto real de verdad se perdió,
+recuperarlo desde el dashboard de Supabase (los datos de un proyecto pausado
+no se borran, solo se pausa el cómputo) antes de reintentar nada.
+
+**Mientras no se resuelva esto, el sitio en vivo está caído para cualquier
+visitante** (todas las páginas cuelgan). No es cosmético, es bloqueante.
+
+---
+
 ## 🚨 Cierre de sesión (2026-08-10) — LEE ESTO PRIMERO ANTES DE NADA
 
 **Estado ahora mismo**: los **28 commits locales** de esta sesión (multi-país +
