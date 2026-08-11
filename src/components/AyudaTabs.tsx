@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, HeartHandshake } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SwipeHintRow } from "./SwipeHint";
+import { SwipeHintRowOnce } from "./SwipeHint";
 
 // Barra de pestañas del área de ayuda física. Puntos de ayuda y hospitales
 // viven en páginas separadas (modelos de datos distintos: estado operativo de
@@ -19,7 +19,7 @@ const TABS = [
 export function AyudaTabs() {
   const pathname = usePathname();
   return (
-    <SwipeHintRow className="no-scrollbar mb-6 flex gap-1.5 overflow-x-auto pb-1">
+    <SwipeHintRowOnce className="no-scrollbar mb-6 flex gap-1.5 overflow-x-auto pb-1">
       {TABS.map(({ href, label, icon: Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
@@ -39,6 +39,6 @@ export function AyudaTabs() {
           </Link>
         );
       })}
-    </SwipeHintRow>
+    </SwipeHintRowOnce>
   );
 }

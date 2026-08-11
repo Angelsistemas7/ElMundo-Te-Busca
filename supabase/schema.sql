@@ -96,6 +96,18 @@ create index if not exists persons_name_trgm_idx     on persons using gin ((firs
 alter table persons add column if not exists country text not null default 've';
 create index if not exists persons_country_idx on persons (country);
 
+-- ── Sincronización desde colombiatebusca.com / venezuelatebusca.com ────────
+-- Esos sitios quedaron sin mantenimiento (ver docs/ESTADO-DEL-PROYECTO.md).
+-- `external_source`/`external_id` identifican el registro original para que
+-- la sincronización horaria (scripts/sync-legacy-sites) pueda hacer upsert
+-- idempotente sin depender de un archivo de estado local entre corridas de
+-- GitHub Actions (cada corrida es una máquina nueva).
+alter table persons add column if not exists external_source text;
+alter table persons add column if not exists external_id text;
+create unique index if not exists persons_external_uniq
+  on persons (external_source, external_id)
+  where external_id is not null;
+
 -- ── Propietario de la publicación (token privado de gestión) ────────────────
 -- Tabla aparte y SIN lectura pública: el token es secreto. Solo el servidor
 -- (service role) lo lee para verificar al autor. Permite que quien publicó

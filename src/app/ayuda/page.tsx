@@ -12,7 +12,7 @@ import { AidPointCard } from "@/components/AidPointCard";
 const RegisterAidPointButton = nextDynamic(() =>
   import("@/components/RegisterAidPointButton").then((m) => m.RegisterAidPointButton),
 );
-import { SwipeHintRow } from "@/components/SwipeHint";
+import { SwipeHintRowOnce } from "@/components/SwipeHint";
 import { Pagination } from "@/components/Pagination";
 import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
@@ -139,7 +139,7 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
       </div>
 
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <SwipeHintRow className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+        <SwipeHintRowOnce className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
           {TYPE_CHIPS.map((c) => (
             <Link
               key={c.value}
@@ -154,7 +154,7 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
               {c.label}
             </Link>
           ))}
-        </SwipeHintRow>
+        </SwipeHintRowOnce>
         <Link
           href={availHref()}
           className={cn(

@@ -27,7 +27,7 @@ import { getCountry } from "@/lib/countries";
 import { directionsLink, formatDateTime, whatsappLink } from "@/lib/utils";
 import { CrisisMap } from "@/components/map/CrisisMap";
 import { RecentQuakes } from "@/components/RecentQuakes";
-import { SwipeHintNested } from "@/components/SwipeHint";
+import { SwipeHintNestedOnce } from "@/components/SwipeHint";
 import type {
   AidMarker,
   HelpMarker,
@@ -269,8 +269,8 @@ export default async function MapaPage() {
       </div>
 
       {/* Fila horizontal (igual que las cifras de "Se busca"): cada una lleva a
-          su sección. Vaivén leve y constante que insinúa que se puede deslizar. */}
-      <SwipeHintNested
+          su sección. Vaivén leve al entrar en pantalla, un par de ciclos, y para. */}
+      <SwipeHintNestedOnce
         outerClassName="no-scrollbar -mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:overflow-visible sm:px-0"
         innerClassName="flex w-max gap-2 sm:w-auto sm:[animation:none] sm:grid sm:grid-cols-3 sm:gap-3 lg:grid-cols-6"
       >
@@ -316,7 +316,7 @@ export default async function MapaPage() {
             <div className="text-lg font-bold text-sky-700 sm:text-xl">{marchMarkers.length}</div>
             <div className="text-[11px] text-zinc-600 sm:text-xs">Caravanas</div>
           </Link>
-      </SwipeHintNested>
+      </SwipeHintNestedOnce>
 
       <div className="mb-4 rounded-2xl border border-zinc-200 bg-white p-4">
         <h2 className="text-sm font-bold text-zinc-900">Datos del sismo (fuentes públicas)</h2>

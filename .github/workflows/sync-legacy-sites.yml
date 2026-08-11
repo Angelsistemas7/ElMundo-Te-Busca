@@ -1,0 +1,55 @@
+name: Sincronizar sitios sin mantenimiento
+
+# colombiatebusca.com y venezuelatebusca.com quedaron sin quien las administre
+# (ver docs/ESTADO-DEL-PROYECTO.md) pero la gente sigue publicando ahí sin
+# saberlo. Cada hora, este workflow trae lo nuevo y lo agrega a este sitio.
+#
+# Requiere estos secrets del repositorio (Settings → Secrets and variables →
+# Actions):
+#   NEXT_PUBLIC_SUPABASE_URL       - misma URL que en .env.local de producción
+#   SUPABASE_SERVICE_ROLE_KEY      - misma service_role key (NO la publishable/anon)
+#
+# También requiere que la migración en supabase/schema.sql (columnas
+# external_source / external_id en `persons`) ya se haya aplicado en la base
+# real — corre ese fragmento una vez en el SQL Editor de Supabase antes de
+# activar este workflow.
+
+on:
+  schedule:
+    - cron: "0 * * * *" # cada hora, en punto
+  workflow_dispatch: {} # también se puede disparar a mano desde la pestaña Actions
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: scripts/sync-legacy-sites
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Instalar Chromium (para venezuelatebusca.com)
+        run: npx playwright install --with-deps chromium
+
+      - name: Sincronizar colombiatebusca.com
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node sync-colombia.mjs
+
+      - name: Sincronizar venezuelatebusca.com
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        # venezuelatebusca.com está detrás de un challenge de Cloudflare que
+        # bloquea navegadores headless; xvfb-run le da una pantalla virtual
+        # para que Playwright corra en modo "con cabeza" y lo pase.
+        run: xvfb-run --auto-servernum node sync-venezuela.mjs

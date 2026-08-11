@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
-import { SwipeHintRow } from "../SwipeHint";
+import { SwipeHintRowOnce } from "../SwipeHint";
 import type {
   AidMarker,
   HelpMarker,
@@ -75,7 +75,7 @@ export function CrisisMap({
       {/* Fila horizontal deslizable (igual que "Se busca"): en móvil, apilar estos
           9 íconos en varias líneas se veía muy saturado. Empujoncito breve para
           insinuar que se puede deslizar. */}
-      <SwipeHintRow className="no-scrollbar flex items-center gap-x-4 overflow-x-auto pb-1 text-sm text-zinc-600">
+      <SwipeHintRowOnce className="no-scrollbar flex items-center gap-x-4 overflow-x-auto pb-1 text-sm text-zinc-600">
         <span className="flex shrink-0 items-center gap-1.5">
           <span className="flex h-4 w-4 items-center justify-center text-[12px] text-amber-900">⊕</span>
           Epicentro
@@ -116,7 +116,7 @@ export function CrisisMap({
           <span className="inline-block h-4 w-4 rounded-full border-2 border-white bg-emerald-500 shadow" />
           Hospital
         </span>
-      </SwipeHintRow>
+      </SwipeHintRowOnce>
     </div>
   );
 }

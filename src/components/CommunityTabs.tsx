@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HandHeart, MapPinned, Megaphone, Users2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SwipeHintRow } from "./SwipeHint";
+import { SwipeHintRowOnce } from "./SwipeHint";
 
 // Barra de pestañas del área de Comunidad. El muro, los voluntarios, las
 // caravanas y las denuncias viven en páginas separadas pero se sienten como
@@ -19,7 +19,7 @@ const TABS = [
 export function CommunityTabs() {
   const pathname = usePathname();
   return (
-    <SwipeHintRow className="no-scrollbar mb-6 flex gap-1.5 overflow-x-auto pb-1">
+    <SwipeHintRowOnce className="no-scrollbar mb-6 flex gap-1.5 overflow-x-auto pb-1">
       {TABS.map(({ href, label, icon: Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
@@ -39,6 +39,6 @@ export function CommunityTabs() {
           </Link>
         );
       })}
-    </SwipeHintRow>
+    </SwipeHintRowOnce>
   );
 }

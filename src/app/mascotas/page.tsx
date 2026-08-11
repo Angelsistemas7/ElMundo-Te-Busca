@@ -11,7 +11,7 @@ const RegisterPetButton = nextDynamic(() =>
   import("@/components/RegisterPetButton").then((m) => m.RegisterPetButton),
 );
 import { EmptyState } from "@/components/EmptyState";
-import { SwipeHintRow } from "@/components/SwipeHint";
+import { SwipeHintRowOnce } from "@/components/SwipeHint";
 import { Pagination } from "@/components/Pagination";
 import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
@@ -137,7 +137,7 @@ export default async function MascotasPage({ searchParams }: { searchParams: Sea
         </button>
       </form>
 
-      <SwipeHintRow className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1">
+      <SwipeHintRowOnce className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1">
         {FILTERS.map((f) => (
           <Link
             key={f.value}
@@ -152,7 +152,7 @@ export default async function MascotasPage({ searchParams }: { searchParams: Sea
             {f.label}
           </Link>
         ))}
-      </SwipeHintRow>
+      </SwipeHintRowOnce>
 
       <div className="mb-4 flex items-center justify-end gap-2">
         <FilterModal basePath="/mascotas" currentParams={currentParams} fields={FILTER_FIELDS} />

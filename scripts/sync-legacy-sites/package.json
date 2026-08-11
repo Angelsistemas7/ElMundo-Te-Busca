@@ -1,0 +1,12 @@
+{
+  "name": "sync-legacy-sites",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Sincronización horaria desde colombiatebusca.com y venezuelatebusca.com (sitios propios sin mantenimiento) hacia El mundo te busca.",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "cheerio": "^1.0.0",
+    "playwright": "^1.48.0"
+  }
+}
