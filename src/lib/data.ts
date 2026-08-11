@@ -2814,6 +2814,7 @@ export async function supportComplaint(id: string): Promise<void> {
 function rowToPet(r: any): Pet {
   return {
     id: r.id,
+    country: r.country ?? "ve",
     status: r.status,
     species: r.species ?? "perro",
     name: r.name ?? "",
@@ -2841,6 +2842,7 @@ export type PetSort = "recent" | "oldest";
 
 export async function getPets(
   filter: {
+    country?: string;
     status?: PetStatus | "all";
     search?: string;
     estado?: string | "all";
@@ -2851,9 +2853,10 @@ export async function getPets(
   pageSize = 10,
   sort: PetSort = "recent",
 ): Promise<PetResult> {
+  const country = filter.country ?? "ve";
   const sb = getSupabase();
   if (!sb) {
-    let items = mem.pets.slice();
+    let items = mem.pets.filter((p) => (p.country ?? "ve") === country);
     if (filter.status && filter.status !== "all") items = items.filter((p) => p.status === filter.status);
     if (filter.estado && filter.estado !== "all") items = items.filter((p) => p.estado === filter.estado);
     if (filter.dateFrom) items = items.filter((p) => p.createdAt >= filter.dateFrom!);
@@ -2879,6 +2882,7 @@ export async function getPets(
   let query = sb
     .from("pets")
     .select("*", { count: "exact" })
+    .eq("country", country)
     .order("created_at", { ascending: sort === "oldest" });
   if (filter.status && filter.status !== "all") query = query.eq("status", filter.status);
   if (filter.estado && filter.estado !== "all") query = query.eq("estado", filter.estado);
@@ -2918,9 +2922,11 @@ export async function createPet(
   const now = new Date().toISOString();
   const ownerToken = newToken();
   const sb = getSupabaseAdmin() ?? getSupabase();
+  const country = input.country ?? "ve";
   if (!sb) {
     const pet: Pet = {
       id: uid("pet"),
+      country,
       status: input.status,
       species: input.species,
       name: input.name || "",
@@ -2939,6 +2945,7 @@ export async function createPet(
   const { data, error } = await sb
     .from("pets")
     .insert({
+      country,
       status: input.status,
       species: input.species,
       name: input.name || "",
@@ -3217,6 +3224,7 @@ export async function hasVolunteered(userId: string): Promise<boolean> {
 function rowToHero(r: any): Hero {
   return {
     id: r.id,
+    country: r.country ?? "ve",
     category: r.category,
     title: r.title,
     body: r.body ?? "",
@@ -3233,22 +3241,18 @@ function rowToHero(r: any): Hero {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-/**
- * Lista de héroes. Por defecto solo los verificados (visto bueno del moderador);
- * con `includeUnverified` trae también los propuestos por la comunidad (para el
- * panel de admin). Ordena: verificados primero, luego por fecha.
- */
-export const getHeroes = unstable_cache(getHeroesImpl, ["heroes"], { revalidate: 60 });
-async function getHeroesImpl(opts: { includeUnverified?: boolean } = {}): Promise<Hero[]> {
+async function getHeroesImpl(opts: { includeUnverified?: boolean; country?: string } = {}): Promise<Hero[]> {
   const sb = getSupabase();
   if (!sb) {
     let items = mem.heroes.slice();
+    if (opts.country) items = items.filter((h) => (h.country ?? "ve") === opts.country);
     if (!opts.includeUnverified) items = items.filter((h) => h.verified);
     return items.sort(
       (a, b) => Number(b.verified) - Number(a.verified) || b.createdAt.localeCompare(a.createdAt),
     );
   }
   let query = sb.from("heroes").select("*").limit(300);
+  if (opts.country) query = query.eq("country", opts.country);
   if (!opts.includeUnverified) query = query.eq("verified", true);
   const { data, error } = await query
     .order("verified", { ascending: false })
@@ -3257,12 +3261,29 @@ async function getHeroesImpl(opts: { includeUnverified?: boolean } = {}): Promis
   return (data ?? []).map(rowToHero);
 }
 
-export async function createHero(input: HeroInput, photoUrl: string | null, authorName: string): Promise<Hero> {
+/** Héroes verificados de un país (portada de `/ayuda`). Cacheado 60s por país. */
+const heroesCache = perCountryCache("heroes", (c) => () => getHeroesImpl({ country: c }), { revalidate: 60 });
+export function getHeroes(country = "ve"): Promise<Hero[]> {
+  return heroesCache[resolveCountry(country)]();
+}
+
+/** Todos los héroes de TODOS los países, incluidos los sin verificar (panel de admin). Sin caché. */
+export function getHeroesForAdmin(): Promise<Hero[]> {
+  return getHeroesImpl({ includeUnverified: true });
+}
+
+export async function createHero(
+  input: HeroInput,
+  photoUrl: string | null,
+  authorName: string,
+): Promise<Hero> {
   const now = new Date().toISOString();
   const sb = getSupabaseAdmin() ?? getSupabase();
+  const country = input.country ?? "ve";
   if (!sb) {
     const hero: Hero = {
       id: uid("hero"),
+      country,
       category: input.category,
       title: input.title,
       body: input.body,
@@ -3282,6 +3303,7 @@ export async function createHero(input: HeroInput, photoUrl: string | null, auth
   const { data, error } = await sb
     .from("heroes")
     .insert({
+      country,
       category: input.category,
       title: input.title,
       body: input.body,
@@ -3343,6 +3365,7 @@ export async function deleteHero(id: string): Promise<void> {
 function rowToNewsItem(r: any): NewsItem {
   return {
     id: r.id,
+    country: r.country ?? "ve",
     kind: r.kind,
     title: r.title,
     body: r.body ?? "",
@@ -3355,28 +3378,48 @@ function rowToNewsItem(r: any): NewsItem {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-/** Noticias curadas; con `kind` se filtra por ayuda humanitaria o titulares. */
-export const getNewsItems = unstable_cache(getNewsItemsImpl, ["news-items"], { revalidate: 60 });
-async function getNewsItemsImpl(kind?: NewsItem["kind"]): Promise<NewsItem[]> {
+async function getNewsItemsImpl(kind: NewsItem["kind"] | undefined, country: string): Promise<NewsItem[]> {
   const sb = getSupabase();
   if (!sb) {
-    let items = mem.newsItems.slice();
+    let items = mem.newsItems.filter((n) => (n.country ?? "ve") === country);
     if (kind) items = items.filter((n) => n.kind === kind);
     return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
-  let query = sb.from("news_items").select("*").order("created_at", { ascending: false }).limit(200);
+  let query = sb
+    .from("news_items")
+    .select("*")
+    .eq("country", country)
+    .order("created_at", { ascending: false })
+    .limit(200);
   if (kind) query = query.eq("kind", kind);
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map(rowToNewsItem);
 }
 
+/**
+ * Noticias curadas de un país; con `kind` se filtra por ayuda humanitaria o
+ * titulares. Cacheado 60s por país (trae TODOS los kinds de ese país y el
+ * filtro por kind se aplica después, sin caché — pasar `kind` como argumento
+ * a `unstable_cache` no distingue entradas de forma confiable, mismo motivo
+ * por el que `country` va fijo en la clave y no como argumento).
+ */
+const newsItemsCache = perCountryCache("news-items", (c) => () => getNewsItemsImpl(undefined, c), {
+  revalidate: 60,
+});
+export async function getNewsItems(kind: NewsItem["kind"] | undefined, country = "ve"): Promise<NewsItem[]> {
+  const items = await newsItemsCache[resolveCountry(country)]();
+  return kind ? items.filter((n) => n.kind === kind) : items;
+}
+
 export async function createNewsItem(input: NewsItemInput, photoUrl: string | null = null): Promise<NewsItem> {
   const now = new Date().toISOString();
   const sb = getSupabaseAdmin() ?? getSupabase();
+  const country = input.country ?? "ve";
   if (!sb) {
     const item: NewsItem = {
       id: uid("news"),
+      country,
       kind: input.kind,
       title: input.title,
       body: input.body,
@@ -3392,6 +3435,7 @@ export async function createNewsItem(input: NewsItemInput, photoUrl: string | nu
   const { data, error } = await sb
     .from("news_items")
     .insert({
+      country,
       kind: input.kind,
       title: input.title,
       body: input.body,

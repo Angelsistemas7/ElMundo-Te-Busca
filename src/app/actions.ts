@@ -762,7 +762,7 @@ export async function registerPetAction(form: FormData): Promise<ActionResult> {
 
   try {
     const { pet, ownerToken } = await createPet(
-      parsed.data,
+      { ...parsed.data, country: await getActiveCountry() },
       photoUrl,
       (await getCurrentUser())?.id ?? null,
     );
@@ -909,7 +909,11 @@ export async function registerHeroAction(form: FormData): Promise<ActionResult> 
   const authorName = (await getCurrentUser())?.username ?? "Comunidad";
 
   try {
-    const hero = await createHero(parsed.data, photoUrl, authorName);
+    const hero = await createHero(
+      { ...parsed.data, country: await getActiveCountry() },
+      photoUrl,
+      authorName,
+    );
     revalidatePath("/ayuda");
     return {
       ok: true,

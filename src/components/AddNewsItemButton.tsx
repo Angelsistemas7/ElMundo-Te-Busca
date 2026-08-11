@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { ImagePlus, Loader2, Plus } from "lucide-react";
 import type { NewsKind } from "@/lib/types";
 import { NEWS_KIND_LABEL } from "@/lib/types";
+import { COUNTRIES, COUNTRY_CODES } from "@/lib/countries";
 import { createNewsItemAction } from "@/app/admin/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
 import { Modal } from "./Modal";
-import { Field, Input, Textarea } from "./FormControls";
+import { Field, Input, Select, Textarea } from "./FormControls";
 
 // Solo para el equipo (admin): agrega una noticia curada con su fuente. Aparece
 // en la pestaña que corresponda con "me gusta" y comentarios.
@@ -98,6 +99,16 @@ export function AddNewsItemButton({ kind }: { kind: NewsKind }) {
               }}
             />
           </label>
+
+          <Field label="País" htmlFor="country" required>
+            <Select id="country" name="country" defaultValue="ve">
+              {COUNTRY_CODES.map((c) => (
+                <option key={c} value={c}>
+                  {COUNTRIES[c].name}
+                </option>
+              ))}
+            </Select>
+          </Field>
 
           <Field label="Titular" htmlFor="title" required error={fieldErrors?.title}>
             <Input id="title" name="title" placeholder="Ej. Suiza envía equipo de rescate a Venezuela" />

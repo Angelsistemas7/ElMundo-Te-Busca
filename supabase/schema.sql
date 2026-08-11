@@ -354,6 +354,10 @@ create table if not exists pets (
 create index if not exists pets_status_idx  on pets (status);
 create index if not exists pets_created_idx on pets (created_at desc);
 
+-- Migración multi-país (ago. 2026): ver nota en `persons` más arriba.
+alter table pets add column if not exists country text not null default 've';
+create index if not exists pets_country_idx on pets (country);
+
 -- ── Voluntarios ("Puedo ayudar") ────────────────────────────────────────────
 create table if not exists volunteers (
   id uuid primary key default uuid_generate_v4(),
@@ -419,6 +423,10 @@ create table if not exists heroes (
 );
 create index if not exists heroes_verified_idx on heroes (verified, created_at desc);
 
+-- Migración multi-país (ago. 2026): ver nota en `persons` más arriba.
+alter table heroes add column if not exists country text not null default 've';
+create index if not exists heroes_country_idx on heroes (country);
+
 -- ── Noticias curadas (las agrega el equipo, con su fuente) ───────────────────
 create table if not exists news_items (
   id uuid primary key default uuid_generate_v4(),
@@ -432,6 +440,11 @@ create table if not exists news_items (
   created_at timestamptz not null default now()
 );
 create index if not exists news_items_kind_idx on news_items (kind, created_at desc);
+
+-- Migración multi-país (ago. 2026): ver nota en `persons` más arriba. Aquí el
+-- equipo (admin) elige el país al crear la noticia, no se infiere del cliente.
+alter table news_items add column if not exists country text not null default 've';
+create index if not exists news_items_country_idx on news_items (country);
 
 -- ── Comentarios (foro de comunidad) ─────────────────────────────────────────
 create table if not exists comments (

@@ -2,7 +2,9 @@ import Link from "next/link";
 import nextDynamic from "next/dynamic";
 import { PawPrint, Search } from "lucide-react";
 import { getCommentsForEntities, getPets, type PetSort } from "@/lib/data";
-import { ESTADOS, PET_STATUS_EMOJI, PET_STATUS_LABEL, type PetStatus } from "@/lib/types";
+import { PET_STATUS_EMOJI, PET_STATUS_LABEL, type PetStatus } from "@/lib/types";
+import { getActiveCountry } from "@/lib/country-server";
+import { getCountry } from "@/lib/countries";
 import { cn, clampPageSize } from "@/lib/utils";
 import { PetCard } from "@/components/PetCard";
 const RegisterPetButton = nextDynamic(() =>
@@ -34,29 +36,33 @@ const FILTERS: { value: PetStatus | "all"; label: string }[] = [
   })),
 ];
 
-const FILTER_FIELDS: FilterField[] = [
-  {
-    kind: "select",
-    key: "estado",
-    label: "Estado (región)",
-    placeholder: "Todos",
-    options: ESTADOS.map((e) => ({ value: e, label: e })),
-  },
-  {
-    kind: "chips",
-    key: "sort",
-    label: "Ordenar por",
-    defaultValue: "recent",
-    options: [
-      { value: "recent", label: "Más recientes" },
-      { value: "oldest", label: "Más antiguas" },
-    ],
-  },
-  { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Registrado entre" },
-];
+function buildFilterFields(regions: readonly string[]): FilterField[] {
+  return [
+    {
+      kind: "select",
+      key: "estado",
+      label: "Estado (región)",
+      placeholder: "Todos",
+      options: regions.map((e) => ({ value: e, label: e })),
+    },
+    {
+      kind: "chips",
+      key: "sort",
+      label: "Ordenar por",
+      defaultValue: "recent",
+      options: [
+        { value: "recent", label: "Más recientes" },
+        { value: "oldest", label: "Más antiguas" },
+      ],
+    },
+    { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Registrado entre" },
+  ];
+}
 
 export default async function MascotasPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
+  const country = await getActiveCountry();
+  const FILTER_FIELDS = buildFilterFields(getCountry(country).regions);
   const status = (str(sp.status) as PetStatus | "all") ?? "all";
   const q = str(sp.q);
   const estado = str(sp.estado) ?? "all";
@@ -67,7 +73,7 @@ export default async function MascotasPage({ searchParams }: { searchParams: Sea
   const pageSize = clampPageSize(num(sp.pageSize));
 
   const { items: pets, total } = await getPets(
-    { status, search: q, estado, dateFrom, dateTo },
+    { country, status, search: q, estado, dateFrom, dateTo },
     page,
     pageSize,
     sort,
@@ -106,7 +112,7 @@ export default async function MascotasPage({ searchParams }: { searchParams: Sea
           description="¿Perdiste o encontraste una mascota tras el terremoto? Repórtala con foto y ubicación para reunirla con su familia."
         />
         <div className="shrink-0">
-          <RegisterPetButton />
+          <RegisterPetButton country={country} />
         </div>
       </div>
 

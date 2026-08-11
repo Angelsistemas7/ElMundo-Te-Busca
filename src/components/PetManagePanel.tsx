@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Trash2, TriangleAlert } from "lucide-react";
 import type { Pet, PetSpecies, PetStatus } from "@/lib/types";
-import { ESTADOS, PET_SPECIES_LABEL, PET_STATUS_LABEL } from "@/lib/types";
+import { PET_SPECIES_LABEL, PET_STATUS_LABEL } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import {
   ownerDeletePetAction,
   ownerSetPetStatusAction,
@@ -18,6 +19,7 @@ const STATUSES = Object.keys(PET_STATUS_LABEL) as PetStatus[];
 const SPECIES = Object.keys(PET_SPECIES_LABEL) as PetSpecies[];
 
 export function PetManagePanel({ pet, token }: { pet: Pet; token: string }) {
+  const regions = getCountry(pet.country ?? "ve").regions;
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
@@ -122,7 +124,7 @@ export function PetManagePanel({ pet, token }: { pet: Pet; token: string }) {
             <Field label="Estado (región)" htmlFor="estado">
               <Select id="estado" name="estado" defaultValue={pet.estado ?? ""}>
                 <option value="">Seleccionar</option>
-                {ESTADOS.map((e) => (
+                {regions.map((e) => (
                   <option key={e} value={e}>
                     {e}
                   </option>

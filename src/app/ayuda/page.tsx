@@ -78,10 +78,10 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
   // cada visita. Ahora pagina de verdad (10/20/50 a elegir), en vivo.
   const [{ items: points, total }, heroes, quakes, curatedAyuda, admin] = await Promise.all([
     getAidPointsPage({ country, type, availOnly, estado, dateFrom, dateTo }, page, pageSize),
-    getHeroes(),
+    getHeroes(country),
     getRecentQuakes(country),
     // Si la tabla aún no existe (esquema sin migrar), no rompemos la página.
-    getNewsItems("ayuda").catch(() => []),
+    getNewsItems("ayuda", country).catch(() => []),
     isAdmin(),
   ]);
   // Independientes entre sí: en paralelo en vez de una detrás de otra.
@@ -199,6 +199,7 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
         heroComments={heroComments}
         quakes={quakes}
         isAdmin={admin}
+        country={country}
       />
     </div>
     </PullToRefresh>

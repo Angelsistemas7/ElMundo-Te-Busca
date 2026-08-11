@@ -26,6 +26,7 @@ export function AyudaExtras({
   heroComments,
   quakes,
   isAdmin,
+  country = "ve",
 }: {
   curatedAyuda: NewsItem[];
   newsComments: Record<string, Comment[]>;
@@ -33,6 +34,7 @@ export function AyudaExtras({
   heroComments: Record<string, Comment[]>;
   quakes: Quake[];
   isAdmin: boolean;
+  country?: string;
 }) {
   const [tab, setTab] = useState<TabKey>("humanitaria");
 
@@ -92,7 +94,7 @@ export function AyudaExtras({
                 Reconocimiento a quienes ayudan: bomberos, rescatistas, perros de búsqueda, personal de
                 salud y donantes. Cualquiera puede proponer uno; un moderador lo verifica.
               </p>
-              <ProposeHeroButton />
+              <ProposeHeroButton country={country} />
             </div>
             {heroes.length === 0 ? (
               <p className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 py-6 text-center text-sm text-zinc-500">

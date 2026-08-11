@@ -274,6 +274,7 @@ export type ComplaintInput = z.infer<typeof complaintSchema>;
 
 // ── Mascotas ─────────────────────────────────────────────────────────────────
 export const petSchema = z.object({
+  country: countryEnum.optional(),
   status: z.enum(["perdida", "encontrada", "refugio", "veterinario"]),
   species: z.enum(["perro", "gato", "otro"]),
   name: z.string().trim().max(60).optional().or(z.literal("")),
@@ -313,6 +314,7 @@ export const volunteerSchema = z.object({
 export type VolunteerInput = z.infer<typeof volunteerSchema>;
 
 export const heroSchema = z.object({
+  country: countryEnum.optional(),
   category: z.enum([
     "bombero",
     "rescatista",
@@ -334,6 +336,7 @@ export const heroSchema = z.object({
 export type HeroInput = z.infer<typeof heroSchema>;
 
 export const newsItemSchema = z.object({
+  country: countryEnum,
   kind: z.enum(["ayuda", "noticia"]),
   title: z.string().trim().min(4, "Indica el titular").max(200),
   body: z.string().trim().min(10, "Escribe un resumen").max(1200),

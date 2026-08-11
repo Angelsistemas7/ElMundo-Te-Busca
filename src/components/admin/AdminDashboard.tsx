@@ -53,6 +53,8 @@ import {
   POST_TYPE_LABEL,
 } from "@/lib/types";
 import { timeAgo } from "@/lib/utils";
+import { FlagIcon } from "@/components/FlagIcon";
+import type { CountryCode } from "@/lib/countries";
 import {
   approveExternalPostAction,
   approveReportAction,
@@ -73,6 +75,17 @@ import {
 } from "@/app/admin/actions";
 
 export type ReportWithName = StatusReport & { personName: string };
+
+// El panel junta Venezuela + Colombia en una sola lista (ver `admin/page.tsx`):
+// esta insignia deja claro a qué país pertenece cada fila.
+function CountryBadge({ country }: { country?: CountryCode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-500">
+      <FlagIcon code={country ?? "ve"} className="h-2.5 w-4 shrink-0 rounded-[2px]" />
+      {(country ?? "ve").toUpperCase()}
+    </span>
+  );
+}
 
 export function AdminDashboard({
   reports,
@@ -325,9 +338,12 @@ export function AdminDashboard({
             return (
               <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
-                  <Link href={`/persona/${p.id}`} className="font-medium text-zinc-900 hover:underline">
-                    {name}
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Link href={`/persona/${p.id}`} className="font-medium text-zinc-900 hover:underline">
+                      {name}
+                    </Link>
+                    <CountryBadge country={p.country} />
+                  </div>
                   <p className="text-xs text-zinc-500">
                     {[p.estado, p.locationText].filter(Boolean).join(" · ")} · {timeAgo(p.createdAt)}
                   </p>
@@ -375,6 +391,7 @@ export function AdminDashboard({
                 entityType="aid_point"
                 id={point.id}
                 name={point.name}
+                country={point.country}
                 href={`/ayuda/${point.id}`}
                 verified={point.verified}
                 photoUrl={point.photoUrl}
@@ -415,6 +432,7 @@ export function AdminDashboard({
                 entityType="hospital"
                 id={hospital.id}
                 name={hospital.name}
+                country={hospital.country}
                 href={`/hospitales/${hospital.id}`}
                 verified={hospital.verified}
                 photoUrl={null}
@@ -456,6 +474,7 @@ export function AdminDashboard({
                     <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
                       {POST_TYPE_EMOJI[p.type]} {POST_TYPE_LABEL[p.type]}
                     </span>
+                    <CountryBadge country={p.country} />
                     {p.pinned && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
                         <Pin className="h-3 w-3" /> Fijado
@@ -510,6 +529,7 @@ export function AdminDashboard({
                     <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                       {HERO_CATEGORY_EMOJI[h.category]} {HERO_CATEGORY_LABEL[h.category]}
                     </span>
+                    <CountryBadge country={h.country} />
                     {h.verified ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
                         <BadgeCheck className="h-3 w-3" /> Verificado
@@ -583,6 +603,7 @@ export function AdminDashboard({
                     <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
                       {COMPLAINT_CATEGORY_EMOJI[c.category]} {COMPLAINT_CATEGORY_LABEL[c.category]}
                     </span>
+                    <CountryBadge country={c.country} />
                     <span className="text-xs text-zinc-400">
                       Por {c.authorName} · {timeAgo(c.createdAt)}
                     </span>
@@ -617,6 +638,7 @@ function ResourceRow({
   entityType,
   id,
   name,
+  country,
   href,
   verified,
   photoUrl,
@@ -630,6 +652,7 @@ function ResourceRow({
   entityType: ManagedEntity;
   id: string;
   name: string;
+  country?: CountryCode;
   href: string;
   verified: boolean;
   photoUrl: string | null;
@@ -658,9 +681,12 @@ function ResourceRow({
             <Image src={photoUrl} alt={name} width={56} height={56} className="h-14 w-14 shrink-0 rounded-lg object-cover" />
           ) : null}
           <div className="min-w-0">
-            <Link href={href} className="font-semibold text-zinc-900 hover:underline">
-              {name}
-            </Link>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Link href={href} className="font-semibold text-zinc-900 hover:underline">
+                {name}
+              </Link>
+              <CountryBadge country={country} />
+            </div>
             <div className="mt-1 space-y-0.5 text-xs text-zinc-500">
               {location && (
                 <p className="flex items-center gap-1.5">

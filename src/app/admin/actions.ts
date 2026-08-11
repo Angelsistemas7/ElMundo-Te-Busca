@@ -118,6 +118,7 @@ export async function createNewsItemAction(
   if (!(await isAdmin())) return { ok: false, error: "Solo el equipo puede agregar noticias." };
   const get = (k: string) => String(form.get(k) ?? "").trim();
   const parsed = newsItemSchema.safeParse({
+    country: get("country"),
     kind: get("kind"),
     title: get("title"),
     body: get("body"),

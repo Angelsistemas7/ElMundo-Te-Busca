@@ -484,6 +484,7 @@ export const PET_SPECIES_LABEL: Record<PetSpecies, string> = {
  *  foto, descripción, ubicación y comentarios. */
 export interface Pet {
   id: string;
+  country?: Country;
   status: PetStatus;
   species: PetSpecies;
   /** Nombre de la mascota, si se conoce (puede ir vacío). */
@@ -597,6 +598,7 @@ export const HERO_CATEGORY_EMOJI: Record<HeroCategory, string> = {
  */
 export interface Hero {
   id: string;
+  country?: Country;
   category: HeroCategory;
   /** Nombre o grupo (p. ej. "Bomberos de La Guaira"). */
   title: string;
@@ -632,6 +634,7 @@ export const NEWS_KIND_LABEL: Record<NewsKind, string> = {
  */
 export interface NewsItem {
   id: string;
+  country?: Country;
   kind: NewsKind;
   title: string;
   body: string;
