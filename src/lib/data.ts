@@ -404,9 +404,6 @@ export interface DashboardStats {
 export const getDashboardStats = unstable_cache(getDashboardStatsImpl, ["dashboard-stats"], {
   revalidate: 60,
 });
-// NOTA: `denuncias`/`voluntarios` aún no tienen columna `country` (pendiente
-// de una próxima ronda) — esos dos conteos siguen siendo globales entre
-// países por ahora; el resto (personas, "necesito ayuda") ya está filtrado.
 async function getDashboardStatsImpl(country = "ve"): Promise<DashboardStats> {
   const sb = getSupabase();
   if (!sb) {
@@ -418,9 +415,9 @@ async function getDashboardStatsImpl(country = "ve"): Promise<DashboardStats> {
       aSalvo: p.filter((x) => x.status === "localizado").length,
       fallecidos: p.filter((x) => x.status === "fallecido").length,
       ninos: p.filter((x) => x.age != null && x.age < 18).length,
-      denuncias: mem.complaints.length,
+      denuncias: mem.complaints.filter((x) => (x.country ?? "ve") === country).length,
       necesidades: mem.posts.filter((x) => (x.country ?? "ve") === country && x.type === "necesito").length,
-      voluntarios: mem.volunteers.length,
+      voluntarios: mem.volunteers.filter((x) => (x.country ?? "ve") === country).length,
     };
   }
   const { data: persons } = await sb.from("persons").select("status,age").eq("country", country);
@@ -428,9 +425,9 @@ async function getDashboardStatsImpl(country = "ve"): Promise<DashboardStats> {
   const rows = (persons ?? []) as any[];
   const tally = (s: string) => rows.filter((r) => r.status === s).length;
   const [{ count: denuncias }, { count: necesidades }, { count: voluntarios }] = await Promise.all([
-    sb.from("complaints").select("*", { count: "exact", head: true }),
+    sb.from("complaints").select("*", { count: "exact", head: true }).eq("country", country),
     sb.from("posts").select("*", { count: "exact", head: true }).eq("type", "necesito").eq("country", country),
-    sb.from("volunteers").select("*", { count: "exact", head: true }),
+    sb.from("volunteers").select("*", { count: "exact", head: true }).eq("country", country),
   ]);
   return {
     registered: rows.length,
