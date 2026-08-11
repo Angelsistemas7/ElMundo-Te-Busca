@@ -412,7 +412,23 @@ async function main() {
 
   // Descarta cuerpos vacíos (posts que son solo una imagen, por ejemplo: sin
   // texto no hay nada útil que mostrar en el muro).
-  const rows = found.filter((r) => r.body && r.body.trim().length > 0);
+  // Descarta cuerpos vacíos y, aparte, DEDUPLICA por external_id: un mismo
+  // post puede traer varios de nuestros hashtags a la vez (p. ej.
+  // "#TerremotoColombia #Chocó #SismoColombia" juntos) y salir repetido en
+  // `found` una vez por cada búsqueda que lo encontró. Sin esto se
+  // clasificaba (gastando OpenAI) varias veces el mismo post, y el conteo
+  // final de "aprobadas" podía superar al de guardadas (confirmado en
+  // producción: 303 aprobadas pero solo 262 guardadas). Si el mismo post
+  // apareciera por error bajo dos países, se queda con el primero que lo
+  // encontró (ve antes que co).
+  const seenExternalIds = new Set();
+  const rows = [];
+  for (const r of found) {
+    if (!r.body || !r.body.trim()) continue;
+    if (seenExternalIds.has(r.external_id)) continue;
+    seenExternalIds.add(r.external_id);
+    rows.push(r);
+  }
   const byCountry = COUNTRY_CODES.map((c) => `${c}: ${rows.filter((r) => r.country === c).length}`).join(", ");
   console.log(`🔎 ${rows.length} publicaciones encontradas (${byCountry}).`);
 
