@@ -7,51 +7,52 @@ GitHub Actions + PM2 en cada push a `main`). Español, `npm run build` siempre v
 
 ## 🚨 Cierre de sesión (2026-08-10) — LEE ESTO PRIMERO ANTES DE NADA
 
-**Estado ahora mismo**: hay **24 commits locales sin subir** (`git log
-origin/main..HEAD` en el repo `Elmundotebusca`), todo el trabajo de esta
-sesión (multi-país + pulido iOS de abajo). **NO se hizo `git push`
-todavía** — quedó pendiente por lo siguiente:
+**Estado ahora mismo**: los **28 commits locales** de esta sesión (multi-país +
+pulido iOS + fix de orden en `schema.sql`) ya se subieron con `git push` a
+`origin/main` — dispara el deploy automático (GitHub Actions + PM2) en el VPS.
+Verificar en vivo en `elmundotebusca.com` cuando el deploy termine.
 
-### 1. Supabase se pausó (plan gratis, por inactividad — no es un límite real)
-El dueño vio "Project is paused" en el dashboard de Supabase. **No es que
+### 1. Supabase se pausó (plan gratis, por inactividad — no es un límite real) — RESUELTO
+El dueño vio "Project is paused" en el dashboard de Supabase. **No era que
 se acabó espacio ni nada real** — es la pausa automática del plan gratis
-tras un tiempo sin actividad. Los datos están intactos. Se resuelve con un
-clic en "Resume project" en el dashboard. **Recomendación dada** (no
-migrar a Firebase/S3 — el esquema es 100% relacional con RLS, migrar
+tras un tiempo sin actividad. Los datos estaban intactos. Se resolvió con
+"Resume project" en el dashboard. **Recomendación pendiente de decisión**
+(no migrar a Firebase/S3 — el esquema es 100% relacional con RLS, migrar
 sería reescribir semanas de `data.ts`/`schema.sql` para nada): si el
-proyecto va a producción real pronto, pasar a **Supabase Pro ($25/mes)**
-antes del lanzamiento para que no se vuelva a pausar solo en medio de una
+proyecto va a producción real pronto, considerar pasar a **Supabase
+Pro ($25/mes)** para que no se vuelva a pausar solo en medio de una
 emergencia real. Cero cambios de código necesarios para eso.
 
-### 2. Migración SQL pendiente de correr en el Supabase real (antes del push)
-Antes de hacer `push` (para que el review en vivo no muestre páginas
-rotas), correr esto en el **SQL Editor de Supabase** — aditivo e
-idempotente, no borra nada:
-```sql
-alter table persons add column if not exists country text not null default 've';
-create index if not exists persons_country_idx on persons (country);
+### 2. Migración SQL corrida en el Supabase real — RESUELTO (con bug encontrado y corregido)
+El proyecto de Supabase reactivado tenía la base de datos **completamente
+vacía** (no era solo la columna `country` faltante — ni siquiera existía la
+tabla `persons`). Al correr `supabase/schema.sql` completo apareció un bug
+real en el archivo: el bloque de **índices trigram de búsqueda** de
+`posts`/`complaints`/`pets`/`volunteers` estaba ubicado **antes** de las
+`CREATE TABLE` de esas mismas tablas — solo funcionaba en bases que ya las
+tenían de una corrida anterior, nunca en una base nueva desde cero. Se
+corrigió el orden en el archivo fuente (commit `531475b`) y se confirmó que
+el `schema.sql` corregido corre limpio de punta a punta en una base vacía.
+**Si se vuelve a montar Supabase desde cero en el futuro, este archivo ya
+está bien; no hace falta pelear con el orden otra vez.**
 
-alter table aid_points add column if not exists country text not null default 've';
-create index if not exists aid_points_country_idx on aid_points (country);
+### 3. Qué falta para revisar el sitio en vivo
+1. ~~Reactivar el proyecto en Supabase~~ — hecho.
+2. ~~Correr el SQL~~ — hecho (`schema.sql` completo, corregido).
+3. ~~`git push`~~ — hecho, deploy automático en curso/hecho.
+4. **Falta**: revisar en vivo en `elmundotebusca.com` y confirmar que
+   `/ayuda`, `/hospitales`, `/se-busca`, `/comunidad` cargan bien con la
+   columna `country` y el resto del esquema multi-país. La base es NUEVA
+   (estaba vacía), así que probablemente le falte el contenido semilla de
+   producción — ver punto siguiente.
 
-alter table hospitals add column if not exists country text not null default 've';
-create index if not exists hospitals_country_idx on hospitals (country);
-
-alter table posts add column if not exists country text not null default 've';
-create index if not exists posts_country_idx on posts (country);
-```
-Sin esto, tras el `push`, `/ayuda`, `/hospitales`, `/se-busca` y
-`/comunidad` en producción mostrarán el error
-`column ... does not exist` (mismo síntoma que en desarrollo local esta
-sesión). El resto del sitio (mapa, emergencias, mascotas, etc.) sí
-funcionaría bien.
-
-### 3. Qué falta para poder revisar el sitio en vivo, en orden
-1. Reactivar el proyecto en Supabase (clic "Resume project").
-2. Correr el SQL de arriba en el SQL Editor.
-3. Avisar en el chat → recién ahí hacer `git push` de los 24 commits
-   (dispara el deploy automático por GitHub Actions + PM2).
-4. Revisar en vivo en `elmundotebusca.com`.
+### 3bis. Contenido semilla probablemente pendiente en la base nueva
+Como la base de Supabase se creó desde cero en esta sesión, es muy probable
+que falte cargar `supabase/seed-contenido.sql` (hospitales reales, puntos de
+ayuda, publicaciones curadas, héroes — ver sección "Contenido inicial" en
+`docs/ESTADO-DEL-PROYECTO.md`) y el bucket de Storage `photos` (público, para
+subir fotos). Confirmar ambos al revisar en vivo antes de asumir que algo
+está roto.
 
 ### 4. Proyecto nuevo y separado: HelpSearch (faro SOS por Bluetooth, offline)
 El dueño pidió arrancar, en paralelo, una **app nativa aparte** (no es
