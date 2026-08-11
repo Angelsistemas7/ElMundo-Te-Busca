@@ -3,12 +3,16 @@ import { DevModeNotice } from "@/components/DevModeNotice";
 import { HomeHero } from "@/components/HomeHero";
 import { VerifiedNewsCarousel } from "@/components/VerifiedNewsCarousel";
 import { HomeHeroSkeleton, NewsCarouselSkeleton } from "@/components/HomeSkeletons";
+import { CountryIntroModal } from "@/components/CountryIntroModal";
+import { hasChosenCountry } from "@/lib/country-server";
 
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const chosenCountry = await hasChosenCountry();
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
+      <CountryIntroModal initialOpen={!chosenCountry} />
       <DevModeNotice />
       <div className="flex flex-col gap-6">
         {/* Cada sección en su propio Suspense: el hero (datos internos, rápido)

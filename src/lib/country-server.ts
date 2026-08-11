@@ -17,3 +17,13 @@ export async function getActiveCountry(): Promise<CountryCode> {
   const raw = store.get(COUNTRY_COOKIE)?.value;
   return isCountryCode(raw) ? raw : DEFAULT_COUNTRY;
 }
+
+/**
+ * true si esta visita NUNCA eligió país (cookie ausente) — a diferencia de
+ * `getActiveCountry()`, que ya cae en `DEFAULT_COUNTRY` en ese caso. Sirve
+ * para mostrar la pantalla de bienvenida solo la primera vez.
+ */
+export async function hasChosenCountry(): Promise<boolean> {
+  const store = await cookies();
+  return isCountryCode(store.get(COUNTRY_COOKIE)?.value);
+}
