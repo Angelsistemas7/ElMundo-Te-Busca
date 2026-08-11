@@ -293,3 +293,46 @@ export function getCountry(code: string | null | undefined): CountryConfig {
 export const ALL_REGIONS: string[] = Array.from(
   new Set(COUNTRY_CODES.flatMap((c) => COUNTRIES[c].regions as readonly string[])),
 );
+
+/**
+ * Lista amplia de países de América para la pantalla de bienvenida (selector
+ * de país). A diferencia de `COUNTRY_CODES` (los países con una emergencia
+ * activa y datos completos: mapa, cifras, teléfonos, noticias), esta lista es
+ * solo para que cualquier visitante de la región vea que la plataforma existe
+ * y sepa que su país todavía no está activo. Elegir uno de estos NO cambia
+ * `emb_country` ni carga datos reales — ver `CountryIntroModal`.
+ */
+export interface AmericasCountry {
+  code: string;
+  name: string;
+}
+
+export const AMERICAS_COUNTRIES: AmericasCountry[] = [
+  { code: "ve", name: "Venezuela" },
+  { code: "co", name: "Colombia" },
+  { code: "ar", name: "Argentina" },
+  { code: "bo", name: "Bolivia" },
+  { code: "br", name: "Brasil" },
+  { code: "ca", name: "Canadá" },
+  { code: "cl", name: "Chile" },
+  { code: "cr", name: "Costa Rica" },
+  { code: "cu", name: "Cuba" },
+  { code: "do", name: "República Dominicana" },
+  { code: "ec", name: "Ecuador" },
+  { code: "sv", name: "El Salvador" },
+  { code: "us", name: "Estados Unidos" },
+  { code: "gt", name: "Guatemala" },
+  { code: "gy", name: "Guyana" },
+  { code: "ht", name: "Haití" },
+  { code: "hn", name: "Honduras" },
+  { code: "jm", name: "Jamaica" },
+  { code: "mx", name: "México" },
+  { code: "ni", name: "Nicaragua" },
+  { code: "pa", name: "Panamá" },
+  { code: "py", name: "Paraguay" },
+  { code: "pe", name: "Perú" },
+  { code: "pr", name: "Puerto Rico" },
+  { code: "sr", name: "Surinam" },
+  { code: "tt", name: "Trinidad y Tobago" },
+  { code: "uy", name: "Uruguay" },
+];

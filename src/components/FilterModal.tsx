@@ -1,16 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import { ListFilter } from "lucide-react";
 import { Modal } from "./Modal";
+import { SearchableSelect } from "./SearchableSelect";
 import { cn } from "@/lib/utils";
 
-export type FilterOption = { value: string; label: string };
+export type FilterOption = { value: string; label: string; icon?: ComponentType<{ className?: string }> };
 
 export type FilterField =
   | { kind: "chips"; key: string; label: string; options: FilterOption[]; defaultValue?: string }
   | { kind: "select"; key: string; label: string; options: FilterOption[]; placeholder?: string; defaultValue?: string }
+  | {
+      kind: "chipsRange";
+      fromKey: string;
+      toKey: string;
+      label: string;
+      options: { label: string; min: string; max: string; icon?: ComponentType<{ className?: string }> }[];
+    }
   | { kind: "dateRange"; fromKey: string; toKey: string; label: string }
   | { kind: "numberRange"; fromKey: string; toKey: string; label: string; min?: number; max?: number };
 
@@ -38,7 +46,7 @@ export function FilterModal({
   const activeCount = useMemo(() => {
     let n = 0;
     for (const f of fields) {
-      if (f.kind === "dateRange" || f.kind === "numberRange") {
+      if (f.kind === "dateRange" || f.kind === "numberRange" || f.kind === "chipsRange") {
         if (currentParams[f.fromKey] || currentParams[f.toKey]) n++;
       } else if ((currentParams[f.key] ?? "") !== (f.defaultValue ?? "")) {
         n++;
@@ -72,7 +80,7 @@ export function FilterModal({
   function clear() {
     const cleared = { ...draft };
     for (const f of fields) {
-      if (f.kind === "dateRange" || f.kind === "numberRange") {
+      if (f.kind === "dateRange" || f.kind === "numberRange" || f.kind === "chipsRange") {
         delete cleared[f.fromKey];
         delete cleared[f.toKey];
       } else {
@@ -180,18 +188,46 @@ export function FilterModal({
               return (
                 <div key={f.key}>
                   <p className="mb-1.5 text-sm font-semibold text-zinc-900">{f.label}</p>
-                  <select
+                  <SearchableSelect
                     value={draft[f.key] ?? ""}
-                    onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-                  >
-                    <option value="">{f.placeholder ?? "Todos"}</option>
-                    {f.options.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))}
+                    options={f.options}
+                    placeholder={f.placeholder ?? "Todos"}
+                  />
+                </div>
+              );
+            }
+
+            if (f.kind === "chipsRange") {
+              const from = draft[f.fromKey] ?? "";
+              const to = draft[f.toKey] ?? "";
+              return (
+                <div key={f.fromKey}>
+                  <p className="mb-1.5 text-sm font-semibold text-zinc-900">{f.label}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {f.options.map((o) => {
+                      const active = from === o.min && to === o.max;
+                      const Icon = o.icon;
+                      return (
+                        <button
+                          key={o.label}
+                          type="button"
+                          onClick={() =>
+                            setDraft((d) => ({ ...d, [f.fromKey]: o.min, [f.toKey]: o.max }))
+                          }
+                          className={cn(
+                            "press flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition",
+                            active
+                              ? "border-brand-400 bg-brand-50 text-brand-700"
+                              : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300",
+                          )}
+                        >
+                          {Icon && <Icon className="h-3.5 w-3.5" />}
+                          {o.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             }

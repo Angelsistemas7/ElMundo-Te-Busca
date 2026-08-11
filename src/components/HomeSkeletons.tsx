@@ -33,6 +33,16 @@ export function HomeHeroSkeleton() {
   );
 }
 
+export function DashboardStatsSkeleton() {
+  return (
+    <div className="no-scrollbar -mx-4 flex animate-pulse gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-3 sm:overflow-visible sm:px-0 lg:grid-cols-8">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="h-[4.5rem] w-28 shrink-0 rounded-2xl bg-zinc-100 sm:w-auto" />
+      ))}
+    </div>
+  );
+}
+
 export function NewsCarouselSkeleton() {
   return (
     <section className="animate-pulse rounded-3xl border-2 border-zinc-200 bg-white p-5 sm:p-6">

@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import { DevModeNotice } from "@/components/DevModeNotice";
 import { HomeHero } from "@/components/HomeHero";
+import { HomeDashboardStats } from "@/components/HomeDashboardStats";
 import { VerifiedNewsCarousel } from "@/components/VerifiedNewsCarousel";
-import { HomeHeroSkeleton, NewsCarouselSkeleton } from "@/components/HomeSkeletons";
+import { HomeHeroSkeleton, DashboardStatsSkeleton, NewsCarouselSkeleton } from "@/components/HomeSkeletons";
 import { CountryIntroModal } from "@/components/CountryIntroModal";
 import { getActiveCountry, hasChosenCountry } from "@/lib/country-server";
 
@@ -21,6 +22,9 @@ export default async function HomePage() {
             de quedar en blanco hasta que ambas terminen. */}
         <Suspense fallback={<HomeHeroSkeleton />}>
           <HomeHero />
+        </Suspense>
+        <Suspense fallback={<DashboardStatsSkeleton />}>
+          <HomeDashboardStats />
         </Suspense>
         <Suspense fallback={<NewsCarouselSkeleton />}>
           <VerifiedNewsCarousel country={country} />

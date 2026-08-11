@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +42,40 @@ export function SwipeHintRow({
       onScroll={onInteract}
     >
       {children}
+    </div>
+  );
+}
+
+const ONE_SHOT_DURATION_MS = 5_200; // ~2 ciclos de `hint-swipe` (2.6s c/u)
+
+/**
+ * Igual que `SwipeHintNested`, pero el vaivén corre UNA sola vez al montar
+ * (un par de ciclos) y no se reactiva después, ni siquiera tras 10s de
+ * inactividad — a diferencia de `SwipeHintNested`, que lo retoma sin parar.
+ * Pensado para widgets que se ven todo el tiempo (cifras del inicio): el
+ * vaivén continuo ahí se sentía como ruido visual permanente.
+ */
+export function SwipeHintNestedOnce({
+  outerClassName,
+  innerClassName,
+  children,
+}: {
+  outerClassName: string;
+  innerClassName: string;
+  children: React.ReactNode;
+}) {
+  const [active, setActive] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setActive(false), ONE_SHOT_DURATION_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  const stop = useCallback(() => setActive(false), []);
+
+  return (
+    <div className={outerClassName} onPointerDown={stop} onTouchStart={stop} onScroll={stop}>
+      <div className={cn(innerClassName, active && "hint-swipe")}>{children}</div>
     </div>
   );
 }

@@ -3,7 +3,10 @@ import type { CountryCode } from "@/lib/countries";
 // SVG propio en vez del emoji de bandera (🇻🇪/🇨🇴): Windows no tiene esos
 // glifos en Segoe UI Emoji y cae al texto plano "VE"/"CO" en vez de dibujar
 // la bandera — problema conocido de esa fuente, no de nuestro código. Un SVG
-// se ve igual en cualquier sistema operativo/navegador.
+// se ve igual en cualquier sistema operativo/navegador. Solo cubre los países
+// activos (VE/CO); los demás países de `AMERICAS_COUNTRIES` usan una
+// insignia genérica en `CountryIntroModal` (dibujar ~25 banderas a mano no
+// vale la pena para países sin funcionalidad real detrás todavía).
 export function FlagIcon({ code, className }: { code: CountryCode; className?: string }) {
   if (code === "co") {
     return (

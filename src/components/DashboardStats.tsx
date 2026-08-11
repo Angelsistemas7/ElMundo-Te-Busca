@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { DashboardStats as Stats } from "@/lib/data";
 import { AnimatedNumber } from "./AnimatedNumber";
-import { SwipeHintNested } from "./SwipeHint";
+import { SwipeHintNestedOnce } from "./SwipeHint";
 
 type Tone = "rose" | "amber" | "emerald" | "sky" | "violet" | "zinc";
 
@@ -46,14 +46,14 @@ export function DashboardStats({ stats }: { stats: Stats }) {
   return (
     <section>
       {/* Móvil: fila deslizable a mano. Escritorio: rejilla de 8. */}
-      <SwipeHintNested
+      <SwipeHintNestedOnce
         outerClassName="no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:overflow-visible sm:px-0"
         innerClassName="flex w-max gap-2 sm:w-auto sm:[animation:none] sm:grid sm:grid-cols-4 sm:gap-3 lg:grid-cols-8"
       >
         {cards.map((c) => (
           <Card key={c.label} {...c} />
         ))}
-      </SwipeHintNested>
+      </SwipeHintNestedOnce>
     </section>
   );
 }

@@ -1,7 +1,6 @@
 import nextDynamic from "next/dynamic";
 import { Search } from "lucide-react";
 import {
-  getDashboardStats,
   getPersonGroups,
   getPersons,
   getRecentlyLocated,
@@ -12,7 +11,6 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { getActiveCountry } from "@/lib/country-server";
 import type { PersonStatus } from "@/lib/types";
-import { DashboardStats } from "@/components/DashboardStats";
 import { RecentlyLocated } from "@/components/RecentlyLocated";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { PersonViewToggle } from "@/components/PersonViewToggle";
@@ -114,8 +112,7 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
   const pageSize = clampPageSize(num(sp.pageSize));
 
   const user = await getCurrentUser();
-  const [stats, result, groups, recentlyLocated, alreadyVolunteered] = await Promise.all([
-    getDashboardStats(country),
+  const [result, groups, recentlyLocated, alreadyVolunteered] = await Promise.all([
     groupBy
       ? Promise.resolve(null)
       : getPersons({ ...baseQuery, page: num(sp.page) ?? 1, pageSize: isReconoces ? 60 : pageSize }),
@@ -166,23 +163,12 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
         <PersonViewToggle view={view} />
       </div>
 
-      {/* Los widgets de cifras solo aportan en "Se busca"; en la baraja tipo
-          Tinder de "¿La reconoces?" sobran y quitan espacio a la tarjeta. */}
-      {!isReconoces && <DashboardStats stats={stats} />}
-
-      <div className="mt-8 flex flex-col gap-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex-1">
-            <SearchAndFilters unidentified={isReconoces} country={country} />
-          </div>
+      <div className="mt-2 flex flex-col gap-4">
+        <SearchAndFilters unidentified={isReconoces} country={country}>
           {/* Publicar solo vive en "Se busca" — "¿La reconoces?" es una forma
               de RECORRER lo ya publicado, no un lugar distinto para publicar. */}
-          {!isReconoces && (
-            <div className="shrink-0">
-              <RegisterPersonButton country={country} />
-            </div>
-          )}
-        </div>
+          {!isReconoces && <RegisterPersonButton country={country} />}
+        </SearchAndFilters>
 
         {/* "¿La reconoces?": baraja de tarjetas (desliza para reconocer). */}
         {isReconoces && (

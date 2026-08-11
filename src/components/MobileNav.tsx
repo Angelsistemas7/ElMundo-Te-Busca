@@ -105,7 +105,15 @@ export function MobileNav() {
         </div>
       )}
 
-      <nav className="pb-safe-nav fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur md:hidden">
+      {/* `translateZ(0)` fuerza una capa de composición propia: sin esto, en
+          Chrome/Safari móvil la barra fija se queda un frame atrás cuando la
+          barra de direcciones del navegador se oculta al hacer scroll, y se
+          ve un hueco blanco momentáneo entre la barra y el borde real de la
+          pantalla. */}
+      <nav
+        className="pb-safe-nav fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur will-change-transform md:hidden"
+        style={{ transform: "translateZ(0)" }}
+      >
         <ul className="relative mx-auto flex max-w-md items-stretch justify-around">
           {/* Indicador que se desliza al cambiar de sección, en vez de solo
               cambiar el color del texto. */}

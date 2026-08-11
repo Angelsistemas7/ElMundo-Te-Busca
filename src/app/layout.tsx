@@ -58,6 +58,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#d3824a",
+  // "cover" para que `env(safe-area-inset-bottom)` (usado en `.pb-safe-nav`)
+  // devuelva el alto real del home indicator en vez de 0 — sin esto la barra
+  // inferior fija queda sin su relleno de seguridad en iPhones recientes.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
