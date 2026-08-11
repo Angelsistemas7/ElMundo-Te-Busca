@@ -173,9 +173,15 @@ crontab /tmp/crontab_nuevo.txt
 mkdir -p /var/www/elmundotebusca/logs
 ```
 
-Ver los comentarios al inicio del script para las variables opcionales
-(`SOCIAL_HASHTAGS`, `MASTODON_INSTANCES`, `BLUESKY_IDENTIFIER`/`BLUESKY_APP_PASSWORD` —
-ya configuradas en el `.env` del VPS).
+Ver los comentarios al inicio del script para las variables opcionales.
+Desde la migración multi-país busca por separado en Venezuela y Colombia
+(`SOCIAL_HASHTAGS_VE`/`SOCIAL_HASHTAGS_CO`, con el nombre viejo `SOCIAL_HASHTAGS`
+como alias de VE si no se actualiza el `.env`) y ahora también en **Reddit**
+además de Bluesky/Mastodon (`REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` — app
+gratis tipo "script" en reddit.com/prefs/apps; sin esas dos variables, Reddit
+simplemente no aporta resultados, igual que Bluesky sin sesión). El resto
+(`MASTODON_INSTANCES`, `BLUESKY_IDENTIFIER`/`BLUESKY_APP_PASSWORD`) ya está
+configurado en el `.env` del VPS.
 
 ## 7) Calentar la caché de noticias (opcional)
 
