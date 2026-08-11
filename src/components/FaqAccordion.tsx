@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { ChevronDown, HelpCircle } from "lucide-react";
+import { getEmergency } from "@/lib/emergency";
+import type { CountryCode } from "@/lib/countries";
 
-const FAQS = [
+function buildFaqs(country: CountryCode) {
+  const { nationalLine } = getEmergency(country);
+  return [
   {
     q: "¿Cómo puedo reportar a una persona desaparecida?",
     a: (
@@ -45,14 +49,16 @@ const FAQS = [
         <Link href="/emergencias" className="font-medium text-brand-700 hover:underline">
           Emergencias
         </Link>
-        , incluida la línea única nacional 911. Si ves una situación crítica, repórtala de inmediato
-        con el botón "Reportar AHORA".
+        , incluida la {nationalLine.label.toLowerCase()} ({nationalLine.number}). Si ves una situación
+        crítica, repórtala de inmediato con el botón "Reportar AHORA".
       </>
     ),
   },
-];
+  ];
+}
 
-export function FaqAccordion() {
+export function FaqAccordion({ country }: { country: CountryCode }) {
+  const faqs = buildFaqs(country);
   return (
     <section className="reveal-up rounded-3xl border-2 border-navy-700 bg-white p-5 sm:p-6">
       <h2 className="flex items-center gap-2 text-lg font-bold text-navy-700">
@@ -62,7 +68,7 @@ export function FaqAccordion() {
       <p className="mt-1 text-xs text-zinc-500">Resuelve tus dudas aquí</p>
 
       <div className="mt-4 flex flex-col gap-2">
-        {FAQS.map(({ q, a }) => (
+        {faqs.map(({ q, a }) => (
           <details
             key={q}
             className="group rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3 open:bg-brand-50"

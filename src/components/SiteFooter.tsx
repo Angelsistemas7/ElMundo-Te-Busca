@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ShareWhatsApp } from "./ShareWhatsApp";
+import { FooterEmergencyLine } from "./FooterEmergencyLine";
 
 export function SiteFooter() {
   return (
@@ -40,17 +41,7 @@ export function SiteFooter() {
 
         <div>
           <h3 className="text-sm font-semibold text-navy-700">Emergencias</h3>
-          <a
-            href="tel:911"
-            className="press mt-3 flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 transition hover:bg-rose-100"
-          >
-            <span className="text-3xl font-extrabold leading-none text-rose-600">911</span>
-            <span className="text-xs leading-relaxed text-zinc-600">
-              <span className="font-semibold text-zinc-800">Línea única nacional (VEN 9‑1‑1).</span>{" "}
-              Policía, bomberos, Protección Civil y ambulancias. Funciona desde cualquier teléfono,
-              las 24 horas.
-            </span>
-          </a>
+          <FooterEmergencyLine />
           <Link
             href="/emergencias"
             className="press mt-2 inline-block text-sm font-medium text-brand-700 transition hover:underline"

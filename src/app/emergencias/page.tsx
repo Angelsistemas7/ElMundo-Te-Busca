@@ -171,7 +171,7 @@ export default async function EmergenciasPage() {
 
       <p className="mt-3 text-xs text-zinc-400">
         Los teléfonos por organismo son de referencia y pueden cambiar. Ante una emergencia médica o
-        de rescate, llama siempre a los organismos oficiales (911).
+        de rescate, llama siempre a los organismos oficiales ({NATIONAL_LINE.number}).
       </p>
 
       {/* Guía rápida para la comunidad */}

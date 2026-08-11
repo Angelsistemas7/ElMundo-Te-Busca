@@ -62,6 +62,17 @@ function buildFilterFields(regions: readonly string[], statusChips: typeof STATU
         { value: "otro", label: "Otro" },
       ],
     },
+    {
+      kind: "chips",
+      key: "cause",
+      label: "¿Por qué se publicó?",
+      defaultValue: "all",
+      options: [
+        { value: "all", label: "Todos" },
+        { value: "desastre", label: "Ligado al terremoto" },
+        { value: "otra", label: "Otro motivo" },
+      ],
+    },
     { kind: "numberRange", fromKey: "minAge", toKey: "maxAge", label: "Edad exacta (opcional)", min: 0, max: 120 },
     {
       kind: "chips",
@@ -128,7 +139,7 @@ export function SearchAndFilters({
   // "view" decide Se busca / ¿La reconoces? en la misma ruta — hay que
   // conservarlo siempre o el modal te devolvería a "Se busca" al aplicar.
   const currentParams: Record<string, string> = {};
-  for (const key of ["view", "estado", "gender", "sort", "minAge", "maxAge", "dateFrom", "dateTo", "q", "status", "pageSize"]) {
+  for (const key of ["view", "estado", "gender", "cause", "sort", "minAge", "maxAge", "dateFrom", "dateTo", "q", "status", "pageSize"]) {
     const v = params.get(key);
     if (v) currentParams[key] = v;
   }

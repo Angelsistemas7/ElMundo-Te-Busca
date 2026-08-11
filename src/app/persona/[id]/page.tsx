@@ -20,6 +20,7 @@ import { PersonPhoto } from "@/components/PersonPhoto";
 import { PersonReactions } from "@/components/PersonReactions";
 import { PersonShareButton } from "@/components/PersonShareButton";
 import { BackLink } from "@/components/BackLink";
+import { MiniMap } from "@/components/map/MiniMap";
 
 export const dynamic = "force-dynamic";
 
@@ -164,6 +165,31 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
               <PersonReactions personId={person.id} reactions={person.reactions} />
             </div>
           </div>
+
+          {person.lat != null && person.lng != null && (
+            <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+              <div className="flex items-center gap-2 p-4 pb-0">
+                <MapPin className="h-4 w-4 text-zinc-400" />
+                <h2 className="text-sm font-semibold text-zinc-900">Ubicación señalada en el mapa</h2>
+              </div>
+              <div className="mt-3 h-56 w-full">
+                <MiniMap
+                  zones={[]}
+                  hospitals={[]}
+                  aidPoints={[
+                    {
+                      id: person.id,
+                      lat: person.lat,
+                      lng: person.lng,
+                      label: person.locationText || displayName,
+                    },
+                  ]}
+                  center={[person.lat, person.lng]}
+                  zoom={14}
+                />
+              </div>
+            </div>
+          )}
 
           {person.description && (
             <div className="rounded-2xl border border-zinc-200 bg-white p-5">

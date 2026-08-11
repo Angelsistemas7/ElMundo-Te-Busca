@@ -34,6 +34,9 @@ export interface QuakeInfo {
   depthKm: number;
   epicenterText: string;
   date: string;
+  /** Misma fecha que `date`, en formato ISO (solo día): usada para calcular la
+   *  ventana de prioridad de "Se busca" (ver `PRIORITY_WINDOW_DAYS` en data.ts). */
+  dateISO: string;
   /** Cifras iniciales que cambian con los reportes; no es un conteo final. */
   deaths: number;
   injured: number;
@@ -169,6 +172,7 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
       depthKm: 10,
       epicenterText: "≈28 km al SE de Yumare (Yaracuy)",
       date: "24–25 de junio de 2026",
+      dateISO: "2026-06-24",
       deaths: 1719,
       injured: 5034,
       mostAffected: "La Guaira (Caraballeda, Catia La Mar)",
@@ -264,6 +268,7 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
       depthKm: 96,
       epicenterText: "cerca de San José del Palmar (Chocó)",
       date: "10 de agosto de 2026, 7:34 a.m.",
+      dateISO: "2026-08-10",
       deaths: 132,
       injured: 570,
       mostAffected: "Risaralda (Pereira) y Valle del Cauca (Cali)",

@@ -8,6 +8,7 @@ import {
 } from "@/lib/types";
 import { getCountry } from "@/lib/countries";
 import { getActiveCountry } from "@/lib/country-server";
+import { getEmergency } from "@/lib/emergency";
 import { cn, clampPageSize } from "@/lib/utils";
 import { ComplaintCard } from "@/components/ComplaintCard";
 import { DenunciaButton } from "@/components/DenunciaButton";
@@ -60,6 +61,7 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
   const pageSize = clampPageSize(num(sp.pageSize));
   const country = await getActiveCountry();
   const regions = getCountry(country).regions;
+  const { nationalLine } = getEmergency(country);
 
   const { items: complaints, total } = await getComplaints(
     { country, category, search: q, estado, dateFrom, dateTo },
@@ -117,7 +119,9 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
               acusación falsa puede dañar a un inocente y traerte problemas legales.
             </li>
             <li>Publicar requiere <strong>iniciar sesión</strong> (no es anónimo ante el sistema).</li>
-            <li>Si hay un menor en riesgo o un delito en curso, <strong>llama también al 911</strong>.</li>
+            <li>
+              Si hay un menor en riesgo o un delito en curso, <strong>llama también al {nationalLine.number}</strong>.
+            </li>
           </ul>
         </div>
       </div>

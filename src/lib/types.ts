@@ -61,6 +61,19 @@ export const ESTADOS = [
  */
 export type Estado = string;
 
+/**
+ * Por qué se publicó a esta persona: si su desaparición está ligada al
+ * desastre activo (terremoto) o es ajena a él (una desaparición cotidiana,
+ * sin relación con la emergencia). Ausente en registros migrados antes de
+ * este campo = "desastre" (el caso por defecto de la plataforma).
+ */
+export type PersonCause = "desastre" | "otra";
+
+export const PERSON_CAUSE_LABEL: Record<PersonCause, string> = {
+  desastre: "Relacionado con el desastre",
+  otra: "Otro motivo",
+};
+
 /** Reacciones de la comunidad a la ficha de una persona. */
 export type PersonReaction = "fuerza" | "corazon" | "difundir";
 
@@ -98,6 +111,7 @@ export interface Person {
   hospitalName: string | null;
   /** Caso sin identificar: se busca por foto/rasgos, no por nombre. */
   isUnidentified: boolean;
+  cause: PersonCause;
   contactName: string | null;
   contactPhone: string | null;
   contactEmail: string | null;

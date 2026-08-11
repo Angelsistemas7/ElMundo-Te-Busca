@@ -1,5 +1,5 @@
 import "server-only";
-import { getCountry, type CountryCode } from "./countries";
+import { COUNTRIES, COUNTRY_CODES, DEFAULT_COUNTRY, getCountry, isCountryCode, type CountryCode } from "./countries";
 
 // Sismos recientes alrededor del país activo desde la API pública y GRATUITA
 // del USGS (Servicio Geológico de EE. UU.). No requiere clave. Los sismos no
@@ -41,8 +41,25 @@ export async function getRecentQuakes(
     const json = (await res.json()) as {
       features?: { id: string; properties: { mag: number; place: string; time: number; url: string } }[];
     };
+    // Venezuela y Colombia son países vecinos: sus `usgsBbox` (arriba) se
+    // superponen bastante cerca de la frontera, así que un sismo ahí podía
+    // aparecer en ambos países aunque solo sea relevante para uno. Se refina
+    // con el mismo patrón de lugares que ya usa `news.ts` para prensa: si el
+    // texto de ubicación de USGS nombra claramente AL OTRO país (y no al
+    // activo), se descarta. Si es ambiguo (no nombra a ninguno), se deja —
+    // mejor de más que perder un sismo real cerca de la zona.
+    const activeCode = isCountryCode(country) ? country : DEFAULT_COUNTRY;
+    const otherCodes = COUNTRY_CODES.filter((c) => c !== activeCode);
+    const ownPattern = new RegExp(COUNTRIES[activeCode].news.matchPattern, "i");
+    const otherPatterns = otherCodes.map((c) => new RegExp(COUNTRIES[c].news.matchPattern, "i"));
+
     return (json.features ?? [])
       .filter((f) => typeof f.properties?.mag === "number")
+      .filter((f) => {
+        const place = f.properties?.place ?? "";
+        if (ownPattern.test(place)) return true;
+        return !otherPatterns.some((p) => p.test(place));
+      })
       .map((f) => ({
         id: f.id,
         mag: f.properties.mag,

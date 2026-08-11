@@ -23,7 +23,6 @@ const RegisterPersonButton = nextDynamic(() =>
 );
 import { FieldVolunteerBar } from "@/components/FieldVolunteerBar";
 import { FeaturedSections } from "@/components/FeaturedSections";
-import { EstadoChips } from "@/components/EstadoChips";
 import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
@@ -55,6 +54,7 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
     "status",
     "estado",
     "gender",
+    "cause",
     "minAge",
     "maxAge",
     "page",
@@ -96,6 +96,7 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
     status,
     estado: str(sp.estado) ?? "all",
     gender: str(sp.gender) ?? "all",
+    cause: (str(sp.cause) as "desastre" | "otra" | "all" | undefined) ?? "all",
     minAge: num(sp.minAge),
     maxAge: num(sp.maxAge),
     dateFrom: str(sp.dateFrom),
@@ -179,11 +180,10 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
 
         {!isReconoces && showAgeSections && (
           <div className="space-y-8 border-t border-zinc-100 pt-6">
-            {showBuscaExtras && <EstadoChips country={country} />}
-            <FeaturedSections unidentified={false} country={country} />
-            {/* Al final de todo, después de "Adultos mayores" — antes iba
-                primero y quedaba antes de que la gente llegara a explorar. */}
+            {/* Da esperanza primero: lo que más motiva a seguir usando la
+                plataforma va arriba, antes de explorar por edad. */}
             {showBuscaExtras && <RecentlyLocated persons={recentlyLocated} />}
+            <FeaturedSections unidentified={false} country={country} />
           </div>
         )}
 

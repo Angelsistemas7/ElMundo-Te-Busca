@@ -9,12 +9,6 @@ a **publicar**. Prioridad: salvar vidas, bien hecho.
 > (qué está hecho y qué falta). El idioma del producto y de la comunicación con el
 > usuario es **español**.
 
-## ⚠️ Límite ético (no cruzar)
-No scrapear ni replicar la base de datos del sitio original `venezuelatebusca.com`,
-ni saltar su Cloudflare. Son cédulas/fotos de personas reales (muchas menores).
-El camino correcto es pedir un export autorizado e importarlo con
-`scripts/import-data.mjs`. El usuario ya aceptó construir desde cero.
-
 ## Stack
 - **Next.js 15** (App Router, React 19, Server Components + Server Actions), TypeScript.
 - **Tailwind CSS v4** (config en `src/app/globals.css` con `@theme`; color de marca `brand-*`).

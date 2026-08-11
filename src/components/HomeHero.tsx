@@ -1,9 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { HeartHandshake, MapPinned, ShieldCheck, Users2 } from "lucide-react";
 import { getAidPoints, getDashboardStats, getStats } from "@/lib/data";
 import { getCrisisStats, type CrisisStat } from "@/lib/news";
 import { getActiveCountry } from "@/lib/country-server";
-import { COUNTRIES } from "@/lib/countries";
+import { COUNTRIES, type CountryConfig, type CountryCode } from "@/lib/countries";
 import { timeAgo } from "@/lib/utils";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { ExternalLinkGuard } from "./ExternalLinkGuard";
@@ -60,14 +61,33 @@ function CrisisStatLine({ stat }: { stat: CrisisStat }) {
   );
 }
 
-export async function HomeHero() {
-  const country = await getActiveCountry();
-  const [stats, dashboardStats, aidPoints, crisisStats] = await Promise.all([
-    getStats(country),
-    getDashboardStats(country),
-    getAidPoints(country),
-    getCrisisStats(country),
-  ]);
+// Bloque estático (sin fetch, instantáneo): cifra curada a mano por país en
+// `countries.ts`. Es el fallback del Suspense de abajo Y lo que se muestra si
+// la extracción en vivo de prensa no trae nada útil.
+function StaticQuakeStat({ active }: { active: CountryConfig }) {
+  return (
+    <div className="mt-4 space-y-1 border-t border-zinc-100 pt-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+        Sismo M{active.quakeInfo.magnitude}
+      </p>
+      <p className="text-xs leading-relaxed text-zinc-500">
+        <span className="font-semibold text-zinc-700">{active.quakeInfo.deaths.toLocaleString("es")}</span>{" "}
+        fallecidos, <span className="font-semibold text-zinc-700">{active.quakeInfo.injured.toLocaleString("es")}</span>{" "}
+        heridos — {active.quakeInfo.sourceName}
+      </p>
+    </div>
+  );
+}
+
+// Extraído en su propio Suspense: GDELT puede tardar varios segundos (o
+// agotar su tiempo de espera y caer a GNews, otros varios segundos más) en
+// una caché fría. Antes esto bloqueaba TODO el hero (país, cifras propias,
+// botones) hasta que la prensa respondiera; ahora el hero aparece de
+// inmediato con la cifra curada estática y esta franja se actualiza sola
+// cuando la extracción en vivo termine.
+async function CrisisStatsPanel({ country }: { country: CountryCode }) {
+  const active = COUNTRIES[country];
+  const crisisStats = await getCrisisStats(country);
   // `news.ts` ya filtra por país (ver countries.ts), pero de todos modos el
   // banner sigue mostrando SOLO la cifra curada y corroborada de `countries.ts`
   // para el país activo, no la extracción en vivo de prensa: esta última es
@@ -81,6 +101,26 @@ export async function HomeHero() {
           (s): s is CrisisStat => Boolean(s),
         )
       : [];
+  if (crisisRows.length === 0) return <StaticQuakeStat active={active} />;
+  return (
+    <div className="mt-4 space-y-1.5 border-t border-zinc-100 pt-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+        Según prensa reciente
+      </p>
+      {crisisRows.map((stat) => (
+        <CrisisStatLine key={stat.label} stat={stat} />
+      ))}
+    </div>
+  );
+}
+
+export async function HomeHero() {
+  const country = await getActiveCountry();
+  const [stats, dashboardStats, aidPoints] = await Promise.all([
+    getStats(country),
+    getDashboardStats(country),
+    getAidPoints(country),
+  ]);
   const active = COUNTRIES[country];
 
   return (
@@ -110,7 +150,8 @@ export async function HomeHero() {
             <span className="text-brand-500">la solidaridad nos encuentra.</span>
           </h1>
           <p className="mt-4 max-w-xl text-zinc-600">
-            Plataforma ciudadana de ayuda y búsqueda tras el terremoto en {active.name}, {active.quakeInfo.date}.
+            Plataforma ciudadana de ayuda y búsqueda ante emergencias en cualquier parte del mundo.
+            Activa ahora para el terremoto en {active.name}, {active.quakeInfo.date}.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -149,28 +190,9 @@ export async function HomeHero() {
             Cifras en vivo
           </p>
 
-          {crisisRows.length > 0 && (
-            <div className="mt-4 space-y-1.5 border-t border-zinc-100 pt-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-                Según prensa reciente
-              </p>
-              {crisisRows.map((stat) => (
-                <CrisisStatLine key={stat.label} stat={stat} />
-              ))}
-            </div>
-          )}
-          {crisisRows.length === 0 && (
-            <div className="mt-4 space-y-1 border-t border-zinc-100 pt-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-                Sismo M{active.quakeInfo.magnitude}
-              </p>
-              <p className="text-xs leading-relaxed text-zinc-500">
-                <span className="font-semibold text-zinc-700">{active.quakeInfo.deaths.toLocaleString("es")}</span>{" "}
-                fallecidos, <span className="font-semibold text-zinc-700">{active.quakeInfo.injured.toLocaleString("es")}</span>{" "}
-                heridos — {active.quakeInfo.sourceName}
-              </p>
-            </div>
-          )}
+          <Suspense fallback={<StaticQuakeStat active={active} />}>
+            <CrisisStatsPanel country={country} />
+          </Suspense>
         </div>
       </div>
     </section>

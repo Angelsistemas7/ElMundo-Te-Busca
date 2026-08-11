@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   LayerGroup,
   LayersControl,
@@ -11,6 +12,26 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+
+// El panel de capas (LayersControl) forzado siempre abierto ocupa mucho del
+// mapa en pantallas chicas. En móvil arranca colapsado (icono que se
+// despliega al tocar, comportamiento nativo de Leaflet); en escritorio sigue
+// abierto de una vez, hay espacio de sobra.
+function useIsMobile(): boolean {
+  // Este componente (CrisisMap) solo se carga en el cliente (`dynamic(...,
+  // {ssr:false})`), así que leer `window` en el estado inicial es seguro: no
+  // hay hidratación de servidor con la que desincronizarse. Se evalúa una
+  // vez ANTES de que `LayersControl` monte, para que arranque colapsado en
+  // móvil desde el primer render en vez de abrirse y cerrarse de golpe.
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 639px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return isMobile;
+}
 
 export type Zone = {
   key: string;
@@ -166,6 +187,7 @@ export default function MapView({
   center: [number, number];
   zoom?: number;
 }) {
+  const isMobile = useIsMobile();
   return (
     <div className="flex h-[68vh] min-h-[460px] w-full flex-col">
       <MapContainer
@@ -193,8 +215,9 @@ export default function MapView({
       )}
 
       {/* Control nativo de Leaflet (checkboxes flotando sobre el mapa, esquina
-          superior derecha) para encender/apagar cada capa. */}
-      <LayersControl position="topright" collapsed={false}>
+          superior derecha) para encender/apagar cada capa. En móvil arranca
+          colapsado (ver useIsMobile) para no tapar el mapa. */}
+      <LayersControl position="topright" collapsed={isMobile}>
         <LayersControl.Overlay checked name="🆘 Necesito ayuda">
           <LayerGroup>
             {needs.map((n) => (

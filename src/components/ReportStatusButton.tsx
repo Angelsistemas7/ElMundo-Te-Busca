@@ -1,15 +1,23 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, LogIn, Loader2, ShieldCheck } from "lucide-react";
 import { PERSON_STATUS_LABEL, type PersonStatus } from "@/lib/types";
-import { reportStatusAction, type ActionResult } from "@/app/actions";
+import { getSessionUserAction, reportStatusAction, type ActionResult } from "@/app/actions";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
 import { Turnstile } from "./Turnstile";
 
 const REPORTABLE: PersonStatus[] = ["localizado", "hospitalizado", "fallecido", "por_localizar"];
+
+// "localizado"/"fallecido" son los dos reportes que más daño hacen si son
+// falsos (falsa esperanza o falso duelo a la familia) — exigen cuenta, igual
+// que las denuncias. "hospitalizado"/"por_localizar" siguen siendo anónimos:
+// son correcciones de menor riesgo y a veces las manda un testigo sin cuenta.
+function needsAccount(status: string): boolean {
+  return status === "localizado" || status === "fallecido";
+}
 
 export function ReportStatusButton({
   personId,
@@ -23,20 +31,32 @@ export function ReportStatusButton({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [reportedStatus, setReportedStatus] = useState<PersonStatus>("localizado");
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    getSessionUserAction()
+      .then((u) => setLoggedIn(!!u))
+      .catch(() => setLoggedIn(false));
+  }, [open]);
+
+  const blockedByLogin = needsAccount(reportedStatus) && loggedIn === false;
 
   function close() {
     setOpen(false);
     setTimeout(() => {
       setResult(null);
       setConfirmed(false);
+      setReportedStatus("localizado");
       formRef.current?.reset();
     }, 200);
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (submitting) return;
+    if (submitting || blockedByLogin) return;
     setSubmitting(true);
     setResult(null);
     try {
@@ -90,7 +110,12 @@ export function ReportStatusButton({
             </div>
 
             <Field label="¿Qué quieres reportar?" htmlFor="reportedStatus" required>
-              <Select id="reportedStatus" name="reportedStatus" defaultValue="localizado">
+              <Select
+                id="reportedStatus"
+                name="reportedStatus"
+                value={reportedStatus}
+                onChange={(e) => setReportedStatus(e.target.value as PersonStatus)}
+              >
                 {REPORTABLE.map((s) => (
                   <option key={s} value={s}>
                     {s === "por_localizar" ? "Sigue desaparecida (corregir)" : PERSON_STATUS_LABEL[s]}
@@ -99,56 +124,72 @@ export function ReportStatusButton({
               </Select>
             </Field>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Tu nombre" htmlFor="reporterName" required error={fieldErrors?.reporterName}>
-                <Input id="reporterName" name="reporterName" placeholder="Nombre y apellido" />
-              </Field>
-              <Field
-                label="Tu teléfono"
-                htmlFor="reporterPhone"
-                required
-                error={fieldErrors?.reporterPhone}
-                hint="Con el código de tu país si no es +58."
-              >
-                <Input id="reporterPhone" name="reporterPhone" placeholder="+58 424 0000000" />
-              </Field>
-            </div>
+            {blockedByLogin && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3 text-sm text-amber-900">
+                <LogIn className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  Para reportar que <strong>apareció</strong> o <strong>falleció</strong> necesitas{" "}
+                  <strong>iniciar sesión</strong>: es el reporte que más daño hace si es falso (falsa
+                  esperanza o falso duelo a la familia). Abre el menú de tu cuenta (arriba a la
+                  derecha) para entrar, o elige otro tipo de reporte.
+                </p>
+              </div>
+            )}
 
-            <Field
-              label="¿Qué relación tienes con la persona?"
-              htmlFor="reporterRelationship"
-              required
-              hint="Familiar, médico, rescatista, vecino, testigo..."
-              error={fieldErrors?.reporterRelationship}
-            >
-              <Input id="reporterRelationship" name="reporterRelationship" placeholder="Ej. Médico del hospital Vargas" />
-            </Field>
+            {!blockedByLogin && (
+              <>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Tu nombre" htmlFor="reporterName" required error={fieldErrors?.reporterName}>
+                    <Input id="reporterName" name="reporterName" placeholder="Nombre y apellido" />
+                  </Field>
+                  <Field
+                    label="Tu teléfono"
+                    htmlFor="reporterPhone"
+                    required
+                    error={fieldErrors?.reporterPhone}
+                    hint="Con el código de tu país si no es +58."
+                  >
+                    <Input id="reporterPhone" name="reporterPhone" placeholder="+58 424 0000000" />
+                  </Field>
+                </div>
 
-            <Field
-              label="¿Dónde la viste / encontraste?"
-              htmlFor="locationFound"
-              required
-              error={fieldErrors?.locationFound}
-            >
-              <Input id="locationFound" name="locationFound" placeholder="Lugar, sector, centro de salud..." />
-            </Field>
+                <Field
+                  label="¿Qué relación tienes con la persona?"
+                  htmlFor="reporterRelationship"
+                  required
+                  hint="Familiar, médico, rescatista, vecino, testigo..."
+                  error={fieldErrors?.reporterRelationship}
+                >
+                  <Input id="reporterRelationship" name="reporterRelationship" placeholder="Ej. Médico del hospital Vargas" />
+                </Field>
 
-            <Field label="Detalles adicionales" htmlFor="notes">
-              <Textarea id="notes" name="notes" placeholder="Cuenta lo que sabes para ayudar a verificar..." />
-            </Field>
+                <Field
+                  label="¿Dónde la viste / encontraste?"
+                  htmlFor="locationFound"
+                  required
+                  error={fieldErrors?.locationFound}
+                >
+                  <Input id="locationFound" name="locationFound" placeholder="Lugar, sector, centro de salud..." />
+                </Field>
 
-            <Turnstile />
+                <Field label="Detalles adicionales" htmlFor="notes">
+                  <Textarea id="notes" name="notes" placeholder="Cuenta lo que sabes para ayudar a verificar..." />
+                </Field>
 
-            <label className="flex cursor-pointer items-start gap-2.5 text-sm text-zinc-600">
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded"
-              />
-              Confirmo que tengo información directa y verídica. Entiendo que reportar datos falsos
-              perjudica la búsqueda de personas reales.
-            </label>
+                <Turnstile />
+
+                <label className="flex cursor-pointer items-start gap-2.5 text-sm text-zinc-600">
+                  <input
+                    type="checkbox"
+                    checked={confirmed}
+                    onChange={(e) => setConfirmed(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded"
+                  />
+                  Confirmo que tengo información directa y verídica. Entiendo que reportar datos falsos
+                  perjudica la búsqueda de personas reales.
+                </label>
+              </>
+            )}
 
             {result && !result.ok && (
               <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
@@ -166,7 +207,7 @@ export function ReportStatusButton({
               </button>
               <button
                 type="submit"
-                disabled={submitting || !confirmed}
+                disabled={submitting || !confirmed || blockedByLogin}
                 className="flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
               >
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}

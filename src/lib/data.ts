@@ -2,7 +2,7 @@ import { unstable_cache } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { getSupabase, getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
 import { getCurrentUser } from "./auth";
-import { COUNTRY_CODES, DEFAULT_COUNTRY, isCountryCode, type CountryCode } from "./countries";
+import { COUNTRIES, COUNTRY_CODES, DEFAULT_COUNTRY, isCountryCode, type CountryCode } from "./countries";
 import {
   seedAidPoints,
   seedComments,
@@ -26,6 +26,7 @@ import type {
   Comment,
   Complaint,
   ComplaintCategory,
+  Estado,
   Hero,
   NewsItem,
   Hospital,
@@ -34,6 +35,7 @@ import type {
   ManagedEntity,
   March,
   Person,
+  PersonCause,
   PersonReaction,
   PersonStatus,
   Pet,
@@ -74,6 +76,20 @@ import { isSafePhotoUrl } from "./validation";
 
 export type PersonSort = "recent" | "name" | "estado";
 
+// Cuántos días después del sismo del país activo "Se busca" prioriza los
+// casos ligados al desastre por encima de cualquier otro (dentro del orden
+// "Más recientes", el único que aplica esta prioridad). Pasada la ventana, se
+// vuelve a ordenar por fecha de publicación sin importar la causa — así no se
+// entierran para siempre las desapariciones cotidianas ajenas al terremoto.
+const PRIORITY_WINDOW_DAYS = 45;
+
+function isWithinPriorityWindow(country: string): boolean {
+  const cfg = COUNTRIES[isCountryCode(country) ? country : DEFAULT_COUNTRY];
+  const quakeDate = new Date(`${cfg.quakeInfo.dateISO}T00:00:00Z`).getTime();
+  const days = (Date.now() - quakeDate) / (1000 * 60 * 60 * 24);
+  return days >= 0 && days <= PRIORITY_WINDOW_DAYS;
+}
+
 export interface PersonQuery {
   /** País/instancia de desastre activo. Ausente = 've' (Venezuela, compatibilidad). */
   country?: string;
@@ -81,6 +97,7 @@ export interface PersonQuery {
   status?: PersonStatus | "all";
   estado?: string | "all";
   gender?: string | "all";
+  cause?: PersonCause | "all";
   minAge?: number;
   maxAge?: number;
   dateFrom?: string;
@@ -182,6 +199,7 @@ function rowToPerson(r: any): Person {
     status: r.status,
     hospitalName: r.hospital_name,
     isUnidentified: r.is_unidentified,
+    cause: r.cause ?? "desastre",
     contactName: r.contact_name,
     contactPhone: r.contact_phone,
     contactEmail: r.contact_email,
@@ -223,6 +241,7 @@ function queryMemoryPersons(q: PersonQuery): PersonResult {
   if (q.hospitalizedOnly) items = items.filter((p) => p.status === "hospitalizado");
   if (q.estado && q.estado !== "all") items = items.filter((p) => p.estado === q.estado);
   if (q.gender && q.gender !== "all") items = items.filter((p) => p.gender === q.gender);
+  if (q.cause && q.cause !== "all") items = items.filter((p) => p.cause === q.cause);
   if (typeof q.minAge === "number") items = items.filter((p) => p.age != null && p.age >= q.minAge!);
   if (typeof q.maxAge === "number") items = items.filter((p) => p.age != null && p.age <= q.maxAge!);
   if (q.dateFrom) items = items.filter((p) => p.createdAt >= q.dateFrom!);
@@ -247,7 +266,15 @@ function queryMemoryPersons(q: PersonQuery): PersonResult {
       items.sort((a, b) => (a.estado ?? "").localeCompare(b.estado ?? ""));
       break;
     default:
-      items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      if (isWithinPriorityWindow(country)) {
+        items.sort(
+          (a, b) =>
+            (a.cause === "desastre" ? 0 : 1) - (b.cause === "desastre" ? 0 : 1) ||
+            b.createdAt.localeCompare(a.createdAt),
+        );
+      } else {
+        items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      }
   }
 
   const total = items.length;
@@ -271,6 +298,7 @@ export async function getPersons(q: PersonQuery = {}): Promise<PersonResult> {
   if (q.hospitalizedOnly) query = query.eq("status", "hospitalizado");
   if (q.estado && q.estado !== "all") query = query.eq("estado", q.estado);
   if (q.gender && q.gender !== "all") query = query.eq("gender", q.gender);
+  if (q.cause && q.cause !== "all") query = query.eq("cause", q.cause);
   if (typeof q.minAge === "number") query = query.gte("age", q.minAge);
   if (typeof q.maxAge === "number") query = query.lte("age", q.maxAge);
   if (q.dateFrom) query = query.gte("created_at", q.dateFrom);
@@ -279,7 +307,12 @@ export async function getPersons(q: PersonQuery = {}): Promise<PersonResult> {
 
   if (q.sort === "name") query = query.order("first_name", { ascending: true });
   else if (q.sort === "estado") query = query.order("estado", { ascending: true });
-  else query = query.order("created_at", { ascending: false });
+  else if (!q.sort || q.sort === "recent") {
+    // "desastre" < "otra" alfabéticamente: ascendente los deja primero. Solo
+    // se aplica dentro de la ventana de prioridad (ver PRIORITY_WINDOW_DAYS).
+    if (isWithinPriorityWindow(q.country ?? "ve")) query = query.order("cause", { ascending: true });
+    query = query.order("created_at", { ascending: false });
+  }
 
   query = query.range((page - 1) * pageSize, page * pageSize - 1);
 
@@ -450,27 +483,45 @@ async function getDashboardStatsImpl(country = "ve"): Promise<DashboardStats> {
       voluntarios: mem.volunteers.filter((x) => (x.country ?? "ve") === country).length,
     };
   }
-  const { data: persons } = await sb.from("persons").select("status,age").eq("country", country);
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const rows = (persons ?? []) as any[];
-  const tally = (s: string) => rows.filter((r) => r.status === s).length;
-  const [{ count: denuncias }, { count: necesidades }, { count: voluntarios }] = await Promise.all([
+  // Conteos agregados en vez de traer filas: `select()` sin `.range()` lo topa
+  // Supabase/PostgREST en 1000 filas por defecto, así que un país con más de
+  // 1000 personas (Venezuela ya supera 40.000) quedaba contado sobre una
+  // muestra arbitraria en vez del total real. `head: true` con `count: "exact"`
+  // solo pide el conteo, sin ese límite.
+  const byStatus = (status: PersonStatus) =>
+    sb.from("persons").select("*", { count: "exact", head: true }).eq("country", country).eq("status", status);
+  const [
+    { count: registered },
+    { count: desaparecidos },
+    { count: enHospitales },
+    { count: aSalvo },
+    { count: fallecidos },
+    { count: ninos },
+    { count: denuncias },
+    { count: necesidades },
+    { count: voluntarios },
+  ] = await Promise.all([
+    sb.from("persons").select("*", { count: "exact", head: true }).eq("country", country),
+    byStatus("por_localizar"),
+    byStatus("hospitalizado"),
+    byStatus("localizado"),
+    byStatus("fallecido"),
+    sb.from("persons").select("*", { count: "exact", head: true }).eq("country", country).lt("age", 18),
     sb.from("complaints").select("*", { count: "exact", head: true }).eq("country", country),
     sb.from("posts").select("*", { count: "exact", head: true }).eq("type", "necesito").eq("country", country),
     sb.from("volunteers").select("*", { count: "exact", head: true }).eq("country", country),
   ]);
   return {
-    registered: rows.length,
-    desaparecidos: tally("por_localizar"),
-    enHospitales: tally("hospitalizado"),
-    aSalvo: tally("localizado"),
-    fallecidos: tally("fallecido"),
-    ninos: rows.filter((r) => r.age != null && r.age < 18).length,
+    registered: registered ?? 0,
+    desaparecidos: desaparecidos ?? 0,
+    enHospitales: enHospitales ?? 0,
+    aSalvo: aSalvo ?? 0,
+    fallecidos: fallecidos ?? 0,
+    ninos: ninos ?? 0,
     denuncias: denuncias ?? 0,
     necesidades: necesidades ?? 0,
     voluntarios: voluntarios ?? 0,
   };
-  /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
 /** Personas que estaban desaparecidas y ya fueron ubicadas (con vida u hospital). */
@@ -564,6 +615,111 @@ export interface CreatePersonResult {
   ownerToken: string;
 }
 
+// ── Detección de posibles duplicados al registrar ───────────────────────────
+function normalizeCedula(value: string | null | undefined): string {
+  return (value ?? "").replace(/[^0-9]/g, "");
+}
+
+function normalizeName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+export interface PersonDuplicateMatch {
+  id: string;
+  firstName: string;
+  lastName: string;
+  cedula: string | null;
+  estado: Estado | null;
+  locationText: string;
+  status: PersonStatus;
+  photoUrl: string | null;
+  isUnidentified: boolean;
+}
+
+function toDuplicateMatch(p: Person): PersonDuplicateMatch {
+  return {
+    id: p.id,
+    firstName: p.firstName,
+    lastName: p.lastName,
+    cedula: p.cedula,
+    estado: p.estado,
+    locationText: p.locationText,
+    status: p.status,
+    photoUrl: p.photoUrl,
+    isUnidentified: p.isUnidentified,
+  };
+}
+
+/**
+ * Busca registros ya existentes que probablemente sean la misma persona (por
+ * cédula exacta o nombre completo exacto), para avisar antes de crear un
+ * duplicado. No es detección difusa: solo coincidencia exacta normalizada.
+ */
+export async function findPersonDuplicates(params: {
+  firstName: string;
+  lastName: string;
+  cedula: string | null;
+  country: CountryCode;
+}): Promise<PersonDuplicateMatch[]> {
+  const cedulaDigits = normalizeCedula(params.cedula);
+  const fullName = normalizeName(`${params.firstName} ${params.lastName}`);
+  if (!cedulaDigits && !fullName) return [];
+
+  const sb = getSupabase();
+  if (!sb) {
+    return mem.persons
+      .filter((p) => (p.country ?? "ve") === params.country)
+      .filter((p) => {
+        if (cedulaDigits && normalizeCedula(p.cedula) === cedulaDigits) return true;
+        if (fullName && normalizeName(`${p.firstName} ${p.lastName}`) === fullName) return true;
+        return false;
+      })
+      .slice(0, 5)
+      .map(toDuplicateMatch);
+  }
+
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const queries: Array<PromiseLike<{ data: any[] | null }>> = [];
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+  if (cedulaDigits) {
+    queries.push(
+      sb
+        .from("persons")
+        .select("*")
+        .eq("country", params.country)
+        .ilike("cedula", `%${cedulaDigits}%`)
+        .limit(5),
+    );
+  }
+  if (fullName && params.firstName.trim()) {
+    queries.push(
+      sb
+        .from("persons")
+        .select("*")
+        .eq("country", params.country)
+        .ilike("first_name", params.firstName.trim())
+        .ilike("last_name", params.lastName.trim() || "")
+        .limit(5),
+    );
+  }
+  if (queries.length === 0) return [];
+
+  const results = await Promise.all(queries);
+  const byId = new Map<string, PersonDuplicateMatch>();
+  for (const { data } of results) {
+    for (const row of data ?? []) {
+      const match = toDuplicateMatch(rowToPerson(row));
+      byId.set(match.id, match);
+    }
+  }
+  return Array.from(byId.values()).slice(0, 5);
+}
+
 export async function createPerson(
   input: PersonInput,
   photoUrl: string | null,
@@ -605,6 +761,7 @@ export async function createPerson(
       status,
       hospitalName: null,
       isUnidentified: input.isUnidentified ?? false,
+      cause: input.cause ?? "desastre",
       contactName: input.contactName || null,
       contactPhone: input.contactPhone || null,
       contactEmail: input.contactEmail || null,
@@ -635,6 +792,7 @@ export async function createPerson(
       photo_url: photoUrl,
       status,
       is_unidentified: input.isUnidentified ?? false,
+      cause: input.cause ?? "desastre",
       contact_name: input.contactName || null,
       contact_phone: input.contactPhone || null,
       contact_email: input.contactEmail || null,
@@ -769,6 +927,7 @@ export async function updatePersonFields(id: string, input: PersonInput): Promis
       person.locationText = input.locationText || "";
       if (input.lat !== undefined) person.lat = input.lat;
       if (input.lng !== undefined) person.lng = input.lng;
+      if (input.cause !== undefined) person.cause = input.cause;
       person.description = input.description || "";
       person.contactName = input.contactName || null;
       person.contactPhone = input.contactPhone || null;
@@ -788,6 +947,7 @@ export async function updatePersonFields(id: string, input: PersonInput): Promis
       location_text: input.locationText || "",
       ...(input.lat !== undefined ? { lat: input.lat } : {}),
       ...(input.lng !== undefined ? { lng: input.lng } : {}),
+      ...(input.cause !== undefined ? { cause: input.cause } : {}),
       description: input.description || "",
       contact_name: input.contactName || null,
       contact_phone: input.contactPhone || null,
@@ -2036,9 +2196,23 @@ async function getEstadoBreakdownImpl(country = "ve"): Promise<Record<string, Es
         .filter((p) => (p.country ?? "ve") === country)
         .map((p) => ({ estado: p.estado, status: p.status })),
     );
-  const { data, error } = await sb.from("persons").select("estado,status").eq("country", country);
-  if (error) throw error;
-  return tally((data ?? []) as { estado: string | null; status: PersonStatus }[]);
+  // Paginado en bloques de 1000: PostgREST tope por defecto es 1000 filas por
+  // consulta. Sin esto, un país con más de 1000 personas (Venezuela ya supera
+  // 40.000) quedaba contado sobre una muestra arbitraria de las primeras 1000
+  // en vez del total real — subestimando fuerte el desglose por estado del mapa.
+  const rows: { estado: string | null; status: PersonStatus }[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from("persons")
+      .select("estado,status")
+      .eq("country", country)
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as { estado: string | null; status: PersonStatus }[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return tally(rows);
 }
 
 /**
@@ -2065,11 +2239,21 @@ async function getCountsByEstadoImpl(country = "ve"): Promise<Record<string, num
     }
     return counts;
   }
-  const { data, error } = await sb.from("persons").select("estado").eq("country", country);
-  if (error) throw error;
+  // Paginado en bloques de 1000 (mismo motivo que en getEstadoBreakdownImpl):
+  // sin `.range()`, PostgREST topa en 1000 filas y subestima países grandes.
   const counts: Record<string, number> = {};
-  for (const r of data ?? []) {
-    if (r.estado) counts[r.estado] = (counts[r.estado] ?? 0) + 1;
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from("persons")
+      .select("estado")
+      .eq("country", country)
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    for (const r of data ?? []) {
+      if (r.estado) counts[r.estado] = (counts[r.estado] ?? 0) + 1;
+    }
+    if (!data || data.length < PAGE) break;
   }
   return counts;
 }

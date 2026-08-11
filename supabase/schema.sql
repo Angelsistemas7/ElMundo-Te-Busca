@@ -23,6 +23,10 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
+  create type person_cause as enum ('desastre', 'otra');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
   create type aid_point_type as enum ('comida', 'agua', 'medicina', 'refugio', 'alojamiento', 'ropa', 'otro');
 exception when duplicate_object then null; end $$;
 -- Migración para bases ya creadas: añade 'alojamiento' (hogares que abren sus puertas).
@@ -43,6 +47,7 @@ create table if not exists persons (
   status          person_status not null default 'por_localizar',
   hospital_name   text,
   is_unidentified boolean not null default false,
+  cause           person_cause not null default 'desastre',
   contact_name    text,
   contact_phone   text,
   contact_email   text,
@@ -95,6 +100,13 @@ create index if not exists persons_name_trgm_idx     on persons using gin ((firs
 -- existentes (todas de Venezuela) quedan en 've' por el default.
 alter table persons add column if not exists country text not null default 've';
 create index if not exists persons_country_idx on persons (country);
+
+-- Migración "categoría de publicación" (ago. 2026): por qué se publicó a esta
+-- persona — ligada al desastre activo, u otra causa (desaparición cotidiana
+-- ajena al terremoto). Filas existentes quedan en 'desastre' por el default
+-- (es el caso original de la plataforma).
+alter table persons add column if not exists cause person_cause not null default 'desastre';
+create index if not exists persons_cause_idx on persons (cause);
 
 -- ── Sincronización desde colombiatebusca.com / venezuelatebusca.com ────────
 -- Esos sitios quedaron sin mantenimiento (ver docs/ESTADO-DEL-PROYECTO.md).

@@ -84,6 +84,7 @@ export const personSchema = z
     lng: z.coerce.number().min(-180).max(180).optional(),
     description: z.string().trim().max(800).optional().or(z.literal("")),
     isUnidentified: z.boolean().default(false),
+    cause: z.enum(["desastre", "otra"]).optional(),
     // Solo aplica a avistamientos ("¿La reconoces?"): la persona ya está ubicada.
     status: z.enum(["por_localizar", "localizado", "hospitalizado", "fallecido"]).optional(),
     contactName: z.string().trim().max(80).optional().or(z.literal("")),

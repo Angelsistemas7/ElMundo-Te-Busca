@@ -33,26 +33,26 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 export const metadata: Metadata = {
   metadataBase: siteUrl ? new URL(siteUrl) : undefined,
   title: {
-    default: "El Mundo Te Busca — Personas desaparecidas tras terremotos (Venezuela y Colombia, 2026)",
+    default: "El Mundo Te Busca — Personas desaparecidas y ayuda ante emergencias",
     template: "%s · El Mundo Te Busca",
   },
   applicationName: "El Mundo Te Busca",
   description:
-    "Iniciativa ciudadana, voluntaria y sin fines de lucro para localizar personas desaparecidas y coordinar ayuda tras los terremotos de Venezuela (jun. 2026) y Colombia (ago. 2026).",
+    "Iniciativa ciudadana, voluntaria y sin fines de lucro para localizar personas desaparecidas y coordinar ayuda ante emergencias en cualquier parte del mundo. Activa ahora tras los terremotos de Venezuela (jun. 2026) y Colombia (ago. 2026).",
   robots: { index: true, follow: true },
   openGraph: {
-    title: "El Mundo Te Busca — Respuesta a los terremotos de 2026",
+    title: "El Mundo Te Busca — Ayuda y búsqueda ante emergencias",
     description:
-      "Plataforma ciudadana para localizar personas desaparecidas y coordinar ayuda tras los terremotos de Venezuela y Colombia de 2026.",
+      "Plataforma ciudadana global para localizar personas desaparecidas y coordinar ayuda ante emergencias. Activa ahora en Venezuela y Colombia (terremotos de 2026).",
     type: "website",
     locale: "es_419",
     siteName: "El Mundo Te Busca",
   },
   twitter: {
     card: "summary_large_image",
-    title: "El Mundo Te Busca — Respuesta a los terremotos de 2026",
+    title: "El Mundo Te Busca — Ayuda y búsqueda ante emergencias",
     description:
-      "Plataforma ciudadana para localizar personas desaparecidas y coordinar ayuda tras los terremotos de Venezuela y Colombia de 2026.",
+      "Plataforma ciudadana global para localizar personas desaparecidas y coordinar ayuda ante emergencias. Activa ahora en Venezuela y Colombia (terremotos de 2026).",
   },
 };
 

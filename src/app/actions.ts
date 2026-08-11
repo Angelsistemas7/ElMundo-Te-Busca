@@ -38,6 +38,8 @@ import {
   deletePerson,
   deletePet,
   deletePost,
+  findPersonDuplicates,
+  type PersonDuplicateMatch,
   likeAidPoint,
   likeHospital,
   likeMarch,
@@ -383,6 +385,30 @@ export async function setSavedAction(
 }
 
 // ── Registrar persona desaparecida ──────────────────────────────────────────
+/**
+ * Consulta liviana (sin Turnstile: es de solo lectura, no escribe nada) que
+ * busca posibles coincidencias exactas por cédula o nombre completo antes de
+ * publicar, para avisar y evitar duplicados. La ficha coincidente ya es
+ * pública (aparece en /se-busca), así que esto no expone nada nuevo.
+ */
+export async function checkPersonDuplicatesAction(
+  firstName: string,
+  lastName: string,
+  cedula: string,
+): Promise<PersonDuplicateMatch[]> {
+  if (!firstName.trim() && !cedula.trim()) return [];
+  try {
+    return await findPersonDuplicates({
+      firstName,
+      lastName,
+      cedula: cedula || null,
+      country: await getActiveCountry(),
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function registerPersonAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
@@ -401,6 +427,7 @@ export async function registerPersonAction(form: FormData): Promise<ActionResult
     lng: getField(form, "lng") || undefined,
     description: getField(form, "description"),
     isUnidentified: getField(form, "isUnidentified") === "on",
+    cause: getField(form, "cause") || undefined,
     status: getField(form, "status") || undefined,
     contactName: getField(form, "contactName"),
     contactPhone: getField(form, "contactPhone"),
@@ -457,6 +484,21 @@ export async function reportStatusAction(form: FormData): Promise<ActionResult> 
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
     return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+  }
+
+  // Reportar "localizado" o "fallecido" exige cuenta (igual que denuncias):
+  // son los dos reportes que más daño hacen si son falsos (falsa esperanza o
+  // falso duelo), aunque nunca cambian el estado oficial por sí solos — un
+  // troll anónimo con nombre/teléfono inventados ya no basta para publicarlos.
+  const reportedStatus = getField(form, "reportedStatus");
+  if (reportedStatus === "localizado" || reportedStatus === "fallecido") {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        ok: false,
+        error: "Para reportar que alguien apareció o falleció necesitas iniciar sesión. Así evitamos reportes falsos.",
+      };
+    }
   }
 
   const parsed = statusReportSchema.safeParse({
@@ -682,22 +724,6 @@ export async function likeHospitalAction(id: string): Promise<{ ok: boolean }> {
 }
 
 // ── Comunidad / Feed ─────────────────────────────────────────────────────────
-/** Siguiente tanda del muro para el scroll infinito (mismo filtro/orden que
- *  cargó la página inicialmente). Devuelve cada post ya con sus comentarios
- *  (una sola consulta por lote) para que `PostCard` no tenga que pedirlos aparte. */
-export async function getMorePostsAction(
-  filter: { type?: PostType | "all"; search?: string; estado?: string | "all"; dateFrom?: string; dateTo?: string },
-  page: number,
-  pageSize: number,
-  sort: PostSort,
-): Promise<{ items: (Post & { comments: Comment[] })[]; hasMore: boolean }> {
-  const pageResult = await getPostsPage({ ...filter, country: await getActiveCountry() }, page, pageSize, sort);
-  const commentsByPost = await getCommentsForEntities("post", pageResult.items.map((p) => p.id));
-  const items = pageResult.items.map((post) => ({ ...post, comments: commentsByPost[post.id] ?? [] }));
-  const hasMore = page * pageSize < pageResult.total;
-  return { items, hasMore };
-}
-
 export async function createPostAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
@@ -1113,6 +1139,7 @@ export async function ownerUpdateAction(form: FormData): Promise<ActionResult> {
     description: getField(form, "description"),
     // Reflejamos si la persona es "sin identificar" para no exigir nombre al editarla.
     isUnidentified: getField(form, "isUnidentified") === "on",
+    cause: getField(form, "cause") || undefined,
     contactName: getField(form, "contactName"),
     contactPhone: getField(form, "contactPhone"),
     contactEmail: getField(form, "contactEmail"),

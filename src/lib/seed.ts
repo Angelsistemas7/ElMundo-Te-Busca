@@ -91,6 +91,7 @@ function buildPersons(): Person[] {
       status,
       hospitalName: status === "hospitalizado" ? "Hospital José María Vargas" : null,
       isUnidentified: unidentified,
+      cause: rand() > 0.88 ? "otra" : "desastre",
       contactName: unidentified ? null : "Familiar",
       contactPhone: unidentified ? null : "+58 412 0000000",
       contactEmail: null,

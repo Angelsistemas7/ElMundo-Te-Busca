@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { MapPin, IdCard, Clock, BadgeCheck, Eye } from "lucide-react";
+import { MapPin, IdCard, Clock, BadgeCheck, Eye, CircleAlert } from "lucide-react";
 import type { Person } from "@/lib/types";
 import { PERSON_STATUS_LABEL } from "@/lib/types";
 import { cn, statusStyle, timeAgo } from "@/lib/utils";
@@ -47,6 +47,15 @@ export const PersonCard = memo(function PersonCard({ person }: { person: Person 
           <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
             <Eye className="h-3 w-3" />
             Sin identificar
+          </span>
+        )}
+        {/* Solo se marca la excepción (no ligado al desastre activo): la
+            mayoría de los casos SÍ lo están, así que etiquetar ese caso por
+            defecto sería ruido en cada tarjeta. */}
+        {person.cause === "otra" && (
+          <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+            <CircleAlert className="h-3 w-3" />
+            Otro motivo
           </span>
         )}
       </div>

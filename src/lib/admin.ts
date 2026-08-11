@@ -1,6 +1,20 @@
+import { timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { getCurrentUser } from "./auth";
 import { hasAppRole } from "./data";
+
+// Compara el token/contraseña maestra sin filtrar por temporización cuánto
+// coincide el prefijo (`===` corta en el primer byte distinto). Si difieren en
+// longitud, igual se compara contra sí mismo para no devolver antes de tiempo.
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
+}
 
 // Control de acceso del panel de moderación. Dos caminos, cualquiera basta:
 //   • ADMIN_TOKEN (llave maestra compartida, siempre disponible como respaldo)
@@ -84,7 +98,8 @@ export async function isAdmin(): Promise<boolean> {
   // dejar la moderación expuesta si se olvida configurar el secreto.
   if (!ADMIN_TOKEN) return process.env.NODE_ENV !== "production";
   const store = await cookies();
-  if (store.get(COOKIE)?.value === ADMIN_TOKEN) return true;
+  const cookieValue = store.get(COOKIE)?.value;
+  if (cookieValue && safeEqual(cookieValue, ADMIN_TOKEN)) return true;
   // Segundo camino: cuenta propia con el rol "admin" asignado (sin compartir
   // la contraseña maestra). El token sigue funcionando como respaldo.
   const user = await getCurrentUser();
@@ -96,7 +111,7 @@ export async function signInAdmin(password: string): Promise<boolean> {
   if (!ADMIN_TOKEN) return process.env.NODE_ENV !== "production";
   const ip = await clientIp();
   if (isLocked(ip)) return false;
-  if (password !== ADMIN_TOKEN) {
+  if (!safeEqual(password, ADMIN_TOKEN)) {
     registerFailure(ip);
     return false;
   }

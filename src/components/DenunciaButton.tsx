@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, ImagePlus, Loader2, LogIn, Megaphone, ShieldAlert } from "lucide-react";
 import { COMPLAINT_CATEGORY_LABEL, type ComplaintCategory } from "@/lib/types";
 import { getCountry } from "@/lib/countries";
+import { getEmergency } from "@/lib/emergency";
 import { createComplaintAction, getSessionUserAction, type ActionResult } from "@/app/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
@@ -15,6 +16,7 @@ const CATEGORIES = Object.keys(COMPLAINT_CATEGORY_LABEL) as ComplaintCategory[];
 
 export function DenunciaButton({ country = "ve" }: { country?: string }) {
   const regions = getCountry(country).regions;
+  const { nationalLine } = getEmergency(country);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
@@ -145,7 +147,7 @@ export function DenunciaButton({ country = "ve" }: { country?: string }) {
                     y dañar a una persona inocente.
                   </li>
                   <li>
-                    Si hay un menor en riesgo o un delito en curso, <strong>llama también al 911</strong>.
+                    Si hay un menor en riesgo o un delito en curso, <strong>llama también al {nationalLine.number}</strong>.
                   </li>
                 </ul>
               </div>

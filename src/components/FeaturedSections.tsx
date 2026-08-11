@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Baby, Clock, GraduationCap, PersonStanding, Sparkles, User, Users } from "lucide-react";
+import { ArrowRight, Baby, Clock, GraduationCap, PersonStanding, User, Users } from "lucide-react";
 import { getFeaturedPersons, type getPersons } from "@/lib/data";
 import { PersonCard } from "./PersonCard";
 
@@ -31,7 +31,7 @@ function buildSections(unidentified: boolean): SectionDef[] {
       title: "Registrados recientemente",
       subtitle: "Los últimos casos publicados — ver todos los registros",
       icon: Clock,
-      href: `/?${viewQS}sort=recent`,
+      href: `/se-busca?${viewQS}sort=recent`,
       query: { ...identityQuery, sort: "recent", pageSize: 12 },
     },
     {
@@ -39,7 +39,7 @@ function buildSections(unidentified: boolean): SectionDef[] {
       title: "Niñas y niños",
       subtitle: "De 0 a 11 años",
       icon: Baby,
-      href: `/?${viewQS}maxAge=11`,
+      href: `/se-busca?${viewQS}maxAge=11`,
       query: { ...identityQuery, maxAge: 11, sort: "recent", pageSize: 12 },
     },
     {
@@ -47,7 +47,7 @@ function buildSections(unidentified: boolean): SectionDef[] {
       title: "Adolescentes",
       subtitle: "De 12 a 17 años",
       icon: GraduationCap,
-      href: `/?${viewQS}minAge=12&maxAge=17`,
+      href: `/se-busca?${viewQS}minAge=12&maxAge=17`,
       query: { ...identityQuery, minAge: 12, maxAge: 17, sort: "recent", pageSize: 12 },
     },
     {
@@ -55,7 +55,7 @@ function buildSections(unidentified: boolean): SectionDef[] {
       title: "Jóvenes",
       subtitle: "De 18 a 29 años",
       icon: User,
-      href: `/?${viewQS}minAge=18&maxAge=29`,
+      href: `/se-busca?${viewQS}minAge=18&maxAge=29`,
       query: { ...identityQuery, minAge: 18, maxAge: 29, sort: "recent", pageSize: 12 },
     },
     {
@@ -63,7 +63,7 @@ function buildSections(unidentified: boolean): SectionDef[] {
       title: "Adultos",
       subtitle: "De 30 a 59 años",
       icon: Users,
-      href: `/?${viewQS}minAge=30&maxAge=59`,
+      href: `/se-busca?${viewQS}minAge=30&maxAge=59`,
       query: { ...identityQuery, minAge: 30, maxAge: 59, sort: "recent", pageSize: 12 },
     },
     {
@@ -71,7 +71,7 @@ function buildSections(unidentified: boolean): SectionDef[] {
       title: "Adultos mayores",
       subtitle: "60 años o más",
       icon: PersonStanding,
-      href: `/?${viewQS}minAge=60`,
+      href: `/se-busca?${viewQS}minAge=60`,
       query: { ...identityQuery, minAge: 60, sort: "recent", pageSize: 12 },
     },
   ];
@@ -128,10 +128,6 @@ export async function FeaturedSections({
   const sections = buildSections(unidentified);
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-2 text-sm font-medium text-zinc-400">
-        <Sparkles className="h-4 w-4" />
-        Secciones destacadas
-      </div>
       {sections.map((def) => (
         <Section key={def.key} def={def} country={country} />
       ))}

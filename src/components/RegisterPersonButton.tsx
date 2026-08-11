@@ -2,9 +2,25 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, ImagePlus, Loader2, MapPin, Plus, Search } from "lucide-react";
+import Link from "next/link";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  ImagePlus,
+  Loader2,
+  MapPin,
+  Plus,
+  Search,
+} from "lucide-react";
 import { getCountry } from "@/lib/countries";
-import { registerPersonAction, type ActionResult } from "@/app/actions";
+import {
+  checkPersonDuplicatesAction,
+  registerPersonAction,
+  type ActionResult,
+} from "@/app/actions";
+import type { PersonDuplicateMatch } from "@/lib/data";
+import { PERSON_STATUS_LABEL } from "@/lib/types";
 import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
 import { Modal } from "./Modal";
@@ -28,6 +44,9 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
   const [preview, setPreview] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [title, setTitle] = useState("");
+  const [duplicates, setDuplicates] = useState<PersonDuplicateMatch[] | null>(null);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const skipDuplicateCheck = useRef(false);
   const fileRef = useRef<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -36,6 +55,8 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
     setPreview(null);
     setDone(false);
     setIntent(null);
+    setDuplicates(null);
+    skipDuplicateCheck.current = false;
     fileRef.current = null;
     formRef.current?.reset();
   }
@@ -50,13 +71,41 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
     setResult(null);
   }
 
+  function continueAnyway() {
+    skipDuplicateCheck.current = true;
+    setDuplicates(null);
+    formRef.current?.requestSubmit();
+  }
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (submitting) return;
+    if (submitting || checkingDuplicates) return;
+    const form = new FormData(e.currentTarget);
+
+    // Antes de crear un registro "busco a esta persona" con nombre/cédula,
+    // avisamos si ya existe algo que coincida exacto, para no duplicar.
+    if (!isSighting && !skipDuplicateCheck.current) {
+      const firstName = String(form.get("firstName") ?? "");
+      const lastName = String(form.get("lastName") ?? "");
+      const cedula = String(form.get("cedula") ?? "");
+      if (firstName.trim() || cedula.trim()) {
+        setCheckingDuplicates(true);
+        try {
+          const matches = await checkPersonDuplicatesAction(firstName, lastName, cedula);
+          if (matches.length > 0) {
+            setDuplicates(matches);
+            return;
+          }
+        } finally {
+          setCheckingDuplicates(false);
+        }
+      }
+    }
+    skipDuplicateCheck.current = false;
+
     setSubmitting(true);
     setResult(null);
     try {
-      const form = new FormData(e.currentTarget);
       const nm = `${String(form.get("firstName") ?? "")} ${String(form.get("lastName") ?? "")}`.trim();
       setTitle(nm || "Persona sin identificar");
       if (fileRef.current) {
@@ -97,9 +146,21 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
 
   return (
     <>
+      {/* En móvil, la barra de búsqueda/filtros se puede ocultar (ver
+          SearchAndFilters) y este botón se iba con ella — un flotante fijo
+          arriba de la barra inferior siempre está a mano, sin depender de
+          que esa barra esté expandida. En escritorio se queda el botón normal. */}
       <button
         onClick={() => setOpen(true)}
-        className="press flex items-center gap-1.5 rounded-xl bg-brand-400 px-4 py-2.5 text-sm font-bold text-zinc-900 shadow-sm transition hover:bg-brand-300 sm:gap-2 sm:px-5 sm:py-3 sm:text-base"
+        aria-label="Publicar persona"
+        className="press fixed left-1/2 z-30 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-brand-400 text-zinc-900 shadow-lg transition hover:bg-brand-300 sm:hidden"
+        style={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+      <button
+        onClick={() => setOpen(true)}
+        className="press hidden items-center gap-1.5 rounded-xl bg-brand-400 px-4 py-2.5 text-sm font-bold text-zinc-900 shadow-sm transition hover:bg-brand-300 sm:flex sm:gap-2 sm:px-5 sm:py-3 sm:text-base"
       >
         <Plus className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
         Publicar persona
@@ -132,6 +193,69 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
                 className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        ) : duplicates && duplicates.length > 0 ? (
+          // ── Aviso de posible duplicado antes de publicar ─────────────────
+          <div className="space-y-4 py-1">
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  Ya encontramos {duplicates.length === 1 ? "un registro" : "registros"} con el
+                  mismo nombre o cédula
+                </p>
+                <p className="mt-1 text-sm text-amber-800">
+                  Si es la misma persona, mejor aporta información en esa ficha en vez de crear una
+                  nueva. Si es alguien distinto, puedes continuar publicando igual.
+                </p>
+              </div>
+            </div>
+
+            <ul className="space-y-2">
+              {duplicates.map((m) => {
+                const name = `${m.firstName} ${m.lastName}`.trim() || "Sin identificar";
+                return (
+                  <li
+                    key={m.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-zinc-900">{name}</p>
+                      <p className="text-xs text-zinc-500">
+                        {[m.cedula, m.estado, m.locationText].filter(Boolean).join(" · ") ||
+                          "Sin más datos"}
+                        {" · "}
+                        {PERSON_STATUS_LABEL[m.status]}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/persona/${m.id}`}
+                      target="_blank"
+                      className="shrink-0 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                    >
+                      Ver ficha
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="flex flex-wrap justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setDuplicates(null)}
+                className="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                Volver a revisar los datos
+              </button>
+              <button
+                type="button"
+                onClick={continueAnyway}
+                className="press rounded-xl bg-brand-400 px-5 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-brand-300"
+              >
+                No es la misma persona, publicar de todas formas
               </button>
             </div>
           </div>
@@ -220,6 +344,17 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
             <p className="-mt-3 text-xs text-zinc-400">
               Sube una foto de la persona, no de su cédula u otro documento de identidad.
             </p>
+
+            <Field
+              label="¿Por qué se publica?"
+              htmlFor="cause"
+              hint="Ayuda a priorizar: los casos ligados al terremoto se destacan primero mientras dure la emergencia."
+            >
+              <Select id="cause" name="cause" defaultValue="desastre">
+                <option value="desastre">Relacionado con el terremoto</option>
+                <option value="otra">Otro motivo (no relacionado con el desastre)</option>
+              </Select>
+            </Field>
 
             <h3 className="text-sm font-semibold text-zinc-900">
               {isSighting ? "Lo que sepas de la persona" : "Datos de la persona"}
@@ -363,11 +498,15 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
               </button>
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || checkingDuplicates}
                 className="press flex items-center gap-2 rounded-xl bg-brand-400 px-5 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-brand-300 disabled:opacity-60"
               >
-                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isSighting ? "Publicar avistamiento" : "Publicar búsqueda"}
+                {(submitting || checkingDuplicates) && <Loader2 className="h-4 w-4 animate-spin" />}
+                {checkingDuplicates
+                  ? "Revisando duplicados..."
+                  : isSighting
+                    ? "Publicar avistamiento"
+                    : "Publicar búsqueda"}
               </button>
             </div>
           </form>

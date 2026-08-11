@@ -93,7 +93,7 @@ export function CreatePostButton({
           className="press flex w-full items-center gap-3 rounded-full border border-zinc-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-zinc-50"
         >
           <Avatar src={avatarUrl} size="md" />
-          <span className="flex-1 text-sm text-zinc-500">¿Qué necesitas o qué ofreces?</span>
+          <span className="flex-1 text-sm text-zinc-500">¿Sabes algo que pueda ayudar? Comparte información, pide o da ayuda...</span>
           <PenLine className="h-4 w-4 shrink-0 text-zinc-400" />
         </button>
       ) : isUrgent ? (

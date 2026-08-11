@@ -152,6 +152,12 @@ export function OwnerManagePanel({ person, token }: { person: Person; token: str
               <Field label="Ubicación / sector" htmlFor="locationText">
                 <Input id="locationText" name="locationText" defaultValue={person.locationText} />
               </Field>
+              <Field label="¿Por qué se publicó?" htmlFor="cause">
+                <Select id="cause" name="cause" defaultValue={person.cause}>
+                  <option value="desastre">Relacionado con el terremoto</option>
+                  <option value="otra">Otro motivo</option>
+                </Select>
+              </Field>
             </div>
             <Field label="Descripción" htmlFor="description">
               <Textarea id="description" name="description" defaultValue={person.description} />
