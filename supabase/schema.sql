@@ -96,27 +96,6 @@ create index if not exists persons_name_trgm_idx     on persons using gin ((firs
 alter table persons add column if not exists country text not null default 've';
 create index if not exists persons_country_idx on persons (country);
 
--- Migración para bases ya creadas: `posts`, `complaints`, `pets` y
--- `volunteers` buscan con `ILIKE '%texto%'` en varias columnas (comunidad,
--- denuncias, mascotas, voluntarios) SIN ningún índice que lo respalde —
--- a diferencia de `persons` (arriba). Sin índice, cada búsqueda escanea la
--- tabla entera fila por fila; sin límite de peticiones, es una forma barata
--- de generar carga cara en la base a medida que estas tablas crezcan. Un
--- índice `gin_trgm_ops` por columna deja que Postgres combine los que hagan
--- falta (`BitmapOr`) en vez de recorrer todo.
-create index if not exists posts_body_trgm_idx          on posts using gin (body gin_trgm_ops);
-create index if not exists posts_location_trgm_idx      on posts using gin (location_text gin_trgm_ops);
-create index if not exists posts_author_trgm_idx         on posts using gin (author_name gin_trgm_ops);
-create index if not exists complaints_body_trgm_idx      on complaints using gin (body gin_trgm_ops);
-create index if not exists complaints_location_trgm_idx  on complaints using gin (location_text gin_trgm_ops);
-create index if not exists complaints_author_trgm_idx    on complaints using gin (author_name gin_trgm_ops);
-create index if not exists pets_name_trgm_idx            on pets using gin (name gin_trgm_ops);
-create index if not exists pets_description_trgm_idx     on pets using gin (description gin_trgm_ops);
-create index if not exists pets_location_trgm_idx        on pets using gin (location_text gin_trgm_ops);
-create index if not exists volunteers_name_trgm_idx      on volunteers using gin (name gin_trgm_ops);
-create index if not exists volunteers_skills_trgm_idx    on volunteers using gin (skills_text gin_trgm_ops);
-create index if not exists volunteers_location_trgm_idx  on volunteers using gin (location_text gin_trgm_ops);
-
 -- ── Propietario de la publicación (token privado de gestión) ────────────────
 -- Tabla aparte y SIN lectura pública: el token es secreto. Solo el servidor
 -- (service role) lo lee para verificar al autor. Permite que quien publicó
@@ -385,6 +364,28 @@ create table if not exists volunteers (
 create index if not exists volunteers_type_idx    on volunteers (type);
 create index if not exists volunteers_created_idx  on volunteers (created_at desc);
 create index if not exists idx_volunteers_user_id  on volunteers (user_id);
+
+-- Búsqueda por texto libre en `posts`/`complaints`/`pets`/`volunteers`: la app
+-- busca con `ILIKE '%texto%'` en varias columnas (comunidad, denuncias,
+-- mascotas, voluntarios) SIN ningún índice que lo respalde — a diferencia de
+-- `persons` (arriba). Sin índice, cada búsqueda escanea la tabla entera fila
+-- por fila; sin límite de peticiones, es una forma barata de generar carga
+-- cara en la base a medida que estas tablas crezcan. Un índice `gin_trgm_ops`
+-- por columna deja que Postgres combine los que hagan falta (`BitmapOr`) en
+-- vez de recorrer todo. (Va aquí, después de crear las 4 tablas, no antes —
+-- antes estaba arriba del todo y fallaba en una base nueva y vacía.)
+create index if not exists posts_body_trgm_idx          on posts using gin (body gin_trgm_ops);
+create index if not exists posts_location_trgm_idx      on posts using gin (location_text gin_trgm_ops);
+create index if not exists posts_author_trgm_idx         on posts using gin (author_name gin_trgm_ops);
+create index if not exists complaints_body_trgm_idx      on complaints using gin (body gin_trgm_ops);
+create index if not exists complaints_location_trgm_idx  on complaints using gin (location_text gin_trgm_ops);
+create index if not exists complaints_author_trgm_idx    on complaints using gin (author_name gin_trgm_ops);
+create index if not exists pets_name_trgm_idx            on pets using gin (name gin_trgm_ops);
+create index if not exists pets_description_trgm_idx     on pets using gin (description gin_trgm_ops);
+create index if not exists pets_location_trgm_idx        on pets using gin (location_text gin_trgm_ops);
+create index if not exists volunteers_name_trgm_idx      on volunteers using gin (name gin_trgm_ops);
+create index if not exists volunteers_skills_trgm_idx    on volunteers using gin (skills_text gin_trgm_ops);
+create index if not exists volunteers_location_trgm_idx  on volunteers using gin (location_text gin_trgm_ops);
 
 -- ── Héroes (sección curada de Noticias) ─────────────────────────────────────
 -- Cualquiera puede proponer un héroe; nace verified=false ("sin verificar") y
