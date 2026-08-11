@@ -5,6 +5,87 @@ coordinar ayuda tras el **terremoto de Venezuela 2026**. En producción en
 `elmundotebusca.com` (VPS propio, Next.js + Supabase, deploy automático por
 GitHub Actions + PM2 en cada push a `main`). Español, `npm run build` siempre verde.
 
+## 🚨 Cierre de sesión (2026-08-10) — LEE ESTO PRIMERO ANTES DE NADA
+
+**Estado ahora mismo**: hay **24 commits locales sin subir** (`git log
+origin/main..HEAD` en el repo `Elmundotebusca`), todo el trabajo de esta
+sesión (multi-país + pulido iOS de abajo). **NO se hizo `git push`
+todavía** — quedó pendiente por lo siguiente:
+
+### 1. Supabase se pausó (plan gratis, por inactividad — no es un límite real)
+El dueño vio "Project is paused" en el dashboard de Supabase. **No es que
+se acabó espacio ni nada real** — es la pausa automática del plan gratis
+tras un tiempo sin actividad. Los datos están intactos. Se resuelve con un
+clic en "Resume project" en el dashboard. **Recomendación dada** (no
+migrar a Firebase/S3 — el esquema es 100% relacional con RLS, migrar
+sería reescribir semanas de `data.ts`/`schema.sql` para nada): si el
+proyecto va a producción real pronto, pasar a **Supabase Pro ($25/mes)**
+antes del lanzamiento para que no se vuelva a pausar solo en medio de una
+emergencia real. Cero cambios de código necesarios para eso.
+
+### 2. Migración SQL pendiente de correr en el Supabase real (antes del push)
+Antes de hacer `push` (para que el review en vivo no muestre páginas
+rotas), correr esto en el **SQL Editor de Supabase** — aditivo e
+idempotente, no borra nada:
+```sql
+alter table persons add column if not exists country text not null default 've';
+create index if not exists persons_country_idx on persons (country);
+
+alter table aid_points add column if not exists country text not null default 've';
+create index if not exists aid_points_country_idx on aid_points (country);
+
+alter table hospitals add column if not exists country text not null default 've';
+create index if not exists hospitals_country_idx on hospitals (country);
+
+alter table posts add column if not exists country text not null default 've';
+create index if not exists posts_country_idx on posts (country);
+```
+Sin esto, tras el `push`, `/ayuda`, `/hospitales`, `/se-busca` y
+`/comunidad` en producción mostrarán el error
+`column ... does not exist` (mismo síntoma que en desarrollo local esta
+sesión). El resto del sitio (mapa, emergencias, mascotas, etc.) sí
+funcionaría bien.
+
+### 3. Qué falta para poder revisar el sitio en vivo, en orden
+1. Reactivar el proyecto en Supabase (clic "Resume project").
+2. Correr el SQL de arriba en el SQL Editor.
+3. Avisar en el chat → recién ahí hacer `git push` de los 24 commits
+   (dispara el deploy automático por GitHub Actions + PM2).
+4. Revisar en vivo en `elmundotebusca.com`.
+
+### 4. Proyecto nuevo y separado: HelpSearch (faro SOS por Bluetooth, offline)
+El dueño pidió arrancar, en paralelo, una **app nativa aparte** (no es
+parte de este repo web): un faro de auxilio SOS por BLE mesh, 100%
+offline, para cuando ni siquiera hay señal — inspirado en
+[SOSBlu](https://github.com/ydmmejia/SOSBlu) (con autorización de su
+autor, Yeison Mejía) y en el whitepaper de
+[bitchat](https://github.com/permissionlesstech/bitchat), pero
+**reescrito desde cero** (SOSBlu es GPLv3; no se copió ningún código).
+
+- **Repo**: [github.com/Angelsistemas7/HelpSearch](https://github.com/Angelsistemas7/HelpSearch)
+  (público). Autor: Angel Acero (Angelsistemas7).
+- **Stack decidido**: React Native (Expo + dev client, TypeScript) para
+  toda la UI, con **un solo módulo nativo en Kotlin** para el
+  Foreground Service + BLE (advertising/scanning) — la fluidez de diseño
+  no depende del framework, pero el BLE en segundo plano confiable sí es
+  una API de Android que hay que tocar en Kotlin sí o sí.
+- **Ya hecho**: scaffold de Expo funcionando, `app.json` con bundle id
+  (`com.angelsistemas.helpsearch`) y permisos Android exactos, y un
+  `PLAN.md` extenso con el protocolo diseñado desde cero (`SOS_BEACON`
+  binario, TTL=20, deduplicación por origen — mejora deliberada sobre el
+  bug de deduplicación por-salto que se encontró en bitchat —, máquina de
+  estados de energía de 5 perfiles, decisión consciente de usar solo BLE
+  *advertising* en vez de conexión GATT para la fase 1). Todo el
+  razonamiento y las fuentes están en `PLAN.md` del repo — leerlo antes de
+  seguir con HelpSearch en otra sesión, no repetir la investigación.
+- **Plan futuro para ESTE repo (`Elmundotebusca`)**: cuando HelpSearch esté
+  publicada en Play Store, agregar su enlace en `/emergencias` o
+  `/recursos`. Todavía no se hizo (la app ni siquiera existe como APK
+  todavía).
+- Este trabajo vive en su propio repositorio/carpeta, no toca nada de
+  `Elmundotebusca` — si se retoma, es una sesión aparte con ese repo como
+  directorio de trabajo.
+
 ## 📌 Continuación misma sesión (2026-08-10) — pulido iOS: transición hero + skeletons
 
 Seguido del pedido explícito "pulido tipo iOS: transiciones, fluidez,
