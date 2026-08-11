@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { getSupabase, getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
 import { getCurrentUser } from "./auth";
+import { COUNTRY_CODES, DEFAULT_COUNTRY, isCountryCode, type CountryCode } from "./countries";
 import {
   seedAidPoints,
   seedComments,
@@ -397,13 +398,42 @@ export interface DashboardStats {
   voluntarios: number; // posts tipo "ofrezco" (ofrecimientos de ayuda)
 }
 
+// `unstable_cache` documenta que la clave de caché ya incluye los argumentos
+// de la llamada, pero en la práctica (confirmado en producción: cambiar de
+// país en el banner de Inicio se quedaba mostrando cifras del país anterior
+// hasta navegar a otra página) dos llamadas con distinto `country` podían
+// terminar sirviendo la misma entrada cacheada. Con una instancia de
+// `unstable_cache` DISTINTA por país (el código de país va FIJO en
+// `keyParts`, no como argumento) no hay ambigüedad posible. `makeImpl(c)`
+// recibe el país ya resuelto y devuelve la función a cachear para ESE país.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function perCountryCache<Fn extends (...args: any[]) => Promise<any>>(
+  baseKey: string,
+  makeImpl: (country: CountryCode) => Fn,
+  options: { revalidate: number },
+): Record<CountryCode, Fn> {
+  const entries = COUNTRY_CODES.map(
+    (c) => [c, unstable_cache(makeImpl(c), [baseKey, c], options)] as [CountryCode, Fn],
+  );
+  return Object.fromEntries(entries) as Record<CountryCode, Fn>;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+function resolveCountry(country: string | undefined): CountryCode {
+  return isCountryCode(country) ? country : DEFAULT_COUNTRY;
+}
+
 // Cifras del panel: consulta agregada pesada que se ve en CADA visita al inicio.
 // Cacheada 60s (igual para todos) para no golpear Supabase en cada carga: con
 // mucha gente a la vez, esto reduce drásticamente la carga. 60s de retraso en un
 // contador es aceptable.
-export const getDashboardStats = unstable_cache(getDashboardStatsImpl, ["dashboard-stats"], {
-  revalidate: 60,
-});
+const dashboardStatsCache = perCountryCache(
+  "dashboard-stats",
+  (c) => () => getDashboardStatsImpl(c),
+  { revalidate: 60 },
+);
+export function getDashboardStats(country = "ve"): Promise<DashboardStats> {
+  return dashboardStatsCache[resolveCountry(country)]();
+}
 async function getDashboardStatsImpl(country = "ve"): Promise<DashboardStats> {
   const sb = getSupabase();
   if (!sb) {
@@ -446,9 +476,14 @@ async function getDashboardStatsImpl(country = "ve"): Promise<DashboardStats> {
 /** Personas que estaban desaparecidas y ya fueron ubicadas (con vida u hospital). */
 // "Localizados recientemente" (inicio): cacheado 60s, es público e igual para
 // todos. 60s de retraso en este listado de esperanza es imperceptible.
-export const getRecentlyLocated = unstable_cache(getRecentlyLocatedImpl, ["recently-located"], {
-  revalidate: 60,
-});
+const recentlyLocatedCache = perCountryCache(
+  "recently-located",
+  (c) => (limit: number) => getRecentlyLocatedImpl(limit, c),
+  { revalidate: 60 },
+);
+export function getRecentlyLocated(limit = 12, country = "ve"): Promise<Person[]> {
+  return recentlyLocatedCache[resolveCountry(country)](limit);
+}
 async function getRecentlyLocatedImpl(limit = 12, country = "ve"): Promise<Person[]> {
   const sb = getSupabase();
   if (!sb) {
@@ -478,14 +513,18 @@ async function getRecentlyLocatedImpl(limit = 12, country = "ve"): Promise<Perso
  * recientemente", que sí), así que cada carga disparaba consultas nuevas a
  * Supabase. Cacheada 60s por combinación de edad, igual para todos.
  */
-export const getFeaturedPersons = unstable_cache(
-  async (query: PersonQuery = {}): Promise<Person[]> => {
-    const { items } = await getPersons(query);
-    return items;
-  },
-  ["featured-persons"],
+const featuredPersonsCache = perCountryCache(
+  "featured-persons",
+  (c) =>
+    async (query: PersonQuery): Promise<Person[]> => {
+      const { items } = await getPersons({ ...query, country: c });
+      return items;
+    },
   { revalidate: 60 },
 );
+export function getFeaturedPersons(query: PersonQuery = {}): Promise<Person[]> {
+  return featuredPersonsCache[resolveCountry(query.country)](query);
+}
 
 /**
  * Personas con coordenada exacta marcada (para pinearlas en el mapa). Sobre todo
@@ -493,28 +532,32 @@ export const getFeaturedPersons = unstable_cache(
  * Cacheada 60s: solo se usa en /mapa (otra página de mucho tráfico) y, a
  * diferencia de las alertas de rescate, un retraso corto aquí es aceptable.
  */
-export const getPersonsWithLocation = unstable_cache(
-  async (limit = 200, country = "ve"): Promise<Person[]> => {
-    const sb = getSupabase();
-    if (!sb) {
-      return mem.persons
-        .filter((p) => (p.country ?? "ve") === country && p.lat != null && p.lng != null)
-        .slice(0, limit);
-    }
-    const { data, error } = await sb
-      .from("persons")
-      .select("*")
-      .eq("country", country)
-      .not("lat", "is", null)
-      .not("lng", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    return (data ?? []).map(rowToPerson);
-  },
-  ["persons-with-location"],
+async function getPersonsWithLocationImpl(limit: number, country: CountryCode): Promise<Person[]> {
+  const sb = getSupabase();
+  if (!sb) {
+    return mem.persons
+      .filter((p) => (p.country ?? "ve") === country && p.lat != null && p.lng != null)
+      .slice(0, limit);
+  }
+  const { data, error } = await sb
+    .from("persons")
+    .select("*")
+    .eq("country", country)
+    .not("lat", "is", null)
+    .not("lng", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map(rowToPerson);
+}
+const personsWithLocationCache = perCountryCache(
+  "persons-with-location",
+  (c) => (limit: number) => getPersonsWithLocationImpl(limit, c),
   { revalidate: 60 },
 );
+export function getPersonsWithLocation(limit = 200, country = "ve"): Promise<Person[]> {
+  return personsWithLocationCache[resolveCountry(country)](limit);
+}
 
 export interface CreatePersonResult {
   person: Person;
@@ -1055,7 +1098,10 @@ export async function removeAppRole(userId: string, role: AppRole): Promise<void
 }
 
 // ── Puntos de ayuda ─────────────────────────────────────────────────────────
-export const getAidPoints = unstable_cache(getAidPointsImpl, ["aid-points"], { revalidate: 60 });
+const aidPointsCache = perCountryCache("aid-points", (c) => () => getAidPointsImpl(c), { revalidate: 60 });
+export function getAidPoints(country = "ve"): Promise<AidPoint[]> {
+  return aidPointsCache[resolveCountry(country)]();
+}
 async function getAidPointsImpl(country = "ve"): Promise<AidPoint[]> {
   const sb = getSupabase();
   if (!sb)
@@ -1961,9 +2007,14 @@ export interface EstadoBreakdown {
 /** Desglose por estado y por estado de localización (para el mapa). */
 // Desglose por estado para el mapa (cuenta todas las personas por región).
 // También cacheado 60s: es público e igual para todos.
-export const getEstadoBreakdown = unstable_cache(getEstadoBreakdownImpl, ["estado-breakdown"], {
-  revalidate: 60,
-});
+const estadoBreakdownCache = perCountryCache(
+  "estado-breakdown",
+  (c) => () => getEstadoBreakdownImpl(c),
+  { revalidate: 60 },
+);
+export function getEstadoBreakdown(country = "ve"): Promise<Record<string, EstadoBreakdown>> {
+  return estadoBreakdownCache[resolveCountry(country)]();
+}
 async function getEstadoBreakdownImpl(country = "ve"): Promise<Record<string, EstadoBreakdown>> {
   const tally = (rows: { estado: string | null; status: PersonStatus }[]) => {
     const out: Record<string, EstadoBreakdown> = {};
@@ -1996,11 +2047,14 @@ async function getEstadoBreakdownImpl(country = "ve"): Promise<Record<string, Es
  * inicio, sin caché — el peor caso de los tres que encontré hoy. Cacheado 60s
  * igual que el resto del panel.
  */
-export const getCountsByEstado = unstable_cache(
-  getCountsByEstadoImpl,
-  ["counts-by-estado"],
+const countsByEstadoCache = perCountryCache(
+  "counts-by-estado",
+  (c) => () => getCountsByEstadoImpl(c),
   { revalidate: 60 },
 );
+export function getCountsByEstado(country = "ve"): Promise<Record<string, number>> {
+  return countsByEstadoCache[resolveCountry(country)]();
+}
 async function getCountsByEstadoImpl(country = "ve"): Promise<Record<string, number>> {
   const sb = getSupabase();
   if (!sb) {
@@ -2197,11 +2251,14 @@ export async function getPostsPage(
  * verdad y un retraso de hasta 60s ahí sí puede importar, así que esas se
  * siguen consultando en vivo (ver getPosts en mapa/page.tsx).
  */
-export const getMapPosts = unstable_cache(
-  async (type: "necesito" | "ofrezco", country = "ve"): Promise<Post[]> => getPosts({ type, country }),
-  ["map-posts"],
+const mapPostsCache = perCountryCache(
+  "map-posts",
+  (c) => (type: "necesito" | "ofrezco"): Promise<Post[]> => getPosts({ type, country: c }),
   { revalidate: 60 },
 );
+export function getMapPosts(type: "necesito" | "ofrezco", country = "ve"): Promise<Post[]> {
+  return mapPostsCache[resolveCountry(country)](type);
+}
 
 export async function getPostById(id: string): Promise<Post | null> {
   const sb = getSupabase();
@@ -3423,7 +3480,10 @@ function splitSpecialties(s: string | undefined): string[] {
     .filter(Boolean);
 }
 
-export const getHospitals = unstable_cache(getHospitalsImpl, ["hospitals"], { revalidate: 60 });
+const hospitalsCache = perCountryCache("hospitals", (c) => () => getHospitalsImpl(c), { revalidate: 60 });
+export function getHospitals(country = "ve"): Promise<Hospital[]> {
+  return hospitalsCache[resolveCountry(country)]();
+}
 async function getHospitalsImpl(country = "ve"): Promise<Hospital[]> {
   const sb = getSupabase();
   if (!sb)
