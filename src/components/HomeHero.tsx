@@ -4,7 +4,7 @@ import { getAidPoints, getDashboardStats, getStats } from "@/lib/data";
 import { getCrisisStats, type CrisisStat } from "@/lib/news";
 import { getActiveCountry } from "@/lib/country-server";
 import { COUNTRIES } from "@/lib/countries";
-import { formatDateTime, timeAgo } from "@/lib/utils";
+import { timeAgo } from "@/lib/utils";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { ExternalLinkGuard } from "./ExternalLinkGuard";
 import { CountrySwitcher } from "./CountrySwitcher";
@@ -144,8 +144,9 @@ export async function HomeHero() {
             />
             <StatRow icon={MapPinned} value={aidPoints.length} label="Puntos de ayuda" tone="brand" />
           </div>
-          <p className="mt-4 text-right text-xs text-zinc-400">
-            Actualizado {formatDateTime(stats.lastUpdated)}
+          <p className="mt-4 flex items-center justify-end gap-1.5 text-right text-xs text-zinc-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Cifras en vivo
           </p>
 
           {crisisRows.length > 0 && (
