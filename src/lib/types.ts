@@ -181,6 +181,7 @@ export interface AidPoint {
 /** Marcha / caravana / ida coordinada hacia una zona. */
 export interface March {
   id: string;
+  country?: Country;
   title: string;
   originText: string;
   destinationText: string;
@@ -441,6 +442,7 @@ export const COMPLAINT_CATEGORY_EMOJI: Record<ComplaintCategory, string> = {
  */
 export interface Complaint {
   id: string;
+  country?: Country;
   category: ComplaintCategory;
   body: string;
   estado: Estado | null;
@@ -534,6 +536,7 @@ export const VOLUNTEER_TYPE_EMOJI: Record<VolunteerType, string> = {
 /** Persona que se ofrece como voluntaria, con su disponibilidad y ciudad. */
 export interface Volunteer {
   id: string;
+  country?: Country;
   type: VolunteerType;
   name: string;
   /** Disponibilidad (horarios, "24/7", "tardes"...). */

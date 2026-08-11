@@ -558,7 +558,7 @@ export async function registerMarchAction(form: FormData): Promise<ActionResult>
 
   try {
     const { march, ownerToken } = await createMarch(
-      parsed.data,
+      { ...parsed.data, country: await getActiveCountry() },
       (await getCurrentUser())?.id ?? null,
     );
     revalidatePath("/caravanas");
@@ -869,7 +869,11 @@ export async function registerVolunteerAction(form: FormData): Promise<ActionRes
   const photoUrl = getPhotoUrl(form);
 
   try {
-    const volunteer = await createVolunteer(parsed.data, photoUrl, (await getCurrentUser())?.id ?? null);
+    const volunteer = await createVolunteer(
+      { ...parsed.data, country: await getActiveCountry() },
+      photoUrl,
+      (await getCurrentUser())?.id ?? null,
+    );
     revalidatePath("/voluntarios");
     revalidatePath("/");
     return { ok: true, id: volunteer.id, message: "¡Gracias por ofrecerte! Tu disponibilidad ya es visible." };
@@ -964,7 +968,12 @@ export async function createComplaintAction(form: FormData): Promise<ActionResul
   const photoUrl = getPhotoUrl(form);
 
   try {
-    const complaint = await createComplaint(parsed.data, photoUrl, user.id, user.username);
+    const complaint = await createComplaint(
+      { ...parsed.data, country: await getActiveCountry() },
+      photoUrl,
+      user.id,
+      user.username,
+    );
     revalidatePath("/denuncias");
     return {
       ok: true,

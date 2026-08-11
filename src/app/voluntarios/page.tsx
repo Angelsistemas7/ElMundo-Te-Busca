@@ -3,7 +3,9 @@ import Image from "next/image";
 import nextDynamic from "next/dynamic";
 import { HandHeart, Mail, MapPin, Phone, Search } from "lucide-react";
 import { getVolunteersPage, type VolunteerSort } from "@/lib/data";
-import { ESTADOS, VOLUNTEER_TYPE_EMOJI, VOLUNTEER_TYPE_LABEL, type VolunteerType } from "@/lib/types";
+import { VOLUNTEER_TYPE_EMOJI, VOLUNTEER_TYPE_LABEL, type VolunteerType } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
+import { getActiveCountry } from "@/lib/country-server";
 import { cn, clampPageSize, timeAgo } from "@/lib/utils";
 const RegisterVolunteerButton = nextDynamic(() =>
   import("@/components/RegisterVolunteerButton").then((m) => m.RegisterVolunteerButton),
@@ -35,13 +37,13 @@ const FILTERS: { value: VolunteerType | "all"; label: string }[] = [
   })),
 ];
 
-const FILTER_FIELDS: FilterField[] = [
+const buildFilterFields = (regions: readonly string[]): FilterField[] => [
   {
     kind: "select",
     key: "estado",
     label: "Estado (región)",
     placeholder: "Todos",
-    options: ESTADOS.map((e) => ({ value: e, label: e })),
+    options: regions.map((e) => ({ value: e, label: e })),
   },
   {
     kind: "chips",
@@ -67,12 +69,14 @@ export default async function VoluntariosPage({ searchParams }: { searchParams: 
   const dateTo = str(sp.dateTo);
   const page = num(sp.page) ?? 1;
   const pageSize = clampPageSize(num(sp.pageSize));
+  const country = await getActiveCountry();
+  const regions = getCountry(country).regions;
 
   // Antes: hasta 300 voluntarios sin límite de página, cacheados 60s (te
   // acababas de ofrecer y podías no verte en la lista por un minuto). Ahora
   // pagina de verdad (10/20/50 a elegir) y consulta en vivo.
   const { items: volunteers, total } = await getVolunteersPage(
-    { type, search: q, estado, dateFrom, dateTo },
+    { country, type, search: q, estado, dateFrom, dateTo },
     page,
     pageSize,
     sort,
@@ -112,7 +116,7 @@ export default async function VoluntariosPage({ searchParams }: { searchParams: 
           description="Personas que ofrecen su tiempo y conocimiento: médicos, rescatistas, conductores, traductores y más. Ofrécete o encuentra a quien pueda ayudar."
         />
         <div className="shrink-0">
-          <RegisterVolunteerButton />
+          <RegisterVolunteerButton country={country} />
         </div>
       </div>
 
@@ -154,7 +158,7 @@ export default async function VoluntariosPage({ searchParams }: { searchParams: 
           ))}
         </SwipeStaticRow>
         <div className="flex shrink-0 items-center gap-2">
-          <FilterModal basePath="/voluntarios" currentParams={currentParams} fields={FILTER_FIELDS} />
+          <FilterModal basePath="/voluntarios" currentParams={currentParams} fields={buildFilterFields(regions)} />
           <PageSizeSelect value={pageSize} />
         </div>
       </div>

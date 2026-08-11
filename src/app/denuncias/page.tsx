@@ -4,9 +4,10 @@ import { getCommentsForEntities, getComplaints } from "@/lib/data";
 import {
   COMPLAINT_CATEGORY_EMOJI,
   COMPLAINT_CATEGORY_LABEL,
-  ESTADOS,
   type ComplaintCategory,
 } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
+import { getActiveCountry } from "@/lib/country-server";
 import { cn, clampPageSize } from "@/lib/utils";
 import { ComplaintCard } from "@/components/ComplaintCard";
 import { DenunciaButton } from "@/components/DenunciaButton";
@@ -37,13 +38,13 @@ const FILTERS: { value: ComplaintCategory | "all"; label: string }[] = [
   })),
 ];
 
-const FILTER_FIELDS: FilterField[] = [
+const buildFilterFields = (regions: readonly string[]): FilterField[] => [
   {
     kind: "select",
     key: "estado",
     label: "Estado (región)",
     placeholder: "Todos",
-    options: ESTADOS.map((e) => ({ value: e, label: e })),
+    options: regions.map((e) => ({ value: e, label: e })),
   },
   { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Publicado entre" },
 ];
@@ -57,9 +58,11 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
   const dateTo = str(sp.dateTo);
   const page = num(sp.page) ?? 1;
   const pageSize = clampPageSize(num(sp.pageSize));
+  const country = await getActiveCountry();
+  const regions = getCountry(country).regions;
 
   const { items: complaints, total } = await getComplaints(
-    { category, search: q, estado, dateFrom, dateTo },
+    { country, category, search: q, estado, dateFrom, dateTo },
     page,
     pageSize,
   );
@@ -97,7 +100,7 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
           description="Reporta irregularidades: desvío o robo de ayuda, riesgo a la niñez, fraude o abuso de autoridad. La comunidad ve y apoya cada reporte."
         />
         <div className="shrink-0">
-          <DenunciaButton />
+          <DenunciaButton country={country} />
         </div>
       </div>
 
@@ -154,7 +157,7 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
       </SwipeStaticRow>
 
       <div className="mb-4 flex items-center justify-end gap-2">
-        <FilterModal basePath="/denuncias" currentParams={currentParams} fields={FILTER_FIELDS} />
+        <FilterModal basePath="/denuncias" currentParams={currentParams} fields={buildFilterFields(regions)} />
         <PageSizeSelect value={pageSize} />
       </div>
 

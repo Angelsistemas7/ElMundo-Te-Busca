@@ -2,6 +2,7 @@ import Link from "next/link";
 import nextDynamic from "next/dynamic";
 import { MapPinned } from "lucide-react";
 import { getMarchesPage } from "@/lib/data";
+import { getActiveCountry } from "@/lib/country-server";
 import { cn, clampPageSize } from "@/lib/utils";
 import { MarchCard } from "@/components/MarchCard";
 const RegisterMarchButton = nextDynamic(() =>
@@ -40,13 +41,14 @@ export default async function CaravanasPage({ searchParams }: { searchParams: Se
   const dateTo = str(sp.dateTo);
   const page = num(sp.page) ?? 1;
   const pageSize = clampPageSize(num(sp.pageSize));
+  const country = await getActiveCountry();
 
   const {
     items: marches,
     total,
     upcomingCount,
     pastCount,
-  } = await getMarchesPage(show, page, pageSize, dateFrom, dateTo);
+  } = await getMarchesPage(show, page, pageSize, dateFrom, dateTo, country);
 
   const showHref = (s: Show) => {
     const params = new URLSearchParams();

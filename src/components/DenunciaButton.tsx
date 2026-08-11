@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, ImagePlus, Loader2, LogIn, Megaphone, ShieldAlert } from "lucide-react";
-import { COMPLAINT_CATEGORY_LABEL, ESTADOS, type ComplaintCategory } from "@/lib/types";
+import { COMPLAINT_CATEGORY_LABEL, type ComplaintCategory } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import { createComplaintAction, getSessionUserAction, type ActionResult } from "@/app/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
@@ -12,7 +13,8 @@ import { Field, Input, Select, Textarea } from "./FormControls";
 
 const CATEGORIES = Object.keys(COMPLAINT_CATEGORY_LABEL) as ComplaintCategory[];
 
-export function DenunciaButton() {
+export function DenunciaButton({ country = "ve" }: { country?: string }) {
+  const regions = getCountry(country).regions;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
@@ -204,7 +206,7 @@ export function DenunciaButton() {
               <Field label="Estado (región)" htmlFor="estado">
                 <Select id="estado" name="estado" defaultValue="">
                   <option value="">Seleccionar</option>
-                  {ESTADOS.map((e) => (
+                  {regions.map((e) => (
                     <option key={e} value={e}>
                       {e}
                     </option>

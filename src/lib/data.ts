@@ -1424,11 +1424,12 @@ export async function getMarchesPage(
   pageSize = 10,
   dateFrom?: string,
   dateTo?: string,
+  country = "ve",
 ): Promise<MarchResult> {
   const sb = getSupabase();
   const nowIso = new Date().toISOString();
   if (!sb) {
-    const all = mem.marches.slice();
+    const all = mem.marches.filter((m) => (m.country ?? "ve") === country);
     const upcomingCount = all.filter((m) => m.departAt >= nowIso).length;
     const pastCount = all.length - upcomingCount;
     let items = all;
@@ -1446,7 +1447,7 @@ export async function getMarchesPage(
     return { items: items.slice(start, start + pageSize), total, page, pageSize, upcomingCount, pastCount };
   }
 
-  let query = sb.from("marches").select("*", { count: "exact" });
+  let query = sb.from("marches").select("*", { count: "exact" }).eq("country", country);
   if (show === "upcoming") query = query.gte("depart_at", nowIso).order("depart_at", { ascending: true });
   else if (show === "past") query = query.lt("depart_at", nowIso).order("depart_at", { ascending: false });
   else query = query.order("depart_at", { ascending: true });
@@ -1456,8 +1457,8 @@ export async function getMarchesPage(
   const start = (page - 1) * pageSize;
   const [{ data, error, count }, upcomingRes, pastRes] = await Promise.all([
     query.range(start, start + pageSize - 1),
-    sb.from("marches").select("*", { count: "exact", head: true }).gte("depart_at", nowIso),
-    sb.from("marches").select("*", { count: "exact", head: true }).lt("depart_at", nowIso),
+    sb.from("marches").select("*", { count: "exact", head: true }).eq("country", country).gte("depart_at", nowIso),
+    sb.from("marches").select("*", { count: "exact", head: true }).eq("country", country).lt("depart_at", nowIso),
   ]);
   if (error) throw error;
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -1476,6 +1477,7 @@ export async function getMarchesPage(
 function rowToMarch(r: any): March {
   return {
     id: r.id,
+    country: r.country ?? "ve",
     title: r.title,
     originText: r.origin_text,
     destinationText: r.destination_text,
@@ -1517,9 +1519,11 @@ export async function createMarch(
   const now = new Date().toISOString();
   const ownerToken = newToken();
   const sb = getSupabaseAdmin() ?? getSupabase();
+  const country = input.country ?? "ve";
   if (!sb) {
     const march: March = {
       id: uid("march"),
+      country,
       title: input.title,
       originText: input.originText,
       destinationText: input.destinationText,
@@ -1539,6 +1543,7 @@ export async function createMarch(
   const { data, error } = await sb
     .from("marches")
     .insert({
+      country,
       title: input.title,
       origin_text: input.originText,
       destination_text: input.destinationText,
@@ -2600,6 +2605,7 @@ export async function reactToPost(id: string, kind: ReactionKind): Promise<void>
 function rowToComplaint(r: any): Complaint {
   return {
     id: r.id,
+    country: r.country ?? "ve",
     category: r.category,
     body: r.body,
     estado: r.estado,
@@ -2623,6 +2629,7 @@ export interface ComplaintResult {
 // verdad (10/20/50 a elegir), en vivo.
 export async function getComplaints(
   filter: {
+    country?: string;
     category?: ComplaintCategory | "all";
     search?: string;
     estado?: string | "all";
@@ -2632,9 +2639,10 @@ export async function getComplaints(
   page = 1,
   pageSize = 10,
 ): Promise<ComplaintResult> {
+  const country = filter.country ?? "ve";
   const sb = getSupabase();
   if (!sb) {
-    let items = mem.complaints.slice();
+    let items = mem.complaints.filter((c) => (c.country ?? "ve") === country);
     if (filter.category && filter.category !== "all")
       items = items.filter((c) => c.category === filter.category);
     if (filter.estado && filter.estado !== "all") items = items.filter((c) => c.estado === filter.estado);
@@ -2655,7 +2663,11 @@ export async function getComplaints(
     const start = (page - 1) * pageSize;
     return { items: items.slice(start, start + pageSize), total, page, pageSize };
   }
-  let query = sb.from("complaints").select("*", { count: "exact" }).order("created_at", { ascending: false });
+  let query = sb
+    .from("complaints")
+    .select("*", { count: "exact" })
+    .eq("country", country)
+    .order("created_at", { ascending: false });
   if (filter.category && filter.category !== "all") query = query.eq("category", filter.category);
   if (filter.estado && filter.estado !== "all") query = query.eq("estado", filter.estado);
   if (filter.dateFrom) query = query.gte("created_at", filter.dateFrom);
@@ -2678,9 +2690,11 @@ export async function createComplaint(
 ): Promise<Complaint> {
   const now = new Date().toISOString();
   const sb = getSupabaseAdmin() ?? getSupabase();
+  const country = input.country ?? "ve";
   if (!sb) {
     const complaint: Complaint = {
       id: uid("complaint"),
+      country,
       category: input.category,
       body: input.body,
       estado: input.estado ?? null,
@@ -2696,6 +2710,7 @@ export async function createComplaint(
   const { data, error } = await sb
     .from("complaints")
     .insert({
+      country,
       category: input.category,
       body: input.body,
       estado: input.estado ?? null,
@@ -2960,6 +2975,7 @@ export async function canManagePet(id: string): Promise<boolean> {
 function rowToVolunteer(r: any): Volunteer {
   return {
     id: r.id,
+    country: r.country ?? "ve",
     type: r.type,
     name: r.name,
     availabilityText: r.availability_text ?? "",
@@ -3025,6 +3041,7 @@ export type VolunteerSort = "recent" | "oldest" | "name";
 
 export async function getVolunteersPage(
   filter: {
+    country?: string;
     type?: VolunteerType | "all";
     search?: string;
     estado?: string | "all";
@@ -3035,9 +3052,10 @@ export async function getVolunteersPage(
   pageSize = 10,
   sort: VolunteerSort = "recent",
 ): Promise<VolunteerResult> {
+  const country = filter.country ?? "ve";
   const sb = getSupabase();
   if (!sb) {
-    let items = mem.volunteers.slice();
+    let items = mem.volunteers.filter((v) => (v.country ?? "ve") === country);
     if (filter.type && filter.type !== "all") items = items.filter((v) => v.type === filter.type);
     if (filter.estado && filter.estado !== "all") items = items.filter((v) => v.estado === filter.estado);
     if (filter.dateFrom) items = items.filter((v) => v.createdAt >= filter.dateFrom!);
@@ -3058,7 +3076,7 @@ export async function getVolunteersPage(
     const start = (page - 1) * pageSize;
     return { items: items.slice(start, start + pageSize), total, page, pageSize };
   }
-  let query = sb.from("volunteers").select("*", { count: "exact" });
+  let query = sb.from("volunteers").select("*", { count: "exact" }).eq("country", country);
   query =
     sort === "oldest"
       ? query.order("created_at", { ascending: true })
@@ -3086,9 +3104,11 @@ export async function createVolunteer(
 ): Promise<Volunteer> {
   const now = new Date().toISOString();
   const sb = getSupabaseAdmin() ?? getSupabase();
+  const country = input.country ?? "ve";
   if (!sb) {
     const volunteer: Volunteer = {
       id: uid("vol"),
+      country,
       type: input.type,
       name: input.name,
       availabilityText: input.availabilityText || "",
@@ -3108,6 +3128,7 @@ export async function createVolunteer(
   const { data, error } = await sb
     .from("volunteers")
     .insert({
+      country,
       type: input.type,
       name: input.name,
       availability_text: input.availabilityText || "",

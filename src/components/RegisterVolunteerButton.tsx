@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, HandHeart, ImagePlus, Loader2 } from "lucide-react";
-import { ESTADOS, VOLUNTEER_TYPE_LABEL, type VolunteerType } from "@/lib/types";
+import { VOLUNTEER_TYPE_LABEL, type VolunteerType } from "@/lib/types";
+import { getCountry } from "@/lib/countries";
 import { registerVolunteerAction, type ActionResult } from "@/app/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
@@ -14,7 +15,8 @@ import { Turnstile } from "./Turnstile";
 
 const TYPES = Object.keys(VOLUNTEER_TYPE_LABEL) as VolunteerType[];
 
-export function RegisterVolunteerButton() {
+export function RegisterVolunteerButton({ country = "ve" }: { country?: string }) {
+  const regions = getCountry(country).regions;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -137,7 +139,7 @@ export function RegisterVolunteerButton() {
               <Field label="Estado (región)" htmlFor="estado">
                 <Select id="estado" name="estado" defaultValue="">
                   <option value="">Seleccionar</option>
-                  {ESTADOS.map((e) => (
+                  {regions.map((e) => (
                     <option key={e} value={e}>
                       {e}
                     </option>

@@ -143,6 +143,7 @@ export const aidPointSchema = z.object({
 export type AidPointInput = z.infer<typeof aidPointSchema>;
 
 export const marchSchema = z.object({
+  country: countryEnum.optional(),
   title: z.string().trim().min(3, "Título obligatorio").max(120),
   originText: z.string().trim().min(2, "Indica el punto de salida").max(160),
   destinationText: z.string().trim().min(2, "Indica el destino").max(160),
@@ -255,6 +256,7 @@ export type RoleAssignInput = z.infer<typeof roleAssignSchema>;
 
 // ── Denuncias de irregularidades ─────────────────────────────────────────────
 export const complaintSchema = z.object({
+  country: countryEnum.optional(),
   category: z.enum([
     "riesgo_ninos",
     "desvio_ayuda",
@@ -285,6 +287,7 @@ export type PetInput = z.infer<typeof petSchema>;
 
 // ── Voluntarios ──────────────────────────────────────────────────────────────
 export const volunteerSchema = z.object({
+  country: countryEnum.optional(),
   type: z.enum([
     "medico",
     "enfermero",

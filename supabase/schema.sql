@@ -214,6 +214,10 @@ create table if not exists marches (
 );
 create index if not exists marches_depart_idx on marches (depart_at);
 
+-- Migración multi-país (ago. 2026): ver nota en `persons` más arriba.
+alter table marches add column if not exists country text not null default 've';
+create index if not exists marches_country_idx on marches (country);
+
 -- ── Hospitales ──────────────────────────────────────────────────────────────
 create table if not exists hospitals (
   id uuid primary key default uuid_generate_v4(),
@@ -328,6 +332,10 @@ create index if not exists complaints_category_idx on complaints (category);
 create index if not exists complaints_created_idx  on complaints (created_at desc);
 create index if not exists complaints_user_idx     on complaints (user_id);
 
+-- Migración multi-país (ago. 2026): ver nota en `persons` más arriba.
+alter table complaints add column if not exists country text not null default 've';
+create index if not exists complaints_country_idx on complaints (country);
+
 -- ── Mascotas ────────────────────────────────────────────────────────────────
 create table if not exists pets (
   id uuid primary key default uuid_generate_v4(),
@@ -364,6 +372,10 @@ create table if not exists volunteers (
 create index if not exists volunteers_type_idx    on volunteers (type);
 create index if not exists volunteers_created_idx  on volunteers (created_at desc);
 create index if not exists idx_volunteers_user_id  on volunteers (user_id);
+
+-- Migración multi-país (ago. 2026): ver nota en `persons` más arriba.
+alter table volunteers add column if not exists country text not null default 've';
+create index if not exists volunteers_country_idx on volunteers (country);
 
 -- Búsqueda por texto libre en `posts`/`complaints`/`pets`/`volunteers`: la app
 -- busca con `ILIKE '%texto%'` en varias columnas (comunidad, denuncias,
