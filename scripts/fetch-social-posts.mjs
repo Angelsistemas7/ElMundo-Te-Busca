@@ -448,18 +448,26 @@ async function main() {
   // procesó en una corrida anterior — el .upsert() de más abajo ya lo
   // ignoraría por `external_id`, pero clasificar de nuevo cada 15 min sería
   // tirar dinero en llamadas repetidas a OpenAI.
-  const { data: existing, error: existingError } = await sb
-    .from("posts")
-    .select("external_id")
-    .in(
-      "external_id",
-      rows.map((r) => r.external_id),
-    );
-  if (existingError) {
-    console.error("❌ Error consultando publicaciones existentes:", existingError.message);
-    process.exit(1);
+  //
+  // Por LOTES de 100: con la lista de Colombia ampliada (ciudades sueltas
+  // como Cali/Pereira/Manizales) una sola corrida puede traer 500+
+  // resultados, y meter todos los external_id en un solo `.in()` arma una
+  // URL tan larga que Supabase responde "Bad Request" (confirmado en
+  // producción con 610 filas de un tirón) — nunca llegaba a guardar nada.
+  const EXISTING_CHECK_CHUNK = 100;
+  const knownIds = new Set();
+  for (let i = 0; i < rows.length; i += EXISTING_CHECK_CHUNK) {
+    const chunk = rows.slice(i, i + EXISTING_CHECK_CHUNK).map((r) => r.external_id);
+    const { data: existing, error: existingError } = await sb
+      .from("posts")
+      .select("external_id")
+      .in("external_id", chunk);
+    if (existingError) {
+      console.error("❌ Error consultando publicaciones existentes:", existingError.message);
+      process.exit(1);
+    }
+    for (const r of existing ?? []) knownIds.add(r.external_id);
   }
-  const knownIds = new Set((existing ?? []).map((r) => r.external_id));
   const newRows = rows.filter((r) => !knownIds.has(r.external_id));
   console.log(`🆕 ${newRows.length} de ${rows.length} son nuevas (el resto ya estaban).`);
 
