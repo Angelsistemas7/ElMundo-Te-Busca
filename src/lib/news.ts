@@ -1,10 +1,13 @@
 import "server-only";
+import { COUNTRIES, DEFAULT_COUNTRY, type CountryCode } from "./countries";
 
 // Noticias y reportes de ayuda humanitaria desde dos APIs públicas y GRATUITAS,
 // sin clave:
 //   • ReliefWeb (ONU/OCHA): reportes oficiales de respuesta humanitaria.
 //   • GDELT 2.0 Doc API: titulares de prensa de todo el mundo.
-// Todo se FILTRA para quedarnos solo con lo relacionado a Venezuela y el sismo.
+// Todo se FILTRA para quedarnos solo con lo relacionado al país/sismo activo
+// (ver `COUNTRIES[country].news` en countries.ts: patrón de filtro, query de
+// búsqueda y `gl` de Google Noticias por país).
 // Si una API falla, se devuelve [] y la UI muestra un aviso suave (igual que USGS).
 // Nunca inventamos contenido: cada artículo conserva su fuente y su enlace.
 
@@ -19,13 +22,12 @@ export interface NewsArticle {
   image: string | null;
 }
 
-// Términos que marcan que una noticia es de Venezuela / del sismo. Sirve de
-// colador final aunque la consulta ya venga orientada al tema.
-const VE_TERMS =
-  /venezuela|venezolan|la guaira|caraballeda|catia la mar|maiquet|yumare|yaracuy|vargas|caracas|naiguat[áa]|macuto/i;
-
-function isVenezuela(...text: (string | null | undefined)[]): boolean {
-  return VE_TERMS.test(text.filter(Boolean).join(" "));
+// Coincide si el texto habla del país/sismo activo. Sirve de colador final
+// aunque la consulta ya venga orientada al tema. Patrón por país en
+// `COUNTRIES[country].news.matchPattern` (countries.ts).
+function matchesCountry(country: CountryCode, ...text: (string | null | undefined)[]): boolean {
+  const pattern = new RegExp(COUNTRIES[country].news.matchPattern, "i");
+  return pattern.test(text.filter(Boolean).join(" "));
 }
 
 
@@ -43,14 +45,16 @@ function decodeXml(s: string): string {
 }
 
 /**
- * Prensa mundial sobre el sismo de Venezuela vía Google Noticias (RSS público,
- * gratis, sin clave). Devuelve titulares reales con su medio y ENLACE que abre
- * la nota completa. Mucho más fiable que GDELT y se actualiza solo.
+ * Prensa mundial sobre el sismo del país activo vía Google Noticias (RSS
+ * público, gratis, sin clave). Devuelve titulares reales con su medio y
+ * ENLACE que abre la nota completa. Mucho más fiable que GDELT y se
+ * actualiza solo.
  */
-export async function getWorldPress(limit = 14): Promise<NewsArticle[]> {
+export async function getWorldPress(limit = 14, country: CountryCode = DEFAULT_COUNTRY): Promise<NewsArticle[]> {
   try {
-    const q = encodeURIComponent("Venezuela (terremoto OR sismo OR réplica OR rescate)");
-    const url = `https://news.google.com/rss/search?q=${q}&hl=es-419&gl=VE&ceid=VE:es`;
+    const { searchQuery, gl } = COUNTRIES[country].news;
+    const q = encodeURIComponent(searchQuery);
+    const url = `https://news.google.com/rss/search?q=${q}&hl=es-419&gl=${gl}&ceid=${gl}:es`;
     const res = await fetch(url, {
       next: { revalidate: 1800 }, // refresca cada 30 min
       signal: AbortSignal.timeout(6000),
@@ -82,7 +86,7 @@ export async function getWorldPress(limit = 14): Promise<NewsArticle[]> {
       if (source && title.endsWith(` - ${source}`)) title = title.slice(0, -(source.length + 3));
       // Solo prensa: descartamos fuentes de redes sociales.
       if (/facebook|twitter|x\.com|instagram|tiktok|youtube|reddit/i.test(source)) continue;
-      if (!isVenezuela(title, source)) continue;
+      if (!matchesCountry(country, title, source)) continue;
       seen.add(link);
       out.push({
         id: link,
@@ -121,8 +125,11 @@ function parseGdeltDate(s: string): string | null {
 // producción. Con el archivo, un reinicio recupera la última lista buena al
 // instante en vez de arrancar de cero.
 type VerifiedNewsCache = { articles: NewsArticle[]; fetchedAt: number };
-let verifiedNewsCache: VerifiedNewsCache | null = null;
-let diskCacheLoaded = false;
+// Cachés SEPARADAS por país activo — antes había un solo balde global, así
+// que ver Colombia con Venezuela ya cacheada (o viceversa) mostraba las
+// noticias del país equivocado hasta que venciera el TTL.
+const verifiedNewsCacheByCountry: Partial<Record<CountryCode, VerifiedNewsCache>> = {};
+const diskCacheLoadedByCountry: Partial<Record<CountryCode, boolean>> = {};
 // 30 min pegaba peticiones cada rato — estas APIs son gratis y sin garantía
 // de disponibilidad, y a más peticiones más riesgo de toparse con un mal
 // momento suyo (confirmado con GDELT: tuvo horas fallando seguido). Con
@@ -137,18 +144,20 @@ const NEWS_TTL_MS = 6 * 60 * 60 * 1000;
 // eso, además, `fs` se importa DINÁMICO dentro de cada función en vez de
 // arriba del archivo: así Next lo deja fuera del paquete de Edge en vez de
 // intentar resolverlo igual.
-const DISK_CACHE_FILE = "/tmp/elmundotebusca-news-cache.json";
+function diskCacheFile(country: CountryCode) {
+  return `/tmp/elmundotebusca-news-cache-${country}.json`;
+}
 
-async function loadDiskCacheOnce() {
-  if (diskCacheLoaded) return;
-  diskCacheLoaded = true;
+async function loadDiskCacheOnce(country: CountryCode) {
+  if (diskCacheLoadedByCountry[country]) return;
+  diskCacheLoadedByCountry[country] = true;
   try {
     const { readFile } = await import("node:fs/promises");
-    const raw = await readFile(DISK_CACHE_FILE, "utf-8");
+    const raw = await readFile(diskCacheFile(country), "utf-8");
     const parsed = JSON.parse(raw) as VerifiedNewsCache;
-    if (Array.isArray(parsed.articles) && parsed.articles.length > 0 && !verifiedNewsCache) {
-      verifiedNewsCache = parsed;
-      console.log("[news] caché recuperada de disco, edad ms:", Date.now() - parsed.fetchedAt);
+    if (Array.isArray(parsed.articles) && parsed.articles.length > 0 && !verifiedNewsCacheByCountry[country]) {
+      verifiedNewsCacheByCountry[country] = parsed;
+      console.log(`[news] (${country}) caché recuperada de disco, edad ms:`, Date.now() - parsed.fetchedAt);
     }
   } catch {
     // No hay archivo todavía (primer arranque) o está corrupto: se ignora,
@@ -156,13 +165,14 @@ async function loadDiskCacheOnce() {
   }
 }
 
-async function saveDiskCache() {
-  if (!verifiedNewsCache) return;
+async function saveDiskCache(country: CountryCode) {
+  const cache = verifiedNewsCacheByCountry[country];
+  if (!cache) return;
   try {
     const { writeFile } = await import("node:fs/promises");
-    await writeFile(DISK_CACHE_FILE, JSON.stringify(verifiedNewsCache));
+    await writeFile(diskCacheFile(country), JSON.stringify(cache));
   } catch (e) {
-    console.error("[news] no se pudo guardar la caché en disco:", e);
+    console.error(`[news] (${country}) no se pudo guardar la caché en disco:`, e);
   }
 }
 
@@ -221,9 +231,9 @@ async function translateTitles(items: { id: string; title: string }[]): Promise<
  * el propio medio para compartir en redes). Sin caché propia — la maneja
  * `getVerifiedNews`, que también prueba GNews si esto no alcanza.
  */
-async function fetchFromGdelt(fetchLimit: number): Promise<NewsArticle[]> {
+async function fetchFromGdelt(fetchLimit: number, country: CountryCode): Promise<NewsArticle[]> {
   try {
-    const q = encodeURIComponent("Venezuela (terremoto OR sismo OR réplica OR rescate)");
+    const q = encodeURIComponent(COUNTRIES[country].news.searchQuery);
     const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=artlist&maxrecords=${fetchLimit}&format=json&sort=datedesc`;
     const res = await fetch(url, {
       cache: "no-store", // el cacheo lo maneja getVerifiedNews; así una respuesta fallida (429) no queda pegada
@@ -301,11 +311,11 @@ async function fetchFromGdelt(fetchLimit: number): Promise<NewsArticle[]> {
  * clave configurada, devuelve [] — el resto de la cadena de respaldo sigue
  * funcionando igual sin ella.
  */
-async function fetchFromGNews(fetchLimit: number): Promise<NewsArticle[]> {
+async function fetchFromGNews(fetchLimit: number, country: CountryCode): Promise<NewsArticle[]> {
   const apiKey = process.env.GNEWS_API_KEY;
   if (!apiKey) return [];
   try {
-    const q = encodeURIComponent("Venezuela terremoto");
+    const q = encodeURIComponent(COUNTRIES[country].news.searchQuery);
     const max = Math.min(Math.max(fetchLimit, 1), 25);
     const url = `https://gnews.io/api/v4/search?q=${q}&lang=es&max=${max}&sortby=publishedAt&apikey=${apiKey}`;
     const res = await fetch(url, {
@@ -361,36 +371,37 @@ async function fetchFromGNews(fetchLimit: number): Promise<NewsArticle[]> {
 // duplicado, y GNews solo da 100 peticiones/día gratis. Con esto, la segunda
 // llamada espera el mismo resultado que ya disparó la primera en vez de
 // repetirlo. Se limpia apenas termina (éxito o error) para no quedar pegado.
-let verifiedNewsInflight: Promise<NewsArticle[]> | null = null;
+const verifiedNewsInflightByCountry: Partial<Record<CountryCode, Promise<NewsArticle[]>>> = {};
 
 // Hace el refresco real UNA sola vez (guarda en caché de memoria/disco
 // adentro) sin importar cuántas llamadas concurrentes esperen esta misma
 // promesa — así no se repite el `saveDiskCache()` por cada una.
-async function refreshVerifiedNews(fetchLimit: number, fetchedAt: number): Promise<NewsArticle[]> {
-  let fresh = await fetchFromGdelt(fetchLimit);
+async function refreshVerifiedNews(fetchLimit: number, fetchedAt: number, country: CountryCode): Promise<NewsArticle[]> {
+  let fresh = await fetchFromGdelt(fetchLimit, country);
   let sourceUsed = "GDELT";
   if (fresh.length === 0) {
-    fresh = await fetchFromGNews(fetchLimit);
+    fresh = await fetchFromGNews(fetchLimit, country);
     sourceUsed = "GNews";
   }
 
   if (fresh.length === 0) {
-    console.error("[news] getVerifiedNews: GDELT y GNews fallaron, usando última caché si hay");
-    return verifiedNewsCache?.articles ?? [];
+    console.error(`[news] (${country}) getVerifiedNews: GDELT y GNews fallaron, usando última caché si hay`);
+    return verifiedNewsCacheByCountry[country]?.articles ?? [];
   }
 
-  console.log("[news] getVerifiedNews: usando", sourceUsed, "-", fresh.length, "artículos");
-  verifiedNewsCache = { articles: fresh, fetchedAt };
-  await saveDiskCache();
+  console.log(`[news] (${country}) getVerifiedNews: usando`, sourceUsed, "-", fresh.length, "artículos");
+  verifiedNewsCacheByCountry[country] = { articles: fresh, fetchedAt };
+  await saveDiskCache(country);
   return fresh;
 }
 
-export async function getVerifiedNews(limit = 10): Promise<NewsArticle[]> {
-  await loadDiskCacheOnce();
+export async function getVerifiedNews(limit = 10, country: CountryCode = DEFAULT_COUNTRY): Promise<NewsArticle[]> {
+  await loadDiskCacheOnce(country);
   const now = Date.now();
-  if (verifiedNewsCache && now - verifiedNewsCache.fetchedAt < NEWS_TTL_MS) {
-    console.log("[news] getVerifiedNews: caché válida (edad ms):", now - verifiedNewsCache.fetchedAt);
-    return verifiedNewsCache.articles.slice(0, limit);
+  const cached = verifiedNewsCacheByCountry[country];
+  if (cached && now - cached.fetchedAt < NEWS_TTL_MS) {
+    console.log(`[news] (${country}) getVerifiedNews: caché válida (edad ms):`, now - cached.fetchedAt);
+    return cached.articles.slice(0, limit);
   }
 
   // Se pide bastante más de lo que hace falta (ambas fuentes rastrean prensa
@@ -398,12 +409,12 @@ export async function getVerifiedNews(limit = 10): Promise<NewsArticle[]> {
   // descarta el resto si hay suficiente.
   const fetchLimit = Math.max(limit * 2, 20);
 
-  if (!verifiedNewsInflight) {
-    verifiedNewsInflight = refreshVerifiedNews(fetchLimit, now).finally(() => {
-      verifiedNewsInflight = null;
+  if (!verifiedNewsInflightByCountry[country]) {
+    verifiedNewsInflightByCountry[country] = refreshVerifiedNews(fetchLimit, now, country).finally(() => {
+      delete verifiedNewsInflightByCountry[country];
     });
   }
-  const articles = await verifiedNewsInflight;
+  const articles = await verifiedNewsInflightByCountry[country]!;
   return articles.slice(0, limit);
 }
 
@@ -438,44 +449,48 @@ const EMPTY_CRISIS_STATS: CrisisStats = {
 };
 
 type CrisisStatsCache = { stats: CrisisStats; fetchedAt: number };
-let crisisStatsCache: CrisisStatsCache | null = null;
-let crisisStatsDiskLoaded = false;
+const crisisStatsCacheByCountry: Partial<Record<CountryCode, CrisisStatsCache>> = {};
+const crisisStatsDiskLoadedByCountry: Partial<Record<CountryCode, boolean>> = {};
 // Cifras de víctimas cambian más rápido que la cobertura de prensa en general
 // (ver NEWS_TTL_MS): una tabla de menos horas para no quedarse con un dato
 // viejo durante la fase aguda de la emergencia.
 const CRISIS_STATS_TTL_MS = 3 * 60 * 60 * 1000;
-const CRISIS_STATS_DISK_CACHE_FILE = "/tmp/elmundotebusca-crisis-stats-cache.json";
+function crisisStatsDiskCacheFile(country: CountryCode) {
+  return `/tmp/elmundotebusca-crisis-stats-cache-${country}.json`;
+}
 
-async function loadCrisisStatsDiskCacheOnce() {
-  if (crisisStatsDiskLoaded) return;
-  crisisStatsDiskLoaded = true;
+async function loadCrisisStatsDiskCacheOnce(country: CountryCode) {
+  if (crisisStatsDiskLoadedByCountry[country]) return;
+  crisisStatsDiskLoadedByCountry[country] = true;
   try {
     const { readFile } = await import("node:fs/promises");
-    const raw = await readFile(CRISIS_STATS_DISK_CACHE_FILE, "utf-8");
+    const raw = await readFile(crisisStatsDiskCacheFile(country), "utf-8");
     const parsed = JSON.parse(raw) as CrisisStatsCache;
-    if (parsed.stats && !crisisStatsCache) crisisStatsCache = parsed;
+    if (parsed.stats && !crisisStatsCacheByCountry[country]) crisisStatsCacheByCountry[country] = parsed;
   } catch {
     // Primer arranque sin archivo todavía, o corrupto: se ignora.
   }
 }
 
-async function saveCrisisStatsDiskCache() {
-  if (!crisisStatsCache) return;
+async function saveCrisisStatsDiskCache(country: CountryCode) {
+  const cache = crisisStatsCacheByCountry[country];
+  if (!cache) return;
   try {
     const { writeFile } = await import("node:fs/promises");
-    await writeFile(CRISIS_STATS_DISK_CACHE_FILE, JSON.stringify(crisisStatsCache));
+    await writeFile(crisisStatsDiskCacheFile(country), JSON.stringify(cache));
   } catch (e) {
-    console.error("[news] no se pudo guardar la caché de cifras en disco:", e);
+    console.error(`[news] (${country}) no se pudo guardar la caché de cifras en disco:`, e);
   }
 }
 
 /** Titulares de GDELT enfocados en víctimas/afectados (no en ayuda o política). */
 async function fetchGdeltForCrisisStats(
   limit: number,
+  country: CountryCode,
 ): Promise<{ title: string; source: string; url: string; publishedAt: string | null }[]> {
   try {
     const q = encodeURIComponent(
-      "Venezuela terremoto (muertos OR fallecidos OR heridos OR desaparecidos OR damnificados OR dead OR killed OR injured OR missing)",
+      `${COUNTRIES[country].news.searchQuery} (muertos OR fallecidos OR heridos OR desaparecidos OR damnificados OR dead OR killed OR injured OR missing)`,
     );
     const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=artlist&maxrecords=${limit}&format=json&sort=datedesc`;
     const res = await fetch(url, {
@@ -596,17 +611,17 @@ const CRISIS_LABELS: Record<string, string> = {
 // Mismo candado que verifiedNewsInflight (ver ahí el porqué): sin esto, dos
 // visitas llegando justo cuando la caché de cifras vence disparan cada una su
 // propia llamada a OpenAI (la más cara de las dos cachés de este archivo).
-let crisisStatsInflight: Promise<CrisisStats> | null = null;
+const crisisStatsInflightByCountry: Partial<Record<CountryCode, Promise<CrisisStats>>> = {};
 
-async function refreshCrisisStats(fetchedAt: number): Promise<CrisisStats> {
+async function refreshCrisisStats(fetchedAt: number, country: CountryCode): Promise<CrisisStats> {
   // Se combinan dos fuentes de titulares: la búsqueda dedicada a víctimas
   // (más cobertura de esos términos específicos) y el mismo pool "verificado"
   // que ya se muestra en el carrusel del home. Así la cifra del banner nunca
   // contradice lo que la persona ve un scroll más abajo, y una cifra que
   // aparece en varios titulares de ambas fuentes gana más corroboración.
   const [casualtyArticles, verifiedArticles] = await Promise.all([
-    fetchGdeltForCrisisStats(30),
-    getVerifiedNews(10),
+    fetchGdeltForCrisisStats(30, country),
+    getVerifiedNews(10, country),
   ]);
   const seenUrls = new Set<string>();
   const articles: { title: string; source: string; url: string; publishedAt: string | null }[] = [];
@@ -622,7 +637,7 @@ async function refreshCrisisStats(fetchedAt: number): Promise<CrisisStats> {
   if (articles.length === 0) {
     // Sin titulares no hay de dónde sacar nada real; se sirve la última
     // caché buena si hay, en vez de mostrar ceros o inventar.
-    return crisisStatsCache?.stats ?? EMPTY_CRISIS_STATS;
+    return crisisStatsCacheByCountry[country]?.stats ?? EMPTY_CRISIS_STATS;
   }
 
   const figures = await extractCrisisFigures(articles);
@@ -643,24 +658,26 @@ async function refreshCrisisStats(fetchedAt: number): Promise<CrisisStats> {
   // Si no se pudo extraer NADA nuevo, mejor quedarse con la última caché
   // buena (si hay) que reemplazarla por puros null.
   const gotSomething = Object.values(stats).some(Boolean);
-  if (!gotSomething && crisisStatsCache) return crisisStatsCache.stats;
+  const existing = crisisStatsCacheByCountry[country];
+  if (!gotSomething && existing) return existing.stats;
 
-  crisisStatsCache = { stats, fetchedAt };
-  await saveCrisisStatsDiskCache();
+  crisisStatsCacheByCountry[country] = { stats, fetchedAt };
+  await saveCrisisStatsDiskCache(country);
   return stats;
 }
 
-export async function getCrisisStats(): Promise<CrisisStats> {
-  await loadCrisisStatsDiskCacheOnce();
+export async function getCrisisStats(country: CountryCode = DEFAULT_COUNTRY): Promise<CrisisStats> {
+  await loadCrisisStatsDiskCacheOnce(country);
   const now = Date.now();
-  if (crisisStatsCache && now - crisisStatsCache.fetchedAt < CRISIS_STATS_TTL_MS) {
-    return crisisStatsCache.stats;
+  const cached = crisisStatsCacheByCountry[country];
+  if (cached && now - cached.fetchedAt < CRISIS_STATS_TTL_MS) {
+    return cached.stats;
   }
 
-  if (!crisisStatsInflight) {
-    crisisStatsInflight = refreshCrisisStats(now).finally(() => {
-      crisisStatsInflight = null;
+  if (!crisisStatsInflightByCountry[country]) {
+    crisisStatsInflightByCountry[country] = refreshCrisisStats(now, country).finally(() => {
+      delete crisisStatsInflightByCountry[country];
     });
   }
-  return crisisStatsInflight;
+  return crisisStatsInflightByCountry[country]!;
 }

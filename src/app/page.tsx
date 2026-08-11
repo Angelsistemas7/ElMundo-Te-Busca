@@ -4,12 +4,12 @@ import { HomeHero } from "@/components/HomeHero";
 import { VerifiedNewsCarousel } from "@/components/VerifiedNewsCarousel";
 import { HomeHeroSkeleton, NewsCarouselSkeleton } from "@/components/HomeSkeletons";
 import { CountryIntroModal } from "@/components/CountryIntroModal";
-import { hasChosenCountry } from "@/lib/country-server";
+import { getActiveCountry, hasChosenCountry } from "@/lib/country-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const chosenCountry = await hasChosenCountry();
+  const [chosenCountry, country] = await Promise.all([hasChosenCountry(), getActiveCountry()]);
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       <CountryIntroModal initialOpen={!chosenCountry} />
@@ -23,7 +23,7 @@ export default async function HomePage() {
           <HomeHero />
         </Suspense>
         <Suspense fallback={<NewsCarouselSkeleton />}>
-          <VerifiedNewsCarousel />
+          <VerifiedNewsCarousel country={country} />
         </Suspense>
       </div>
     </div>

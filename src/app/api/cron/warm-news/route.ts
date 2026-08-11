@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getVerifiedNews, getWorldPress } from "@/lib/news";
+import { COUNTRY_CODES } from "@/lib/countries";
 
 // Endpoint interno para "calentar" la caché de noticias (src/lib/news.ts) desde
 // un cron del VPS, en vez de dejar que la llene la primera visita real del día
@@ -24,6 +25,14 @@ export async function GET(request: Request) {
     }
   }
 
-  const [verified] = await Promise.all([getVerifiedNews(10), getWorldPress(10)]);
-  return NextResponse.json({ ok: true, verifiedCount: verified.length });
+  // Calienta la caché de CADA país activo (antes solo Venezuela) — sin esto,
+  // el primer visitante de Colombia después de que venza el TTL sigue
+  // esperando a GDELT/GNews en vivo.
+  const counts = await Promise.all(
+    COUNTRY_CODES.map(async (country) => {
+      const [verified] = await Promise.all([getVerifiedNews(10, country), getWorldPress(10, country)]);
+      return [country, verified.length] as const;
+    }),
+  );
+  return NextResponse.json({ ok: true, verifiedCounts: Object.fromEntries(counts) });
 }

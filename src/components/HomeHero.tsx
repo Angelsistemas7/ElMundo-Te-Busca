@@ -66,13 +66,15 @@ export async function HomeHero() {
     getStats(country),
     getDashboardStats(country),
     getAidPoints(country),
-    // TODO(multi-país): `news.ts` sigue filtrando solo contra Venezuela
-    // (VE_TERMS) — pendiente de una próxima ronda parametrizarlo por país.
-    getCrisisStats(),
+    getCrisisStats(country),
   ]);
-  // Las cifras de prensa (GDELT/ReliefWeb) solo están afinadas para Venezuela
-  // por ahora (ver TODO arriba); en Colombia se muestran las cifras propias
-  // de `countries.ts` en su lugar, no las de otro país.
+  // `news.ts` ya filtra por país (ver countries.ts), pero de todos modos el
+  // banner sigue mostrando SOLO la cifra curada y corroborada de `countries.ts`
+  // para el país activo, no la extracción en vivo de prensa: esta última es
+  // más ruidosa (depende de que OpenAI/GDELT acierten un titular reciente) y
+  // el sitio ya tiene una cifra verificada a mano para cada país. La
+  // extracción en vivo sigue alimentando el carrusel de noticias, donde sí
+  // tiene sentido (títulos reales, no un número resumen).
   const crisisRows =
     country === "ve"
       ? [crisisStats.fallecidos, crisisStats.heridos, crisisStats.desaparecidos, crisisStats.afectados].filter(

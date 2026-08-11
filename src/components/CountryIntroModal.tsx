@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { setActiveCountryAction } from "@/app/actions";
 import { COUNTRIES, COUNTRY_CODES, DEFAULT_COUNTRY, type CountryCode } from "@/lib/countries";
 import { Modal } from "./Modal";
+import { FlagIcon } from "./FlagIcon";
 
 /**
  * Pantalla de bienvenida: aparece SOLO en la primera visita (sin cookie de
@@ -46,7 +47,7 @@ export function CountryIntroModal({ initialOpen }: { initialOpen: boolean }) {
               onClick={() => choose(code)}
               className="tap-card flex flex-col items-center gap-2 rounded-2xl border-2 border-zinc-200 bg-white p-6 text-center transition hover:border-navy-700 hover:bg-navy-50 disabled:opacity-50"
             >
-              <span className="text-5xl leading-none">{c.flag}</span>
+              <FlagIcon code={code} className="h-10 w-14 rounded-md shadow-sm" />
               <span className="text-base font-bold text-navy-700">{c.name}</span>
               <span className="text-xs leading-relaxed text-zinc-500">
                 Terremoto M{c.quakeInfo.magnitude}

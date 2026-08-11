@@ -1,18 +1,19 @@
 import { ShieldCheck } from "lucide-react";
 import { getVerifiedNews, getWorldPress } from "@/lib/news";
+import type { CountryCode } from "@/lib/countries";
 import { NewsCarouselTrack, type CarouselItem } from "./NewsCarouselTrack";
 
 // Trae noticias reales y vigentes en vez de una lista fija: así el carrusel
 // no requiere curar contenido a mano ni corre el riesgo de mostrar una fuente
 // o URL inventada. getVerifiedNews prueba GDELT y GNews (ambas con foto real
-// de portada) con caché compartida; Google Noticias no trae foto en su feed,
-// así que solo se usa para completar si las otras dos dan pocos resultados
-// (caídas, con límite de peticiones, etc.).
-export async function VerifiedNewsCarousel() {
-  const verified = await getVerifiedNews(10);
+// de portada) con caché compartida POR PAÍS; Google Noticias no trae foto en
+// su feed, así que solo se usa para completar si las otras dos dan pocos
+// resultados (caídas, con límite de peticiones, etc.).
+export async function VerifiedNewsCarousel({ country }: { country: CountryCode }) {
+  const verified = await getVerifiedNews(10, country);
   let articles = verified;
   if (articles.length < 4) {
-    const fallback = await getWorldPress(10);
+    const fallback = await getWorldPress(10, country);
     const seen = new Set(articles.map((a) => a.url));
     articles = [...articles, ...fallback.filter((a) => !seen.has(a.url))].slice(0, 10);
   }

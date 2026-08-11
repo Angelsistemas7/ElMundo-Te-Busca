@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { setActiveCountryAction } from "@/app/actions";
 import { COUNTRIES, COUNTRY_CODES, type CountryCode } from "@/lib/countries";
+import { FlagIcon } from "./FlagIcon";
 
 /**
  * Widget de banderas para elegir el país/tragedia activo. Cambia una cookie
@@ -43,7 +44,7 @@ export function CountrySwitcher({ active }: { active: CountryCode }) {
                 : "text-zinc-500 hover:bg-zinc-100 disabled:opacity-50"
             }`}
           >
-            <span className="text-base leading-none">{c.flag}</span>
+            <FlagIcon code={code} className="h-4 w-6 shrink-0 rounded-sm" />
             <span className={isActive ? "" : "hidden sm:inline"}>{c.name}</span>
           </button>
         );
