@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogIn, Loader2, MailCheck } from "lucide-react";
 import {
@@ -11,8 +11,8 @@ import {
   type AuthActionResult,
 } from "@/app/actions";
 import { Modal } from "./Modal";
-import { Field, Input } from "./FormControls";
-import { Turnstile } from "./Turnstile";
+import { Field, Input, PasswordInput } from "./FormControls";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { ProfileMenu } from "./ProfileMenu";
 
 type SessionUser = { id: string; username: string } | null;
@@ -26,6 +26,7 @@ export function AuthMenu() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<AuthActionResult | null>(null);
   const [resetDone, setResetDone] = useState(false);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   async function refresh() {
     try {
@@ -83,6 +84,10 @@ export function AuthMenu() {
         setOpen(false);
         await refresh();
         router.refresh();
+      } else {
+        // El token ya se consumió en este intento; sin esto, reintentar
+        // reenvía el mismo token y Cloudflare lo rechaza siempre.
+        turnstileRef.current?.reset();
       }
     } finally {
       setSubmitting(false);
@@ -152,10 +157,9 @@ export function AuthMenu() {
                     : undefined
                 }
               >
-                <Input
+                <PasswordInput
                   id="password"
                   name="password"
-                  type="password"
                   autoComplete={mode === "register" ? "new-password" : "current-password"}
                   placeholder="••••••••••"
                 />
@@ -183,7 +187,7 @@ export function AuthMenu() {
               </Field>
             )}
 
-            <Turnstile />
+            <Turnstile ref={turnstileRef} />
 
             {result && !result.ok && (
               <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">

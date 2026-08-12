@@ -50,7 +50,11 @@ function buildFaqs(country: CountryCode) {
           Emergencias
         </Link>
         , incluida la {nationalLine.label.toLowerCase()} ({nationalLine.number}). Si ves una situación
-        crítica, repórtala de inmediato con el botón "Reportar AHORA".
+        crítica, repórtala de inmediato en{" "}
+        <Link href="/comunidad" className="font-medium text-brand-700 hover:underline">
+          Comunidad
+        </Link>{" "}
+        con el tipo "🚨 Rescate urgente".
       </>
     ),
   },

@@ -385,6 +385,18 @@ h6 {
   margin-right: 8px !important;
 }
 
+/* Por defecto Leaflet OCULTA el ícono que abre el panel apenas está
+   expandido (ver MapView.tsx: su manejador de clic nativo solo expande,
+   nunca colapsa) — sin el ícono visible no queda ningún botón para volver a
+   cerrarlo. Se mantiene visible y arriba de la lista como botón de
+   cerrar/abrir; el manejador de clic real que sí alterna vive en
+   `wireLayersToggle` (MapView.tsx). */
+.leaflet-control-layers-expanded .leaflet-control-layers-toggle {
+  display: block !important;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+
 /* Zona afectada: punto pulsante cuyo tamaño refleja la cantidad. */
 .zone-marker {
   position: relative;

@@ -9,7 +9,7 @@ import {
   updateEmailNotificationsAction,
   updateRecoveryEmailAction,
 } from "@/app/actions";
-import { Field, Input } from "./FormControls";
+import { Field, Input, PasswordInput } from "./FormControls";
 import { Modal } from "./Modal";
 
 export function AccountSettings({
@@ -60,10 +60,10 @@ function PasswordSection() {
       </h2>
       <form onSubmit={onSubmit} className="mt-3 space-y-3">
         <Field label="Contraseña actual" htmlFor="currentPassword" required>
-          <Input id="currentPassword" name="currentPassword" type="password" autoComplete="current-password" />
+          <PasswordInput id="currentPassword" name="currentPassword" autoComplete="current-password" />
         </Field>
         <Field label="Contraseña nueva" htmlFor="newPassword" required hint="Mínimo 10 caracteres.">
-          <Input id="newPassword" name="newPassword" type="password" autoComplete="new-password" />
+          <PasswordInput id="newPassword" name="newPassword" autoComplete="new-password" />
         </Field>
         {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
         {done && (
@@ -245,7 +245,7 @@ function DangerSection({ username }: { username: string }) {
       >
         <form onSubmit={onSubmit} className="space-y-4">
           <Field label="Contraseña" htmlFor="del-password" required>
-            <Input id="del-password" name="password" type="password" autoComplete="current-password" />
+            <PasswordInput id="del-password" name="password" autoComplete="current-password" />
           </Field>
           <Field
             label={`Escribe tu usuario ("${username}") para confirmar`}

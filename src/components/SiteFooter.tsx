@@ -5,8 +5,8 @@ import { FooterEmergencyLine } from "./FooterEmergencyLine";
 
 export function SiteFooter() {
   return (
-    <footer className="mt-16 border-t border-zinc-200 bg-white">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-2">
+    <footer className="mt-10 border-t border-zinc-200 bg-white sm:mt-16">
+      <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:gap-8 sm:py-10 md:grid-cols-2">
         <div>
           <div className="flex items-center gap-3">
             <Image
@@ -14,21 +14,21 @@ export function SiteFooter() {
               alt="El Mundo Te Busca"
               width={56}
               height={56}
-              className="h-14 w-14 shrink-0 object-contain"
+              className="h-11 w-11 shrink-0 object-contain sm:h-14 sm:w-14"
             />
-            <span className="text-lg font-bold text-navy-700">El Mundo Te Busca</span>
+            <span className="text-base font-bold text-navy-700 sm:text-lg">El Mundo Te Busca</span>
           </div>
-          <p className="mt-3 max-w-md text-sm leading-relaxed text-zinc-600">
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-600 sm:mt-3">
             Iniciativa ciudadana, voluntaria y sin fines de lucro para ayudar a localizar personas
             desaparecidas y coordinar ayuda ante catástrofes en cualquier lugar del mundo. Hoy,
             respondemos a los terremotos de Venezuela (jun. 2026) y Colombia (ago. 2026).
           </p>
-          <p className="mt-3 max-w-md text-xs leading-relaxed text-zinc-500">
+          <p className="mt-2 max-w-md text-xs leading-relaxed text-zinc-500 sm:mt-3">
             No vendemos ni compartimos tu información con terceros y solo la usamos para ayudar a
             localizar personas. Los datos que se publican son responsabilidad de quien los envía;
             verifícalos antes de difundirlos.
           </p>
-          <p className="mt-3 text-sm text-zinc-600">
+          <p className="mt-2 text-sm text-zinc-600 sm:mt-3">
             Contacto:{" "}
             <a
               href="mailto:atencionsentralabs@gmail.com"
@@ -49,7 +49,7 @@ export function SiteFooter() {
             Más teléfonos y guía de seguridad →
           </Link>
 
-          <p className="mt-4 text-sm font-medium text-zinc-700">
+          <p className="mt-3 text-sm font-medium text-zinc-700 sm:mt-4">
             Sé un voluntario digital: solo necesitas un momento para impactar. Comparte esta
             página — puede salvar vidas.
           </p>
@@ -60,12 +60,12 @@ export function SiteFooter() {
       </div>
 
       <div className="border-t border-zinc-100">
-        <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
           <p className="text-center text-xs font-semibold uppercase tracking-wide text-zinc-400">
             Con el apoyo de
           </p>
           {/* Dos aliados lado a lado, separados por una línea divisoria. */}
-          <div className="mx-auto mt-5 flex max-w-xl items-stretch justify-center divide-x divide-zinc-200">
+          <div className="mx-auto mt-3 flex max-w-xl items-stretch justify-center divide-x divide-zinc-200 sm:mt-5">
             {/* Sentra Labs (patrocinador tecnológico) — enlaza a su sitio. */}
             <div className="flex flex-1 flex-col items-center gap-2 px-4 text-center sm:px-6">
               <a

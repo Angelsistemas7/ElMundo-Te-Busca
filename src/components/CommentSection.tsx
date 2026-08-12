@@ -9,7 +9,7 @@ import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
 import { cn, timeAgo } from "@/lib/utils";
 import { Avatar } from "./Avatar";
-import { Turnstile } from "./Turnstile";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { PhotoView } from "./PhotoView";
 
 export function CommentSection({
@@ -45,6 +45,7 @@ export function CommentSection({
   const [justPostedId, setJustPostedId] = useState<string | null>(null);
   const fileRef = useRef<File | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   const canSubmit = name.trim().length >= 2 && (body.trim().length >= 2 || fileRef.current);
 
@@ -172,6 +173,7 @@ export function CommentSection({
       fileRef.current = null;
     } else {
       setError(res.error);
+      turnstileRef.current?.reset();
     }
     setSubmitting(false);
   }
@@ -343,7 +345,7 @@ export function CommentSection({
             </button>
           </div>
         )}
-        {!sessionName && <Turnstile />}
+        {!sessionName && <Turnstile ref={turnstileRef} />}
         {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
       </form>
 

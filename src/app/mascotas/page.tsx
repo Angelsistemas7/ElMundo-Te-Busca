@@ -1,17 +1,15 @@
-import Link from "next/link";
 import nextDynamic from "next/dynamic";
 import { PawPrint, Search } from "lucide-react";
 import { getCommentsForEntities, getPets, type PetSort } from "@/lib/data";
 import { PET_STATUS_EMOJI, PET_STATUS_LABEL, type PetStatus } from "@/lib/types";
 import { getActiveCountry } from "@/lib/country-server";
 import { getCountry } from "@/lib/countries";
-import { cn, clampPageSize } from "@/lib/utils";
+import { clampPageSize } from "@/lib/utils";
 import { PetCard } from "@/components/PetCard";
 const RegisterPetButton = nextDynamic(() =>
   import("@/components/RegisterPetButton").then((m) => m.RegisterPetButton),
 );
 import { EmptyState } from "@/components/EmptyState";
-import { SwipeHintRowOnce } from "@/components/SwipeHint";
 import { Pagination } from "@/components/Pagination";
 import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
@@ -38,6 +36,13 @@ const FILTERS: { value: PetStatus | "all"; label: string }[] = [
 
 function buildFilterFields(regions: readonly string[]): FilterField[] {
   return [
+    {
+      kind: "chips",
+      key: "status",
+      label: "Estado del reporte",
+      defaultValue: "all",
+      options: FILTERS,
+    },
     {
       kind: "select",
       key: "estado",
@@ -79,19 +84,6 @@ export default async function MascotasPage({ searchParams }: { searchParams: Sea
     sort,
   );
   const commentsByPet = await getCommentsForEntities("pet", pets.map((p) => p.id));
-
-  const statusHref = (s: PetStatus | "all") => {
-    const params = new URLSearchParams();
-    if (s !== "all") params.set("status", s);
-    if (sort !== "recent") params.set("sort", sort);
-    if (estado !== "all") params.set("estado", estado);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
-    if (q) params.set("q", q);
-    if (pageSize !== 10) params.set("pageSize", String(pageSize));
-    const qs = params.toString();
-    return qs ? `/mascotas?${qs}` : "/mascotas";
-  };
 
   const currentParams: Record<string, string> = {};
   if (status !== "all") currentParams.status = status;
@@ -136,23 +128,6 @@ export default async function MascotasPage({ searchParams }: { searchParams: Sea
           Buscar
         </button>
       </form>
-
-      <SwipeHintRowOnce className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.value}
-            href={statusHref(f.value)}
-            className={cn(
-              "press whitespace-nowrap rounded-full border px-3 py-1 text-sm font-medium transition",
-              status === f.value
-                ? "border-brand-400 bg-brand-50 text-brand-700"
-                : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300",
-            )}
-          >
-            {f.label}
-          </Link>
-        ))}
-      </SwipeHintRowOnce>
 
       <div className="mb-4 flex items-center justify-end gap-2">
         <FilterModal basePath="/mascotas" currentParams={currentParams} fields={FILTER_FIELDS} />

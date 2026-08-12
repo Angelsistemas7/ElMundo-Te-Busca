@@ -12,7 +12,7 @@ import { addHospitalPatientAction, canManageHospitalAction, type ActionResult } 
 import { cn, timeAgo } from "@/lib/utils";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
-import { Turnstile } from "./Turnstile";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 
 const PATIENT_STYLE: Record<PatientStatus, string> = {
   estable: "bg-emerald-50 text-emerald-700",
@@ -37,6 +37,7 @@ export function HospitalPatients({
   const [result, setResult] = useState<ActionResult | null>(null);
   const [canManage, setCanManage] = useState<boolean | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   // Solo personal autorizado (admin, autor, gestor o moderador de hospitales)
   // puede agregar pacientes — antes estaba abierto a cualquiera sin sesión.
@@ -71,6 +72,7 @@ export function HospitalPatients({
     const res = await addHospitalPatientAction(form);
     setResult(res);
     if (res.ok) router.refresh();
+    else turnstileRef.current?.reset();
     setSubmitting(false);
   }
 
@@ -178,7 +180,7 @@ export function HospitalPatients({
               <Textarea id="note" name="note" placeholder="Información útil para la familia o el personal." />
             </Field>
 
-            <Turnstile />
+            <Turnstile ref={turnstileRef} />
 
             {result && !result.ok && (
               <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{result.error}</p>

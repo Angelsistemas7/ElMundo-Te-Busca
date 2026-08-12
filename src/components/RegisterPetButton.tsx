@@ -15,7 +15,7 @@ import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
-import { Turnstile } from "./Turnstile";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { ManageLinkBox } from "./ManageLinkBox";
 
 const STATUSES = Object.keys(PET_STATUS_LABEL) as PetStatus[];
@@ -31,6 +31,7 @@ export function RegisterPetButton({ country = "ve" }: { country?: string } = {})
   const [title, setTitle] = useState("");
   const fileRef = useRef<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   function close() {
     setOpen(false);
@@ -62,6 +63,7 @@ export function RegisterPetButton({ country = "ve" }: { country?: string } = {})
       const res = await registerPetAction(form);
       setResult(res);
       if (res.ok) router.refresh();
+      else turnstileRef.current?.reset();
     } finally {
       setSubmitting(false);
     }
@@ -186,7 +188,7 @@ export function RegisterPetButton({ country = "ve" }: { country?: string } = {})
             </Field>
 
             <input type="hidden" name="photoUrl" />
-            <Turnstile />
+            <Turnstile ref={turnstileRef} />
 
             {result && !result.ok && (
               <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{result.error}</p>

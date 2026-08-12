@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { RotateCcw } from "lucide-react";
 
 // Widget de Cloudflare Turnstile. Si no hay site key configurada, renderiza
@@ -18,7 +18,19 @@ declare global {
 
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js";
 
-export function Turnstile() {
+// El token que emite el widget es de un solo uso: si el envío del formulario
+// falla por CUALQUIER motivo (Turnstile expirado, un campo inválido, el
+// nombre de usuario ya existe...), reenviar el mismo formulario manda ese
+// mismo token ya consumido — Cloudflare siempre lo rechaza en el segundo
+// intento ("timeout-or-duplicate"), aunque el problema real ya se haya
+// corregido. Antes de esto, quien reintentaba veía "No se pudo verificar que
+// eres una persona" sin parar, sin ninguna pista de qué hacer. Este `ref`
+// deja que el formulario que lo usa pida un token nuevo tras cualquier fallo.
+export interface TurnstileHandle {
+  reset: () => void;
+}
+
+export const Turnstile = forwardRef<TurnstileHandle>(function Turnstile(_props, forwardedRef) {
   const ref = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
@@ -30,6 +42,15 @@ export function Turnstile() {
   // aquí mismo, con un botón para volver a verificar sin perder el resto del
   // formulario ya escrito.
   const [expired, setExpired] = useState(false);
+
+  function doReset() {
+    if (widgetId.current && window.turnstile) {
+      window.turnstile.reset(widgetId.current);
+      setExpired(false);
+    }
+  }
+
+  useImperativeHandle(forwardedRef, () => ({ reset: doReset }));
 
   useEffect(() => {
     if (!siteKey || !ref.current) return;
@@ -84,20 +105,13 @@ export function Turnstile() {
     );
   }
 
-  function retry() {
-    if (widgetId.current && window.turnstile) {
-      window.turnstile.reset(widgetId.current);
-      setExpired(false);
-    }
-  }
-
   return (
     <div>
       <div ref={ref} className="min-h-[65px]" />
       {expired && (
         <button
           type="button"
-          onClick={retry}
+          onClick={doReset}
           className="press mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:underline"
         >
           <RotateCcw className="h-3.5 w-3.5" />
@@ -106,4 +120,4 @@ export function Turnstile() {
       )}
     </div>
   );
-}
+});
