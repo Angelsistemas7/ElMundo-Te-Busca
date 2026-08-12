@@ -1,3 +1,56 @@
+## ✅ Cerrado (2026-08-12, ronda 14) — bug real encontrado y corregido: el nombre anónimo NO estaba bloqueado en comentarios
+
+**El dueño probó en vivo y encontró que la ronda 13 estaba incompleta**: en
+comentarios (`CommentSection.tsx`) pudo borrar su nombre sin sesión y poner
+otro distinto, sin ninguna traba. La ronda 12 había asumido (nota heredada,
+NUNCA re-verificada) que `CommentSection` "ya funcionaba bien" desde la ronda
+4 y la usó como referencia para construir `AuthorNameField` — pero en
+realidad `CommentSection` solo **prellenaba** el nombre desde `localStorage`
+en un `<input>` normal, sin bloquearlo. Nunca se migró al patrón de
+`useAuthorName`/bloqueo que sí se aplicó a los otros 4 formularios. Corregido:
+`CommentSection.tsx` ahora usa `useAuthorName("vtb_anon_comment_name")` (misma
+clave de siempre, separada de la de publicaciones) y el mismo input de
+solo-lectura + "¿No eres tú?" que ya usan `CreatePostButton`/`ReportStatusButton`/
+`RegisterVolunteerButton`, con `commit()` al comentar con éxito — mismo
+comportamiento, con el estilo compacto propio de la caja de comentarios (sin
+el `Field`/label completo de `AuthorNameField`, para no romper su diseño).
+
+**Auditoría COMPLETA de todo el sitio para esta ronda** (releído código real,
+no notas heredadas, tras el error de arriba):
+
+| Formulario | Campo | Estado |
+|---|---|---|
+| `CreatePostButton.tsx` (Comunidad) | authorName | ✅ Verificado: usa `useAuthorName`+`AuthorNameField`+`commit()` correctamente |
+| `ReportStatusButton.tsx` | reporterName | ✅ Verificado: igual, correcto |
+| `RegisterVolunteerButton.tsx` | name | ✅ Verificado: igual, correcto |
+| `RegisterMarchButton.tsx` (Caravanas) | organizerName | ✅ Prellenado sin bloquear (ronda 13, a propósito — puede ser un colectivo) |
+| `CommentSection.tsx` (TODOS los comentarios del sitio) | authorName | 🔴→✅ **Estaba roto, corregido esta ronda** |
+| `RegisterPersonButton.tsx` | contactName | ✅ Verificado: sin `required`, genuinely opcional, no es el bug |
+| `RegisterAidPointButton.tsx` | contactName | ✅ Verificado: sin `required`, opcional |
+| `RegisterHospitalButton.tsx` | contactName | ✅ Verificado: sin `required`, opcional |
+| `PostManagePanel.tsx` (editar post) | authorName | ✅ Verificado: `defaultValue` del post, no bloquea, es edición no creación |
+| `MarchManagePanel.tsx` (editar caravana) | organizerName | ✅ Verificado: mismo caso, `defaultValue` |
+| `DenunciaButton.tsx` | — | ✅ Verificado: no tiene campo de nombre, requiere sesión, se toma del servidor |
+
+**Foto ampliada (reacciones/comentarios/header sobrepuestos) — re-verificado,
+YA estaba corregido de raíz desde antes de esta sesión** (commit `8dedcfb`,
+sesión anterior): `PhotoLightbox.tsx` usa `createPortal(..., document.body)`
+envolviendo TODO (fondo oscuro, botón cerrar, imagen) en un único `return` —
+al estar fuera del árbol DOM del contenedor con `viewTransitionName` en
+`persona/[id]/page.tsx`, ese `contain: layout` ya no puede afectarlo pase lo
+que pase. Confirmado también que `PersonPhoto.tsx` (la ficha de persona) y
+`PhotoView.tsx` (fotos de comentarios/otras fichas) comparten el mismo
+componente — un solo fix cubre ambos casos. **No fue necesario tocar código
+aquí, solo confirmar que sigue así.**
+
+**Verificado con**: `npm run build` (verde) + `npm run start` + `curl` con
+un ID de persona REAL sacado en vivo de Supabase (no un ID inventado) —
+confirmado 200 y que el HTML inicial trae el campo "Tu nombre". **Lo que
+sigue sin poderse verificar con `curl`** (por ser interacción pura tras
+hidratar): que el bloqueo se sienta bien en el navegador — escribir un
+nombre, comentar, recargar la página, y confirmar que el campo queda de
+solo lectura con el link "¿No eres tú?" en vez de editable.
+
 ## ✅ Cerrado (2026-08-12, ronda 13) — RESUELTO: migración corrida con éxito, "Publicar" funciona de nuevo
 
 **El dueño confirmó que pegó `supabase/schema.sql` completo en el proyecto

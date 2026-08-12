@@ -11,6 +11,7 @@ import { cn, timeAgo } from "@/lib/utils";
 import { Avatar } from "./Avatar";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { PhotoView } from "./PhotoView";
+import { useAuthorName } from "./AuthorNameField";
 
 // Nombre de quien comenta sin cuenta: se recuerda por dispositivo (mismo
 // patrón que la dedup de votos/"me gusta") para no tener que escribirlo cada
@@ -36,7 +37,7 @@ export function CommentSection({
   prefix?: React.ReactNode;
 }) {
   const [comments, setComments] = useState<Comment[]>(initialComments);
-  const [name, setName] = useState("");
+  const author = useAuthorName(ANON_NAME_KEY);
   const [sessionName, setSessionName] = useState<string | null>(null);
   const [sessionAvatar, setSessionAvatar] = useState<string | null>(null);
   const [body, setBody] = useState("");
@@ -52,14 +53,7 @@ export function CommentSection({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
 
-  const canSubmit = name.trim().length >= 2 && (body.trim().length >= 2 || fileRef.current);
-
-  // Sin cuenta: recuerda el nombre que la persona ya escribió antes en este
-  // dispositivo, para no pedírselo de nuevo en cada comentario.
-  useEffect(() => {
-    const saved = localStorage.getItem(ANON_NAME_KEY);
-    if (saved) setName((prev) => prev || saved);
-  }, []);
+  const canSubmit = author.name.trim().length >= 2 && (body.trim().length >= 2 || fileRef.current);
 
   // Con sesión, se comenta con la identidad de la cuenta (el servidor también lo
   // impone). Ocultamos el campo de nombre y usamos el del usuario.
@@ -68,7 +62,6 @@ export function CommentSection({
       .then((u) => {
         if (u) {
           setSessionName(u.username);
-          setName(u.username);
           getMyProfileAction()
             .then((p) => setSessionAvatar(p?.avatarUrl ?? null))
             .catch(() => {});
@@ -76,11 +69,6 @@ export function CommentSection({
       })
       .catch(() => {});
   }, []);
-
-  function updateName(value: string) {
-    setName(value);
-    if (!sessionName) localStorage.setItem(ANON_NAME_KEY, value);
-  }
 
   // Profundidad de respuesta SIN límite (parent_id ya admite cualquier
   // comentario como padre, no solo la raíz) pero con UN SOLO nivel de sangría
@@ -138,7 +126,7 @@ export function CommentSection({
     const form = new FormData();
     form.set("entityType", entityType);
     form.set("entityId", entityId);
-    form.set("authorName", name);
+    form.set("authorName", author.name);
     form.set("body", body);
     if (parentId) form.set("parentId", parentId);
 
@@ -162,6 +150,7 @@ export function CommentSection({
 
     const res = await postCommentAction(form);
     if (res.ok) {
+      author.commit();
       // Usamos el id REAL que devuelve el servidor (no uno temporal): si no,
       // dar "me gusta" a un comentario recién publicado (antes de recargar la
       // página) apuntaba a un id que no existía en la base de datos y el like
@@ -173,7 +162,7 @@ export function CommentSection({
           entityType,
           entityId,
           parentId,
-          authorName: name,
+          authorName: author.name,
           body,
           photoUrl: photoUrl ?? preview,
           likes: 0,
@@ -304,10 +293,26 @@ export function CommentSection({
           <p className="text-xs text-zinc-500">
             Comentando como <span className="font-semibold text-zinc-700">{sessionName}</span>
           </p>
+        ) : author.locked ? (
+          <div className="flex items-center gap-2">
+            <input
+              value={author.name}
+              readOnly
+              aria-label="Tu nombre"
+              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-base text-zinc-700 outline-none sm:text-sm"
+            />
+            <button
+              type="button"
+              onClick={author.unlock}
+              className="shrink-0 text-xs font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
+            >
+              ¿No eres tú?
+            </button>
+          </div>
         ) : (
           <input
-            value={name}
-            onChange={(e) => updateName(e.target.value)}
+            value={author.name}
+            onChange={(e) => author.setName(e.target.value)}
             placeholder="Tu nombre"
             aria-label="Tu nombre"
             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:text-sm"
