@@ -362,9 +362,13 @@ export function OnboardingTour() {
     let attempts = 0;
     // Pasos que acaban de navegar a una página nueva, o que necesitan el
     // desplegable/hoja "Más" abierto, tardan un poco en montar su contenido
-    // real (datos del servidor, sheet/dropdown) — se reintenta varias veces
-    // en vez de dar el elemento por inexistente en el primer intento.
-    const maxAttempts = step.path ? 25 : wantsMore ? 6 : 1;
+    // real (datos del servidor, sheet/dropdown, o el `loading.tsx`/Suspense
+    // de la ruta destino) — se reintenta varias veces en vez de dar el
+    // elemento por inexistente en el primer intento. Las páginas con más
+    // datos que traer (Inicio: cifras + noticias) pueden tardar varios
+    // segundos en un arranque en frío — 40 intentos de 150ms dan ~6s de
+    // margen antes de rendirse.
+    const maxAttempts = step.path ? 40 : wantsMore ? 6 : 1;
 
     const attemptMeasure = () => {
       if (cancelled) return;
@@ -450,6 +454,12 @@ export function OnboardingTour() {
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
   const cardWidth = Math.min(320, vw - 32);
 
+  // Esperando a que cargue la página real de esta sección (el paso trae
+  // `path` y todavía no hay nada que resaltar) — se distingue del caso
+  // "nunca va a aparecer" de un paso normal para no tapar la pantalla con un
+  // fondo opaco mientras el usuario ve la página cargar detrás.
+  const waitingForPage = Boolean(step.path) && !rect;
+
   let cardStyle: React.CSSProperties;
   if (!rect) {
     cardStyle = { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
@@ -490,7 +500,16 @@ export function OnboardingTour() {
               }}
             />
           ) : (
-            <div aria-hidden className="pointer-events-none absolute inset-0 bg-zinc-900/72" />
+            // Fondo mucho más tenue mientras se espera a que cargue la
+            // página destino (`waitingForPage`): un fondo oscuro y opaco ahí
+            // se veía como si la guía "tapara" lo que hay debajo (p. ej. el
+            // selector de país en Inicio) en vez de leerse como una carga en
+            // curso. En el resto de casos (paso sin `path` que de verdad no
+            // encuentra su elemento) se deja el fondo oscuro de siempre.
+            <div
+              aria-hidden
+              className={`pointer-events-none absolute inset-0 ${waitingForPage ? "bg-zinc-900/25" : "bg-zinc-900/72"}`}
+            />
           )}
 
           <div
@@ -510,8 +529,17 @@ export function OnboardingTour() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <h3 className="text-base font-bold text-zinc-900">{step.title}</h3>
-            <p className="mt-1 text-sm leading-snug text-zinc-600">{step.text}</p>
+            {waitingForPage ? (
+              <div className="flex items-center gap-2 py-1">
+                <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-300 border-t-brand-600" />
+                <p className="text-sm font-medium text-zinc-500">Cargando esta sección…</p>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-base font-bold text-zinc-900">{step.title}</h3>
+                <p className="mt-1 text-sm leading-snug text-zinc-600">{step.text}</p>
+              </>
+            )}
             <div className="mt-4 flex items-center justify-between gap-2">
               {stepIndex > 0 ? (
                 <button
