@@ -18,6 +18,9 @@ export default async function OpengraphImage() {
 
   return new ImageResponse(
     (
+      // Mismo fondo claro tipo iOS que las tarjetas de persona/mascota (blanco
+      // con un gris de sistema sutil) — antes era un degradado oscuro navy/
+      // morado que se leía "azul" al compartir el enlace general del sitio.
       <div
         style={{
           width: "100%",
@@ -25,11 +28,11 @@ export default async function OpengraphImage() {
           display: "flex",
           alignItems: "center",
           gap: "56px",
-          background: "linear-gradient(135deg, #16142f 0%, #1d1b40 55%, #332c5e 100%)",
+          background: "linear-gradient(135deg, #ffffff 0%, #f2f2f7 100%)",
           padding: "70px 80px",
         }}
       >
-        {/* Logo dentro de una tarjeta blanca para que destaque sobre el fondo oscuro. */}
+        {/* Logo dentro de una tarjeta blanca con sombra suave, como las demás tarjetas de compartir. */}
         <div
           style={{
             display: "flex",
@@ -40,7 +43,7 @@ export default async function OpengraphImage() {
             borderRadius: "36px",
             background: "#ffffff",
             flexShrink: 0,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+            boxShadow: "0 20px 45px rgba(29,27,64,0.14)",
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -53,7 +56,7 @@ export default async function OpengraphImage() {
               display: "flex",
               fontSize: "76px",
               fontWeight: 800,
-              color: "#ffffff",
+              color: "#16142f",
               lineHeight: 1.05,
             }}
           >
@@ -63,10 +66,10 @@ export default async function OpengraphImage() {
           <div
             style={{ display: "flex", width: "180px", height: "8px", borderRadius: "4px", background: "#d3824a", marginTop: "24px" }}
           />
-          <div style={{ display: "flex", marginTop: "28px", fontSize: "34px", color: "#cbd5e1", lineHeight: 1.3 }}>
+          <div style={{ display: "flex", marginTop: "28px", fontSize: "34px", color: "#475569", lineHeight: 1.3 }}>
             Localizar personas desaparecidas y coordinar ayuda ante cualquier emergencia, en cualquier parte del mundo
           </div>
-          <div style={{ display: "flex", marginTop: "26px", fontSize: "26px", fontWeight: 600, color: "#f2af5e" }}>
+          <div style={{ display: "flex", marginTop: "26px", fontSize: "26px", fontWeight: 600, color: "#b96a3a" }}>
             Iniciativa ciudadana, voluntaria y sin fines de lucro
           </div>
         </div>
