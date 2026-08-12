@@ -36,6 +36,7 @@ export function NotificationBell() {
   return (
     <div className="relative" ref={ref}>
       <button
+        data-tour="tour-bell"
         onClick={() => setOpen((v) => !v)}
         aria-label={`Mis publicaciones y guardados${totalNew > 0 ? ` (${totalNew} avisos nuevos)` : ""}`}
         className="relative flex h-10 w-10 items-center justify-center rounded-full text-zinc-600 transition hover:bg-zinc-100"

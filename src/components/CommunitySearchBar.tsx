@@ -32,7 +32,11 @@ export function CommunitySearchBar({
       }
       next.delete("page");
       startTransition(() => {
-        router.push(`${pathname}?${next.toString()}`, { scroll: false });
+        // "replace": esta función solo la usa la búsqueda con debounce de
+        // abajo. Con "push" cada letra "asentada" apilaba una entrada de
+        // historial nueva, y "atrás" del navegador había que presionarlo
+        // varias veces para salir de la propia búsqueda en vez de una sola.
+        router.replace(`${pathname}?${next.toString()}`, { scroll: false });
       });
     },
     [params, pathname, router],

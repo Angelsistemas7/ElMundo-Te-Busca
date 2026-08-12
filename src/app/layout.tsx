@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { MobileNav } from "@/components/MobileNav";
 import { AccountBanner } from "@/components/AccountBanner";
 import { SafetyBanner } from "@/components/SafetyBanner";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 const figtree = Figtree({
   subsets: ["latin"],
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </main>
         <SiteFooter />
         <MobileNav />
+        <OnboardingTour />
         <Analytics />
         <SpeedInsights />
       </body>

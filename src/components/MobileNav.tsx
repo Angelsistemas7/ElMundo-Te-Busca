@@ -31,11 +31,11 @@ const COMMUNITY_PATHS = ["/comunidad", "/voluntarios", "/caravanas", "/denuncias
 const AYUDA_PATHS = ["/ayuda", "/hospitales"];
 
 const PRIMARY = [
-  { href: "/", label: "Inicio", icon: Home },
-  { href: "/se-busca", label: "Se busca", icon: Search },
-  { href: "/comunidad", label: "Comunidad", icon: Users2 },
-  { href: "/mapa", label: "Mapa", icon: Map },
-  { href: "/emergencias", label: "SOS", icon: LifeBuoy },
+  { href: "/", label: "Inicio", icon: Home, tour: "mnav-inicio" },
+  { href: "/se-busca", label: "Se busca", icon: Search, tour: "mnav-se-busca" },
+  { href: "/comunidad", label: "Comunidad", icon: Users2, tour: "mnav-comunidad" },
+  { href: "/mapa", label: "Mapa", icon: Map, tour: "mnav-mapa" },
+  { href: "/emergencias", label: "SOS", icon: LifeBuoy, tour: "mnav-emergencias" },
 ];
 
 const MORE = [
@@ -126,12 +126,13 @@ export function MobileNav() {
               transitionTimingFunction: "var(--ease-ios)",
             }}
           />
-          {PRIMARY.map(({ href, label, icon: Icon }) => {
+          {PRIMARY.map(({ href, label, icon: Icon, tour }) => {
             const active = isActive(pathname, href);
             return (
               <li key={href} className="relative min-w-0 flex-1">
                 <Link
                   href={href}
+                  data-tour={tour}
                   aria-current={active ? "page" : undefined}
                   onClick={tapHaptic}
                   className={cn(
@@ -147,6 +148,7 @@ export function MobileNav() {
           })}
           <li className="relative min-w-0 flex-1">
             <button
+              data-tour="mnav-mas"
               onClick={() => {
                 tapHaptic();
                 setMoreOpen((v) => !v);

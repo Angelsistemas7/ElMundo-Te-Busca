@@ -1,3 +1,129 @@
+## ✅ Cerrado (2026-08-12, ronda 7) — build verde, SIN PUSHEAR TODAVÍA
+
+Pedido del dueño: que "atrás" del navegador vuelva de verdad a donde estaba
+(cualquier página/formulario/sección), una guía rápida tipo spotlight para
+la primera visita con DOS versiones (móvil y escritorio) bien resueltas, y
+—corrección a mitad de ronda— que Comunidad tenga paginación numerada +
+selector de cantidad por página (20 por defecto) como el resto del sitio,
+en vez de scroll infinito.
+
+1. **Búsqueda con debounce apilaba historial de más — CORREGIDO.** En
+   `SearchAndFilters.tsx` y `CommunitySearchBar.tsx`, el `setParams` que solo
+   usa la búsqueda con debounce (350ms) usaba `router.push` — cada letra
+   "asentada" mientras escribías creaba una entrada de historial nueva, así
+   que "atrás" había que presionarlo varias veces para salir de tu propia
+   búsqueda en vez de una sola vez para volver a la página anterior real.
+   Cambiado a `router.replace` (los cambios de filtro/página SÍ siguen
+   usando `push` vía `FilterModal`/`Pagination`/`PageSizeSelect` — esos sí
+   deben ser un paso de "atrás", no se tocaron).
+2. **Comunidad pasó de scroll infinito a paginación numerada — CAMBIO DE
+   RUMBO a mitad de esta misma ronda.** Primero se hizo un parche para que el
+   scroll infinito de Comunidad restaurara lo cargado al volver atrás
+   (`sessionStorage` con page+scrollY). El dueño corrigió el pedido: quiere
+   Comunidad con el MISMO patrón que Ayuda/Hospitales/Mascotas — botones de
+   página numerada + selector "Mostrar X por página" — no scroll infinito.
+   Se deshizo el parche y se aplicó lo pedido de verdad:
+   - `src/app/comunidad/page.tsx`: ya no usa `InfiniteFeed`, ahora lee
+     `page`/`pageSize` de `searchParams` igual que `ayuda/page.tsx` y
+     renderiza `<Pagination>` + `<PageSizeSelect>`.
+   - **Por defecto 20 por página en Comunidad** (pedido explícito; el resto
+     de secciones sigue en 10). Para no cambiar el default global, se agregó
+     un segundo parámetro opcional `defaultSize` a `clampPageSize()`
+     (`src/lib/utils.ts`) y una prop opcional `defaultValue` a
+     `PageSizeSelect` (`src/components/PageSizeSelect.tsx`) — ambos con su
+     valor de siempre (10) si no se pasa nada, así ninguna otra página cambió
+     de comportamiento.
+   - **Borrado por quedar sin uso**: `src/components/InfiniteFeed.tsx`
+     (era el único consumidor) y `getMorePostsAction` en `actions.ts` (junto
+     con el import de `clampPageSize` ahí, que solo esa función usaba). El
+     `sessionStorage`/restauración de scroll del parche anterior desapareció
+     junto con el archivo — ya no hace falta: con paginación real por URL,
+     "atrás" del navegador vuelve sola a la página/tamaño correctos (son
+     entradas de historial normales), sin ningún parche adicional.
+3. **Modales sin integrar con "atrás" — CORREGIDO, el cambio de más riesgo de
+   esta ronda.** `Modal.tsx` (compartido por TODOS los formularios/modales
+   del sitio) no creaba ninguna entrada de historial al abrirse: "atrás" del
+   navegador nunca cerraba un modal abierto (formulario a medio llenar,
+   denuncia, login...) ni lo reabría si navegabas desde un link dentro de él
+   (caso real: `RecognizeDeck.tsx`, "Ver ficha" dentro del modal
+   "Reconocidos"). Ahora, centralizado en un solo archivo:
+   - Al abrir un modal, se empuja una entrada de historial "fantasma" (misma
+     URL) y se registra en un mapa global.
+   - Un listener `popstate` global cierra el modal que esté ENCIMA de la
+     pila (reutiliza la pila `modalStack` que ya existía para Escape) en vez
+     de dejar que el navegador navegue lejos de la página — así nunca se
+     pierde sin querer lo que estabas escribiendo.
+   - Al cerrarse por cualquier otra vía (X, Escape, fondo, guardar), se
+     "limpia" esa entrada fantasma con `history.back()` — con un contador de
+     supresión para que ese mismo `back()` no dispare el cierre de OTRO
+     modal en el listener global (importante para modales anidados, p. ej.
+     `LocationPicker` dentro de un formulario).
+   - Guard clave: si mientras el modal estaba abierto ocurrió una
+     navegación REAL a otra URL (el caso de `RecognizeDeck.tsx` de arriba),
+     se compara el `href` guardado al abrir contra el actual — si difieren,
+     NO se llama `history.back()` al limpiar (eso deshubiera esa navegación
+     real, sacando al usuario de la página a la que acababa de entrar).
+   - Se usa un `ref` para `onClose` (no como dependencia directa del
+     `useEffect`) porque muchos llamadores pasan una función inline que se
+     recrea en cada render — si el efecto dependiera de su identidad, se
+     re-ejecutaría en cada render con el modal abierto (no solo al cerrar),
+     disparando `history.back()` de más.
+   - **Este es el cambio que más necesita probarse en un navegador real**
+     (interactivo, no verificable con `curl`): abrir cualquier formulario,
+     presionar "atrás" del navegador (no el botón X) y confirmar que solo
+     cierra el modal sin perder lo escrito ni salir de la página; con dos
+     modales anidados (p. ej. el mapa de ubicación dentro de un formulario),
+     confirmar que "atrás" cierra primero el de encima; y el caso concreto
+     de tocar "Ver ficha" dentro del modal "Reconocidos" en Se busca/¿La
+     reconoces?, confirmar que sí navega bien a la ficha de la persona.
+4. **Guía rápida (spotlight tour) — NUEVA**, `src/components/OnboardingTour.tsx`,
+   montada en `layout.tsx` (disponible en cualquier página, no solo el
+   inicio). Aparece SOLO en la primera visita (marca en `localStorage`,
+   independiente de la cookie de país); un botón "?" flotante (esquina
+   inferior derecha, encima de la barra de seguridad en móvil) la vuelve a
+   abrir cuando se quiera. Difumina toda la pantalla y resalta un elemento
+   de navegación a la vez con un aro y una tarjeta explicando qué hace
+   (Siguiente/Atrás/Saltar, contador "2/7").
+   - **Dos secuencias de pasos distintas según el ancho de pantalla al
+     abrir** (se decide una sola vez, no se reparte a mitad de tour si
+     cambia el ancho): móvil ancla a la barra inferior (`data-tour="mnav-*"`
+     en `MobileNav.tsx`); escritorio ancla al header (`data-tour="dnav-*"`
+     en `SiteHeader.tsx`). Comparten los pasos de campanita de avisos
+     (`tour-bell` en `NotificationBell.tsx`) y cuenta (`tour-account` en
+     `AuthMenu.tsx`, el botón "Entrar" — con sesión iniciada ese paso se
+     salta solo).
+   - Si el elemento de un paso no existe en ese momento (p. ej. la
+     campanita sin nada que mostrar para un visitante nuevo, confirmado con
+     `curl` en esta sesión: con `localStorage` vacío `tour-bell` no se
+     renderiza), se salta solo al siguiente paso en vez de mostrar un
+     spotlight vacío o quedar congelada.
+   - Espera a que el selector de país (`CountryIntroModal`, mismo criterio
+     de "primera vez" pero solo en `/`) se cierre antes de arrancar
+     (detecta cualquier `role="dialog"` abierto y reintenta cada 400ms) para
+     no amontonar dos overlays encima del usuario en su primerísima visita.
+   - **Deliberadamente NO incluye el botón "Publicar"** de cada sección (vive
+     en componentes específicos de cada página, no en el layout persistente
+     como el header/nav) — se menciona en el texto de los pasos "Se busca"/
+     "Comunidad" en su lugar. Si se pide después, se puede sumar anclando a
+     esos botones en las páginas donde estén montados.
+   - **Falta probar en navegador real** (no verificable con `curl`): que el
+     aro resalte bien el elemento correcto en ambos tamaños, que la tarjeta
+     no se salga de la pantalla en un teléfono angosto, y que el botón "?"
+     la vuelva a abrir correctamente.
+
+**Verificado con**: `npm run build` (verde, typecheck incluido) +
+`npm run start` + `curl` a `/`, `/se-busca`, `/comunidad`, `/mapa` (200 en
+las 4) + confirmado con `curl` que los 13 anclajes `data-tour` (menos
+`tour-bell`, que no debe renderizar sin avisos — comportamiento esperado)
+aparecen en el HTML servido + confirmado con `curl` que `/comunidad` con
+`page=2`, `pageSize=50` y `pageSize=10` responden 200 y que el `<select>`
+servido trae `10`/`20`/`50` con `20` marcado por defecto (`selected=""`) y
+el `<nav aria-label="Paginación">` presente. **Lo único que sigue sin
+poder verificarse de verdad sin un navegador real** son los cambios de
+interacción pura (botón atrás cerrando modales, el spotlight de la guía) —
+`curl` no puede simular eso. **Sin pushear todavía**, queda para que el dueño lo
+pruebe primero o decida cuándo subirlo.
+
 ## ✅ Cerrado (2026-08-12, ronda 6) — build verde, pusheado
 
 Pedido del dueño: confirmar que Turnstile avisa bien al expirar en TODOS

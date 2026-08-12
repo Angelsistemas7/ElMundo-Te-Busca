@@ -132,7 +132,12 @@ export function SearchAndFilters({
       }
       next.delete("page"); // cualquier cambio de filtro vuelve a la página 1
       startTransition(() => {
-        router.push(`${pathname}?${next.toString()}`, { scroll: false });
+        // "replace", no "push": esta función solo la usa la búsqueda con
+        // debounce de abajo. Con "push" cada letra "asentada" apilaba una
+        // entrada de historial nueva, así que "atrás" del navegador tenía
+        // que presionarse muchas veces para salir de la propia búsqueda en
+        // vez de volver una sola vez a la página anterior real.
+        router.replace(`${pathname}?${next.toString()}`, { scroll: false });
       });
     },
     [params, pathname, router],

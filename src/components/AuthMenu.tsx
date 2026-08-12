@@ -115,6 +115,7 @@ export function AuthMenu() {
         <ProfileMenu user={user} />
       ) : (
         <button
+          data-tour="tour-account"
           onClick={openLogin}
           className="press flex h-10 items-center gap-1.5 rounded-full border border-zinc-300 px-3.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
         >

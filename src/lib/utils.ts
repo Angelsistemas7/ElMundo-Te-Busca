@@ -11,9 +11,11 @@ export function cn(...classes: (string | false | null | undefined)[]): string {
 export const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 export const DEFAULT_PAGE_SIZE = 10;
 
-/** Clampa cualquier valor a una de las opciones válidas (10/20/50). */
-export function clampPageSize(v: number | undefined): number {
-  return v && (PAGE_SIZE_OPTIONS as readonly number[]).includes(v) ? v : DEFAULT_PAGE_SIZE;
+/** Clampa cualquier valor a una de las opciones válidas (10/20/50). `defaultSize`
+ *  permite que una sección puntual (p. ej. Comunidad) tenga su propio valor por
+ *  defecto sin cambiar el de las demás (10). */
+export function clampPageSize(v: number | undefined, defaultSize: number = DEFAULT_PAGE_SIZE): number {
+  return v && (PAGE_SIZE_OPTIONS as readonly number[]).includes(v) ? v : defaultSize;
 }
 
 /** Etiqueta de tiempo relativa en español ("hace 5 min"). */

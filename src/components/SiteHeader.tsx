@@ -23,11 +23,11 @@ import { AuthMenu } from "./AuthMenu";
 // en una sola fila que había que deslizar para ver completa; el resto ahora
 // va detrás de "Más" (menú desplegable aquí; hoja inferior en móvil).
 const PRIMARY = [
-  { href: "/", label: "Inicio", icon: Home },
-  { href: "/se-busca", label: "Se busca", icon: Search },
-  { href: "/comunidad", label: "Comunidad", icon: Users2 },
-  { href: "/mapa", label: "Mapa", icon: Map },
-  { href: "/emergencias", label: "Emergencias", icon: LifeBuoy },
+  { href: "/", label: "Inicio", icon: Home, tour: "dnav-inicio" },
+  { href: "/se-busca", label: "Se busca", icon: Search, tour: "dnav-se-busca" },
+  { href: "/comunidad", label: "Comunidad", icon: Users2, tour: "dnav-comunidad" },
+  { href: "/mapa", label: "Mapa", icon: Map, tour: "dnav-mapa" },
+  { href: "/emergencias", label: "Emergencias", icon: LifeBuoy, tour: "dnav-emergencias" },
 ];
 
 const MORE = [
@@ -106,12 +106,13 @@ export function SiteHeader() {
 
         <div className="flex min-w-0 items-center gap-2">
           <nav className="hidden min-w-0 items-center gap-1 md:flex">
-            {PRIMARY.map(({ href, label, icon: Icon }) => {
+            {PRIMARY.map(({ href, label, icon: Icon, tour }) => {
               const active = isActive(pathname, href);
               return (
                 <Link
                   key={href}
                   href={href}
+                  data-tour={tour}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition",
@@ -128,6 +129,7 @@ export function SiteHeader() {
 
             <div className="relative" ref={moreRef}>
               <button
+                data-tour="dnav-mas"
                 onClick={() => setMoreOpen((v) => !v)}
                 aria-expanded={moreOpen}
                 className={cn(

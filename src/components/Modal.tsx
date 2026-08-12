@@ -12,6 +12,33 @@ import { useDragDismiss } from "@/lib/useDragDismiss";
 // vez; con la pila, solo el que está más arriba (el último abierto) responde.
 let modalStack: symbol[] = [];
 
+// Integración con el botón "atrás" del navegador: cada modal que se abre
+// empuja una entrada de historial "fantasma" (misma URL) y se registra aquí.
+// Si el usuario presiona "atrás", en vez de salir de la página se cierra el
+// modal de encima — así nunca se pierde sin querer lo que estaba escribiendo
+// en un formulario dentro de un modal. `suppressPops` evita que el
+// `history.back()` que dispara el cierre NORMAL (X, Escape, fondo, guardar)
+// -que sirve para "limpiar" esa entrada fantasma- también dispare este mismo
+// listener y cierre otro modal por error.
+const modalCloses = new Map<symbol, () => void>();
+const closingViaBack = new Set<symbol>();
+let suppressPops = 0;
+
+if (typeof window !== "undefined") {
+  window.addEventListener("popstate", () => {
+    if (suppressPops > 0) {
+      suppressPops--;
+      return;
+    }
+    const topId = modalStack[modalStack.length - 1];
+    if (!topId) return;
+    const close = modalCloses.get(topId);
+    if (!close) return;
+    closingViaBack.add(topId);
+    close();
+  });
+}
+
 export function Modal({
   open,
   onClose,
@@ -56,21 +83,55 @@ export function Modal({
   const idRef = useRef<symbol | null>(null);
   if (!idRef.current) idRef.current = Symbol("modal");
 
+  // `onClose` llega muchas veces como función inline (recreada en cada
+  // render del padre) — si el efecto de abajo dependiera de su identidad, se
+  // re-ejecutaría en CADA render con el modal abierto (no solo al abrir/
+  // cerrar), disparando `history.back()` de más y pudiendo desordenar el
+  // historial. Con el ref, el efecto depende solo de `open` y siempre llama
+  // a la versión más reciente de `onClose`.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     const id = idRef.current!;
     modalStack.push(id);
+    modalCloses.set(id, () => onCloseRef.current());
+    // Entrada de historial "fantasma" (misma URL) para que "atrás" cierre
+    // este modal en vez de salir de la página. Se recuerda el href exacto:
+    // si mientras el modal estaba abierto ocurrió una navegación real (p. ej.
+    // un <Link> dentro del modal que ya cerró y navegó, como en
+    // RecognizeDeck.tsx), el href ya no coincide y NO se debe deshacer esa
+    // navegación al limpiar la entrada fantasma.
+    const openedHref = window.location.href;
+    window.history.pushState(window.history.state, "", openedHref);
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && modalStack[modalStack.length - 1] === id) onClose();
+      if (e.key === "Escape" && modalStack[modalStack.length - 1] === id) onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
+      const wasTop = modalStack[modalStack.length - 1] === id;
       modalStack = modalStack.filter((x) => x !== id);
+      modalCloses.delete(id);
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = modalStack.length ? "hidden" : "";
+
+      const viaBack = closingViaBack.delete(id);
+      if (!viaBack && wasTop && window.location.href === openedHref) {
+        // Se cerró por una vía normal (X, Escape, fondo, guardar): consumir
+        // la entrada fantasma para que el historial quede limpio. Se
+        // suprime el próximo "popstate" para que este mismo back() no
+        // dispare el cierre de OTRO modal que ahora esté "encima" en el
+        // listener global.
+        suppressPops++;
+        window.history.back();
+      }
     };
-  }, [open, onClose]);
+  }, [open]);
 
   const { dragY, dragging, dragHandlers } = useDragDismiss(onClose);
 
