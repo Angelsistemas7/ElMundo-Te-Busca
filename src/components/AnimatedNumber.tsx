@@ -21,6 +21,12 @@ export function AnimatedNumber({ value, durationMs = 1100 }: { value: number; du
     const el = ref.current;
     if (!el) return;
 
+    // Rearma la animación si `value` cambia (p. ej. router.refresh() al
+    // cambiar de país reutiliza esta misma instancia con un valor nuevo):
+    // sin este reset, `started` seguiría en `true` desde la primera vez y el
+    // número se quedaría congelado en el valor anterior para siempre.
+    started.current = false;
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && !started.current) {
