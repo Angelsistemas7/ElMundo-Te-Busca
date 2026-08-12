@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Plus } from "lucide-react";
 import { getAidPointOptionsAction, registerMarchAction, type ActionResult } from "@/app/actions";
+import { getCountry } from "@/lib/countries";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { ManageLinkBox } from "./ManageLinkBox";
 
-export function RegisterMarchButton() {
+export function RegisterMarchButton({ country = "ve" }: { country?: string } = {}) {
+  const cc = getCountry(country);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -93,15 +95,15 @@ export function RegisterMarchButton() {
         ) : (
           <form ref={formRef} onSubmit={onSubmit} className="space-y-5">
             <Field label="Título" htmlFor="title" required error={fieldErrors?.title}>
-              <Input id="title" name="title" placeholder="Caravana de ayuda Caracas → La Guaira" />
+              <Input id="title" name="title" placeholder={`Caravana de ayuda a ${cc.exampleCity}`} />
             </Field>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Punto de salida" htmlFor="originText" required error={fieldErrors?.originText}>
-                <Input id="originText" name="originText" placeholder="Plaza Venezuela, Caracas" />
+                <Input id="originText" name="originText" placeholder={cc.exampleCity} />
               </Field>
               <Field label="Destino" htmlFor="destinationText" required error={fieldErrors?.destinationText}>
-                <Input id="destinationText" name="destinationText" placeholder="Macuto, La Guaira" />
+                <Input id="destinationText" name="destinationText" placeholder={cc.exampleCity} />
               </Field>
             </div>
 
@@ -118,9 +120,9 @@ export function RegisterMarchButton() {
                 htmlFor="organizerPhone"
                 required
                 error={fieldErrors?.organizerPhone}
-                hint="Con el código de tu país si no es +58."
+                hint={`Con el código de tu país si no es ${cc.callingCode}.`}
               >
-                <Input id="organizerPhone" name="organizerPhone" placeholder="+58 414 0000000" />
+                <Input id="organizerPhone" name="organizerPhone" placeholder={cc.examplePhone} />
               </Field>
             </div>
 

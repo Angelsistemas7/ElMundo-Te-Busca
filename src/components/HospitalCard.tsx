@@ -1,4 +1,5 @@
 import { memo } from "react";
+import Image from "next/image";
 import { BadgeCheck, Clock3, MapPin, PackageCheck, PackageX, Phone, ShieldQuestion, Stethoscope, Users } from "lucide-react";
 import type { Hospital, HospitalStatus } from "@/lib/types";
 import { HOSPITAL_STATUS_LABEL } from "@/lib/types";
@@ -17,6 +18,11 @@ export const HospitalCard = memo(function HospitalCard({ hospital, patientCount 
 
   return (
     <Card href={`/hospitales/${hospital.id}`} className="gap-3 p-5" viewTransition>
+      {hospital.photoUrl && (
+        <div className="relative -mx-5 -mt-5 h-40 w-[calc(100%+2.5rem)]">
+          <Image src={hospital.photoUrl} alt={hospital.name} fill sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 100vw" className="object-cover" />
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold text-zinc-900">{hospital.name}</h3>
         <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold", s.chip)}>

@@ -78,7 +78,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             </span>
           </div>
 
-          <ReportStatusButton personId={person.id} personName={displayName} />
+          <ReportStatusButton personId={person.id} personName={displayName} personCountry={person.country} />
 
           {!isOwner && (
             <SaveButton type="person" id={person.id} title={displayName} className="w-full justify-center" />

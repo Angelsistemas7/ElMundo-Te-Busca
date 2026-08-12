@@ -18,7 +18,8 @@ import { cn } from "@/lib/utils";
 const TYPES = Object.keys(AID_POINT_TYPE_LABEL) as AidPointType[];
 
 export function AidPointManagePanel({ point, token }: { point: AidPoint; token: string }) {
-  const regions = getCountry(point.country).regions;
+  const cc = getCountry(point.country);
+  const regions = cc.regions;
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
@@ -155,7 +156,7 @@ export function AidPointManagePanel({ point, token }: { point: AidPoint; token: 
               htmlFor="contactPhone"
               required
               error={fieldErrors?.contactPhone}
-              hint="Con el código de tu país si no es +58."
+              hint={`Con el código de tu país si no es ${cc.callingCode}.`}
             >
               <Input id="contactPhone" name="contactPhone" defaultValue={point.contactPhone ?? ""} />
             </Field>

@@ -6,6 +6,7 @@ import { CheckCircle2, LogIn, Loader2, ShieldCheck } from "lucide-react";
 import { PERSON_STATUS_LABEL, type PersonStatus } from "@/lib/types";
 import { getSessionUserAction, reportStatusAction, type ActionResult } from "@/app/actions";
 import { suspiciousPhoneReason } from "@/lib/phone";
+import { getCountry } from "@/lib/countries";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
@@ -23,10 +24,13 @@ function needsAccount(status: string): boolean {
 export function ReportStatusButton({
   personId,
   personName,
+  personCountry,
 }: {
   personId: string;
   personName: string;
+  personCountry?: string;
 }) {
+  const cc = getCountry(personCountry);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -152,12 +156,12 @@ export function ReportStatusButton({
                     htmlFor="reporterPhone"
                     required
                     error={fieldErrors?.reporterPhone}
-                    hint="Con el código de tu país si no es +58."
+                    hint={`Con el código de tu país si no es ${cc.callingCode}.`}
                   >
                     <Input
                       id="reporterPhone"
                       name="reporterPhone"
-                      placeholder="+58 424 0000000"
+                      placeholder={cc.examplePhone}
                       onBlur={(e) => setPhoneWarning(suspiciousPhoneReason(e.target.value))}
                       onChange={() => phoneWarning && setPhoneWarning(null)}
                     />

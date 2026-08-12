@@ -18,7 +18,8 @@ import { Field, Input, Select, Textarea } from "./FormControls";
 const STATUSES: PersonStatus[] = ["por_localizar", "localizado", "hospitalizado", "fallecido"];
 
 export function OwnerManagePanel({ person, token }: { person: Person; token: string }) {
-  const regions = getCountry(person.country).regions;
+  const cc = getCountry(person.country);
+  const regions = cc.regions;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<PersonStatus>(person.status);
@@ -170,7 +171,7 @@ export function OwnerManagePanel({ person, token }: { person: Person; token: str
                 label="Teléfono"
                 htmlFor="contactPhone"
                 error={fieldErrors?.contactPhone}
-                hint="Con el código de tu país si no es +58."
+                hint={`Con el código de tu país si no es ${cc.callingCode}.`}
               >
                 <Input id="contactPhone" name="contactPhone" defaultValue={person.contactPhone ?? ""} />
               </Field>

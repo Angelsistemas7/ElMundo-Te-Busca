@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Megaphone, Search, ShieldAlert } from "lucide-react";
 import { getCommentsForEntities, getComplaints } from "@/lib/data";
 import {
@@ -8,13 +7,11 @@ import {
 } from "@/lib/types";
 import { getCountry } from "@/lib/countries";
 import { getActiveCountry } from "@/lib/country-server";
-import { getEmergency } from "@/lib/emergency";
-import { cn, clampPageSize } from "@/lib/utils";
+import { clampPageSize } from "@/lib/utils";
 import { ComplaintCard } from "@/components/ComplaintCard";
 import { DenunciaButton } from "@/components/DenunciaButton";
 import { CommunityTabs } from "@/components/CommunityTabs";
 import { EmptyState } from "@/components/EmptyState";
-import { SwipeStaticRow } from "@/components/SwipeHint";
 import { Pagination } from "@/components/Pagination";
 import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
@@ -31,15 +28,20 @@ const num = (v: string | string[] | undefined) => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const FILTERS: { value: ComplaintCategory | "all"; label: string }[] = [
-  { value: "all", label: "Todas" },
-  ...(Object.keys(COMPLAINT_CATEGORY_LABEL) as ComplaintCategory[]).map((c) => ({
-    value: c,
-    label: `${COMPLAINT_CATEGORY_EMOJI[c]} ${COMPLAINT_CATEGORY_LABEL[c]}`,
-  })),
-];
-
 const buildFilterFields = (regions: readonly string[]): FilterField[] => [
+  {
+    kind: "chips",
+    key: "cat",
+    label: "Categoría",
+    defaultValue: "all",
+    options: [
+      { value: "all", label: "Todas" },
+      ...(Object.keys(COMPLAINT_CATEGORY_LABEL) as ComplaintCategory[]).map((c) => ({
+        value: c,
+        label: `${COMPLAINT_CATEGORY_EMOJI[c]} ${COMPLAINT_CATEGORY_LABEL[c]}`,
+      })),
+    ],
+  },
   {
     kind: "select",
     key: "estado",
@@ -61,7 +63,6 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
   const pageSize = clampPageSize(num(sp.pageSize));
   const country = await getActiveCountry();
   const regions = getCountry(country).regions;
-  const { nationalLine } = getEmergency(country);
 
   const { items: complaints, total } = await getComplaints(
     { country, category, search: q, estado, dateFrom, dateTo },
@@ -69,18 +70,6 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
     pageSize,
   );
   const commentsByComplaint = await getCommentsForEntities("complaint", complaints.map((c) => c.id));
-
-  const catHref = (c: ComplaintCategory | "all") => {
-    const params = new URLSearchParams();
-    if (c !== "all") params.set("cat", c);
-    if (q) params.set("q", q);
-    if (estado !== "all") params.set("estado", estado);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
-    if (pageSize !== 10) params.set("pageSize", String(pageSize));
-    const qs = params.toString();
-    return qs ? `/denuncias?${qs}` : "/denuncias";
-  };
 
   const currentParams: Record<string, string> = {};
   if (category !== "all") currentParams.cat = category;
@@ -106,26 +95,6 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
         </div>
       </div>
 
-      {/* Aviso de uso responsable */}
-      <div className="mb-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-        <div>
-          <p className="font-bold">Antes de publicar, por favor:</p>
-          <ul className="mt-1 list-disc space-y-0.5 pl-4">
-            <li>Denuncia solo irregularidades <strong>reales y verificables</strong>.</li>
-            <li>Aporta datos concretos: qué pasó, dónde y cuándo. Agrega foto y ubicación si puedes.</li>
-            <li>
-              <strong>No señales a una persona con nombre o foto si no tienes pruebas</strong>: una
-              acusación falsa puede dañar a un inocente y traerte problemas legales.
-            </li>
-            <li>Publicar requiere <strong>iniciar sesión</strong> (no es anónimo ante el sistema).</li>
-            <li>
-              Si hay un menor en riesgo o un delito en curso, <strong>llama también al {nationalLine.number}</strong>.
-            </li>
-          </ul>
-        </div>
-      </div>
-
       <form action="/denuncias" className="mb-3 flex gap-2">
         {category !== "all" && <input type="hidden" name="cat" value={category} />}
         {pageSize !== 10 && <input type="hidden" name="pageSize" value={pageSize} />}
@@ -142,23 +111,6 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
           Buscar
         </button>
       </form>
-
-      <SwipeStaticRow wrapperClassName="mb-4" className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.value}
-            href={catHref(f.value)}
-            className={cn(
-              "press whitespace-nowrap rounded-full border px-3 py-1 text-sm font-medium transition",
-              category === f.value
-                ? "border-rose-300 bg-rose-50 text-rose-700"
-                : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300",
-            )}
-          >
-            {f.label}
-          </Link>
-        ))}
-      </SwipeStaticRow>
 
       <div className="mb-4 flex items-center justify-end gap-2">
         <FilterModal basePath="/denuncias" currentParams={currentParams} fields={buildFilterFields(regions)} />

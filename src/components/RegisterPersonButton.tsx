@@ -498,12 +498,12 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
                 label="Teléfono"
                 htmlFor="contactPhone"
                 error={fieldErrors?.contactPhone}
-                hint="Con el código de tu país si no es +58."
+                hint={`Con el código de tu país si no es ${getCountry(country).callingCode}.`}
               >
                 <Input
                   id="contactPhone"
                   name="contactPhone"
-                  placeholder="+58 424 0000000"
+                  placeholder={getCountry(country).examplePhone}
                   onBlur={(e) => setPhoneWarning(suspiciousPhoneReason(e.target.value))}
                   onChange={() => phoneWarning && setPhoneWarning(null)}
                 />

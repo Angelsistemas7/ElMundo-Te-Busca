@@ -370,6 +370,7 @@ export interface Hospital {
   needsText: string;
   contactName: string | null;
   contactPhone: string | null;
+  photoUrl: string | null;
   /**
    * Sello de "visto bueno" del moderador, igual que en personas y puntos de
    * ayuda. Su ausencia NO oculta el hospital: aparece de inmediato, solo añade

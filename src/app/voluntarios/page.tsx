@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Image from "next/image";
 import nextDynamic from "next/dynamic";
 import { HandHeart, Mail, MapPin, Phone, Search } from "lucide-react";
@@ -6,7 +5,7 @@ import { getVolunteersPage, type VolunteerSort } from "@/lib/data";
 import { VOLUNTEER_TYPE_EMOJI, VOLUNTEER_TYPE_LABEL, type VolunteerType } from "@/lib/types";
 import { getCountry } from "@/lib/countries";
 import { getActiveCountry } from "@/lib/country-server";
-import { cn, clampPageSize, timeAgo } from "@/lib/utils";
+import { clampPageSize, timeAgo } from "@/lib/utils";
 const RegisterVolunteerButton = nextDynamic(() =>
   import("@/components/RegisterVolunteerButton").then((m) => m.RegisterVolunteerButton),
 );
@@ -14,7 +13,6 @@ import { CommunityTabs } from "@/components/CommunityTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { Pagination } from "@/components/Pagination";
 import { PageSizeSelect } from "@/components/PageSizeSelect";
-import { SwipeStaticRow } from "@/components/SwipeHint";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
@@ -29,15 +27,20 @@ const num = (v: string | string[] | undefined) => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const FILTERS: { value: VolunteerType | "all"; label: string }[] = [
-  { value: "all", label: "Todas" },
-  ...(Object.keys(VOLUNTEER_TYPE_LABEL) as VolunteerType[]).map((t) => ({
-    value: t,
-    label: `${VOLUNTEER_TYPE_EMOJI[t]} ${VOLUNTEER_TYPE_LABEL[t]}`,
-  })),
-];
-
 const buildFilterFields = (regions: readonly string[]): FilterField[] => [
+  {
+    kind: "chips",
+    key: "type",
+    label: "Tipo",
+    defaultValue: "all",
+    options: [
+      { value: "all", label: "Todas" },
+      ...(Object.keys(VOLUNTEER_TYPE_LABEL) as VolunteerType[]).map((t) => ({
+        value: t,
+        label: `${VOLUNTEER_TYPE_EMOJI[t]} ${VOLUNTEER_TYPE_LABEL[t]}`,
+      })),
+    ],
+  },
   {
     kind: "select",
     key: "estado",
@@ -81,19 +84,6 @@ export default async function VoluntariosPage({ searchParams }: { searchParams: 
     pageSize,
     sort,
   );
-
-  const typeHref = (t: VolunteerType | "all") => {
-    const params = new URLSearchParams();
-    if (t !== "all") params.set("type", t);
-    if (sort !== "recent") params.set("sort", sort);
-    if (estado !== "all") params.set("estado", estado);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
-    if (q) params.set("q", q);
-    if (pageSize !== 10) params.set("pageSize", String(pageSize));
-    const qs = params.toString();
-    return qs ? `/voluntarios?${qs}` : "/voluntarios";
-  };
 
   const currentParams: Record<string, string> = {};
   if (type !== "all") currentParams.type = type;
@@ -140,27 +130,9 @@ export default async function VoluntariosPage({ searchParams }: { searchParams: 
         </button>
       </form>
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-        <SwipeStaticRow className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-          {FILTERS.map((f) => (
-            <Link
-              key={f.value}
-              href={typeHref(f.value)}
-              className={cn(
-                "press whitespace-nowrap rounded-full border px-3 py-1 text-sm font-medium transition",
-                type === f.value
-                  ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                  : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300",
-              )}
-            >
-              {f.label}
-            </Link>
-          ))}
-        </SwipeStaticRow>
-        <div className="flex shrink-0 items-center gap-2">
-          <FilterModal basePath="/voluntarios" currentParams={currentParams} fields={buildFilterFields(regions)} />
-          <PageSizeSelect value={pageSize} />
-        </div>
+      <div className="mb-5 flex items-center justify-end gap-2">
+        <FilterModal basePath="/voluntarios" currentParams={currentParams} fields={buildFilterFields(regions)} />
+        <PageSizeSelect value={pageSize} />
       </div>
 
       {volunteers.length === 0 ? (

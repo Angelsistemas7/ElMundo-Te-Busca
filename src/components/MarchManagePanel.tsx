@@ -9,6 +9,7 @@ import {
   ownerUpdateMarchAction,
   type ActionResult,
 } from "@/app/actions";
+import { getCountry } from "@/lib/countries";
 import { Field, Input, Textarea } from "./FormControls";
 
 /** ISO → valor para <input type="datetime-local"> en hora local. */
@@ -21,6 +22,7 @@ function toLocalInput(iso: string): string {
 
 export function MarchManagePanel({ march, token }: { march: March; token: string }) {
   const router = useRouter();
+  const cc = getCountry(march.country);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -87,7 +89,7 @@ export function MarchManagePanel({ march, token }: { march: March; token: string
               htmlFor="organizerPhone"
               required
               error={fieldErrors?.organizerPhone}
-              hint="Con el código de tu país si no es +58."
+              hint={`Con el código de tu país si no es ${cc.callingCode}.`}
             >
               <Input id="organizerPhone" name="organizerPhone" defaultValue={march.organizerPhone} />
             </Field>

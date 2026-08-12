@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { BadgeCheck, Clock3, MapPin, Phone, ShieldQuestion, Stethoscope } from "lucide-react";
 import { BackLink } from "@/components/BackLink";
 import { getComments, getHospitalById, getHospitalPatients } from "@/lib/data";
@@ -30,6 +31,11 @@ export default async function HospitalPage({ params }: { params: Promise<{ id: s
       <BackLink label="Volver a hospitales" fallbackHref="/hospitales" />
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+        {hospital.photoUrl && (
+          <div className="relative -mx-5 -mt-5 mb-4 h-56 w-[calc(100%+2.5rem)] overflow-hidden rounded-t-2xl">
+            <Image src={hospital.photoUrl} alt={hospital.name} fill sizes="(min-width: 768px) 672px, 100vw" className="object-cover" />
+          </div>
+        )}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-navy-700">{hospital.name}</h1>

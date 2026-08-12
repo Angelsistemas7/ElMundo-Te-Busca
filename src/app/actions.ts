@@ -1475,9 +1475,12 @@ export async function registerHospitalAction(form: FormData): Promise<ActionResu
     return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
   }
 
+  const photoUrl = getPhotoUrl(form);
+
   try {
     const hospital = await createHospital(
       { ...parsed.data, country: await getActiveCountry() },
+      photoUrl,
       (await getCurrentUser())?.id ?? null,
     );
     revalidatePath("/hospitales");

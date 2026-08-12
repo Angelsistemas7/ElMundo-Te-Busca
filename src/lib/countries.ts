@@ -50,6 +50,12 @@ export interface CountryConfig {
   name: string;
   demonym: string;
   flag: string;
+  /** Código telefónico del país, con "+" (ej. "+58"). Para placeholders/hints. */
+  callingCode: string;
+  /** Ejemplo de teléfono completo con `callingCode`, para placeholders. */
+  examplePhone: string;
+  /** Ciudad/zona de ejemplo para placeholders de ubicación. */
+  exampleCity: string;
   /** Regiones administrativas de primer nivel (estados/departamentos). */
   regions: readonly string[];
   regionCoords: Record<string, LatLng>;
@@ -138,6 +144,9 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
     name: "Venezuela",
     demonym: "venezolano",
     flag: "🇻🇪",
+    callingCode: "+58",
+    examplePhone: "+58 4XX 0000000",
+    exampleCity: "Caracas, La Guaira...",
     regions: VE_REGIONS,
     regionCoords: {
       Amazonas: [4.0, -65.5],
@@ -225,6 +234,9 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
     name: "Colombia",
     demonym: "colombiano",
     flag: "🇨🇴",
+    callingCode: "+57",
+    examplePhone: "+57 3XX 0000000",
+    exampleCity: "Pereira, Cali, Quibdó...",
     regions: CO_REGIONS,
     regionCoords: {
       Amazonas: [-1.44, -71.57],

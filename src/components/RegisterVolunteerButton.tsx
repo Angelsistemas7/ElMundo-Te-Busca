@@ -157,7 +157,7 @@ export function RegisterVolunteerButton({ country = "ve" }: { country?: string }
                 </Select>
               </Field>
               <Field label="Ciudad / zona" htmlFor="locationText">
-                <Input id="locationText" name="locationText" placeholder="Caracas, La Guaira, fuera del país..." />
+                <Input id="locationText" name="locationText" placeholder={`${getCountry(country).exampleCity}, fuera del país...`} />
               </Field>
             </div>
 
@@ -173,9 +173,9 @@ export function RegisterVolunteerButton({ country = "ve" }: { country?: string }
                 label="Teléfono (opcional)"
                 htmlFor="contactPhone"
                 error={fieldErrors?.contactPhone}
-                hint="Con el código de tu país si no es +58."
+                hint={`Con el código de tu país si no es ${getCountry(country).callingCode}.`}
               >
-                <Input id="contactPhone" name="contactPhone" placeholder="+58 424 0000000" />
+                <Input id="contactPhone" name="contactPhone" placeholder={getCountry(country).examplePhone} />
               </Field>
               <Field label="Correo (opcional)" htmlFor="contactEmail" error={fieldErrors?.contactEmail}>
                 <Input id="contactEmail" name="contactEmail" type="email" placeholder="tucorreo@ejemplo.com" />

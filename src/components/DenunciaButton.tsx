@@ -20,7 +20,7 @@ export function DenunciaButton({ country = "ve" }: { country?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
-  const [step, setStep] = useState<"form" | "confirm">("form");
+  const [step, setStep] = useState<"notice" | "form" | "confirm">("notice");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export function DenunciaButton({ country = "ve" }: { country?: string }) {
   function close() {
     setOpen(false);
     setTimeout(() => {
-      setStep("form");
+      setStep("notice");
       setResult(null);
       setPreview(null);
       fileRef.current = null;
@@ -114,6 +114,43 @@ export function DenunciaButton({ country = "ve" }: { country?: string }) {
             >
               Cerrar
             </button>
+          </div>
+        ) : step === "notice" ? (
+          <div className="space-y-4 py-2">
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+              <div>
+                <p className="font-bold">Antes de publicar, por favor:</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  <li>Denuncia solo irregularidades <strong>reales y verificables</strong>.</li>
+                  <li>Aporta datos concretos: qué pasó, dónde y cuándo. Agrega foto y ubicación si puedes.</li>
+                  <li>
+                    <strong>No señales a una persona con nombre o foto si no tienes pruebas</strong>: una
+                    acusación falsa puede dañar a un inocente y traerte problemas legales.
+                  </li>
+                  <li>Publicar requiere <strong>iniciar sesión</strong> (no es anónimo ante el sistema).</li>
+                  <li>
+                    Si hay un menor en riesgo o un delito en curso, <strong>llama también al {nationalLine.number}</strong>.
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={close}
+                className="press rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep("form")}
+                className="press flex items-center gap-2 rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700"
+              >
+                OK, entendido
+              </button>
+            </div>
           </div>
         ) : loggedIn === false ? (
           <div className="flex flex-col items-center py-8 text-center">

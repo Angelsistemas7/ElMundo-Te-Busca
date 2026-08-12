@@ -12,6 +12,11 @@ import { Avatar } from "./Avatar";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { PhotoView } from "./PhotoView";
 
+// Nombre de quien comenta sin cuenta: se recuerda por dispositivo (mismo
+// patrón que la dedup de votos/"me gusta") para no tener que escribirlo cada
+// vez, hasta que la persona cree una cuenta real.
+const ANON_NAME_KEY = "vtb_anon_comment_name";
+
 export function CommentSection({
   entityType,
   entityId,
@@ -49,6 +54,13 @@ export function CommentSection({
 
   const canSubmit = name.trim().length >= 2 && (body.trim().length >= 2 || fileRef.current);
 
+  // Sin cuenta: recuerda el nombre que la persona ya escribió antes en este
+  // dispositivo, para no pedírselo de nuevo en cada comentario.
+  useEffect(() => {
+    const saved = localStorage.getItem(ANON_NAME_KEY);
+    if (saved) setName((prev) => prev || saved);
+  }, []);
+
   // Con sesión, se comenta con la identidad de la cuenta (el servidor también lo
   // impone). Ocultamos el campo de nombre y usamos el del usuario.
   useEffect(() => {
@@ -64,6 +76,11 @@ export function CommentSection({
       })
       .catch(() => {});
   }, []);
+
+  function updateName(value: string) {
+    setName(value);
+    if (!sessionName) localStorage.setItem(ANON_NAME_KEY, value);
+  }
 
   // Profundidad de respuesta SIN límite (parent_id ya admite cualquier
   // comentario como padre, no solo la raíz) pero con UN SOLO nivel de sangría
@@ -202,7 +219,12 @@ export function CommentSection({
                 {c.authorName}
               </Link>
             ) : (
-              <span className="text-sm font-semibold text-zinc-800">{c.authorName}</span>
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                <span className="text-sm font-semibold text-zinc-800">{c.authorName}</span>
+                <span className="rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Sin verificar
+                </span>
+              </span>
             )}
             {c.body && <p className="mt-0.5 whitespace-pre-wrap text-sm text-zinc-600">{c.body}</p>}
             {c.photoUrl && (
@@ -285,7 +307,7 @@ export function CommentSection({
         ) : (
           <input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => updateName(e.target.value)}
             placeholder="Tu nombre"
             aria-label="Tu nombre"
             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-base outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:text-sm"

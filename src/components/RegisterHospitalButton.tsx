@@ -2,10 +2,12 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, Plus } from "lucide-react";
+import { CheckCircle2, ImagePlus, Loader2, Plus } from "lucide-react";
 import { HOSPITAL_STATUS_LABEL, type HospitalStatus } from "@/lib/types";
 import { getCountry } from "@/lib/countries";
 import { registerHospitalAction, type ActionResult } from "@/app/actions";
+import { uploadPhoto } from "@/lib/upload";
+import { compressImage } from "@/lib/image";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
@@ -19,6 +21,8 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const fileRef = useRef<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
 
@@ -26,6 +30,8 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
     setOpen(false);
     setTimeout(() => {
       setResult(null);
+      setPreview(null);
+      fileRef.current = null;
       formRef.current?.reset();
     }, 200);
   }
@@ -36,7 +42,17 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
     setSubmitting(true);
     setResult(null);
     try {
-      const res = await registerHospitalAction(new FormData(e.currentTarget));
+      const form = new FormData(e.currentTarget);
+      if (fileRef.current) {
+        try {
+          const compressed = await compressImage(fileRef.current);
+          const url = await uploadPhoto(compressed);
+          if (url) form.set("photoUrl", url);
+        } catch {
+          /* continúa sin foto */
+        }
+      }
+      const res = await registerHospitalAction(form);
       setResult(res);
       if (res.ok) {
         router.refresh();
@@ -77,8 +93,32 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
           </div>
         ) : (
           <form ref={formRef} onSubmit={onSubmit} className="space-y-5">
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 py-6 transition hover:border-brand-400 hover:bg-brand-50">
+              {preview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview} alt="Vista previa" className="h-28 w-full max-w-xs rounded-lg object-cover" />
+              ) : (
+                <>
+                  <ImagePlus className="h-7 w-7 text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-700">Foto del hospital (opcional)</span>
+                  <span className="text-xs text-zinc-400">Ayuda a verificar que es real</span>
+                </>
+              )}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  fileRef.current = file;
+                  setPreview(URL.createObjectURL(file));
+                }}
+              />
+            </label>
+
             <Field label="Nombre del hospital / centro" htmlFor="name" required error={fieldErrors?.name}>
-              <Input id="name" name="name" placeholder="Hospital Periférico de La Guaira" />
+              <Input id="name" name="name" placeholder={`Hospital de ${getCountry(country).exampleCity}`} />
             </Field>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -104,7 +144,7 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
             </div>
 
             <Field label="Ubicación / sector" htmlFor="locationText">
-              <Input id="locationText" name="locationText" placeholder="Catia la Mar, La Guaira" />
+              <Input id="locationText" name="locationText" placeholder={getCountry(country).exampleCity} />
             </Field>
 
             <Field label="Señala el hospital en el mapa" hint="Toca el mapa o usa tu GPS para ubicarlo exacto.">
@@ -131,12 +171,13 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
                 label="Teléfono"
                 htmlFor="contactPhone"
                 error={fieldErrors?.contactPhone}
-                hint="Con el código de tu país si no es +58."
+                hint={`Con el código de tu país si no es ${getCountry(country).callingCode}.`}
               >
-                <Input id="contactPhone" name="contactPhone" placeholder="+58 212 0000000" />
+                <Input id="contactPhone" name="contactPhone" placeholder={getCountry(country).examplePhone} />
               </Field>
             </div>
 
+            <input type="hidden" name="photoUrl" />
             <Turnstile ref={turnstileRef} />
 
             {result && !result.ok && (

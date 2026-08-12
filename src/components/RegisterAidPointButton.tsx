@@ -212,9 +212,9 @@ export function RegisterAidPointButton({ country = "ve" }: { country?: string } 
                 htmlFor="contactPhone"
                 required
                 error={fieldErrors?.contactPhone}
-                hint="Con el código de tu país si no es +58."
+                hint={`Con el código de tu país si no es ${getCountry(country).callingCode}.`}
               >
-                <Input id="contactPhone" name="contactPhone" placeholder="+58 424 0000000" />
+                <Input id="contactPhone" name="contactPhone" placeholder={getCountry(country).examplePhone} />
               </Field>
             </div>
 

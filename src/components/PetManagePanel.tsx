@@ -19,7 +19,8 @@ const STATUSES = Object.keys(PET_STATUS_LABEL) as PetStatus[];
 const SPECIES = Object.keys(PET_SPECIES_LABEL) as PetSpecies[];
 
 export function PetManagePanel({ pet, token }: { pet: Pet; token: string }) {
-  const regions = getCountry(pet.country ?? "ve").regions;
+  const cc = getCountry(pet.country ?? "ve");
+  const regions = cc.regions;
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
@@ -140,7 +141,7 @@ export function PetManagePanel({ pet, token }: { pet: Pet; token: string }) {
             label="Teléfono de contacto"
             htmlFor="contactPhone"
             error={fieldErrors?.contactPhone}
-            hint="Con el código de tu país si no es +58."
+            hint={`Con el código de tu país si no es ${cc.callingCode}.`}
           >
             <Input id="contactPhone" name="contactPhone" defaultValue={pet.contactPhone ?? ""} />
           </Field>

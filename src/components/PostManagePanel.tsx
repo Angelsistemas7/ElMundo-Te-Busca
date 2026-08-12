@@ -16,7 +16,8 @@ import { Field, Input, Select, Textarea } from "./FormControls";
 const TYPES = Object.keys(POST_TYPE_LABEL) as PostType[];
 
 export function PostManagePanel({ post, token }: { post: Post; token: string }) {
-  const regions = getCountry(post.country).regions;
+  const cc = getCountry(post.country);
+  const regions = cc.regions;
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
@@ -100,7 +101,7 @@ export function PostManagePanel({ post, token }: { post: Post; token: string }) 
               label="Teléfono (opcional)"
               htmlFor="contactPhone"
               error={fieldErrors?.contactPhone}
-              hint="Con el código de tu país si no es +58."
+              hint={`Con el código de tu país si no es ${cc.callingCode}.`}
             >
               <Input id="contactPhone" name="contactPhone" defaultValue={post.contactPhone ?? ""} />
             </Field>

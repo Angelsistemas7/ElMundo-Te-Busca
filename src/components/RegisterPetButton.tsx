@@ -182,9 +182,9 @@ export function RegisterPetButton({ country = "ve" }: { country?: string } = {})
               label="Teléfono de contacto"
               htmlFor="contactPhone"
               error={fieldErrors?.contactPhone}
-              hint="Con el código de tu país si no es +58."
+              hint={`Con el código de tu país si no es ${getCountry(country).callingCode}.`}
             >
-              <Input id="contactPhone" name="contactPhone" placeholder="+58 424 0000000" />
+              <Input id="contactPhone" name="contactPhone" placeholder={getCountry(country).examplePhone} />
             </Field>
 
             <input type="hidden" name="photoUrl" />

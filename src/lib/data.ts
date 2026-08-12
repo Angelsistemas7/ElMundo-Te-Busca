@@ -3956,6 +3956,7 @@ function rowToHospital(r: any): Hospital {
     needsText: r.needs_text ?? "",
     contactName: r.contact_name,
     contactPhone: r.contact_phone,
+    photoUrl: r.photo_url ?? null,
     verified: r.verified ?? false,
     votesSupplies: r.votes_supplies ?? 0,
     votesNoSupplies: r.votes_no_supplies ?? 0,
@@ -4071,6 +4072,7 @@ export async function getHospitalById(id: string): Promise<Hospital | null> {
 
 export async function createHospital(
   input: HospitalInput,
+  photoUrl: string | null = null,
   userId: string | null = null,
 ): Promise<Hospital> {
   const now = new Date().toISOString();
@@ -4091,6 +4093,7 @@ export async function createHospital(
       needsText: input.needsText || "",
       contactName: input.contactName || null,
       contactPhone: input.contactPhone || null,
+      photoUrl: photoUrl || null,
       verified: false,
       votesSupplies: 0,
       votesNoSupplies: 0,
@@ -4115,6 +4118,7 @@ export async function createHospital(
       needs_text: input.needsText || "",
       contact_name: input.contactName || null,
       contact_phone: input.contactPhone || null,
+      photo_url: photoUrl || null,
       user_id: userId,
     })
     .select("*")

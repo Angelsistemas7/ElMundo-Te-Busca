@@ -1,9 +1,8 @@
-import Link from "next/link";
 import nextDynamic from "next/dynamic";
 import { MapPinned } from "lucide-react";
 import { getMarchesPage } from "@/lib/data";
 import { getActiveCountry } from "@/lib/country-server";
-import { cn, clampPageSize } from "@/lib/utils";
+import { clampPageSize } from "@/lib/utils";
 import { MarchCard } from "@/components/MarchCard";
 const RegisterMarchButton = nextDynamic(() =>
   import("@/components/RegisterMarchButton").then((m) => m.RegisterMarchButton),
@@ -29,7 +28,18 @@ const num = (v: string | string[] | undefined) => {
 const SHOWS = ["all", "upcoming", "past"] as const;
 type Show = (typeof SHOWS)[number];
 
-const FILTER_FIELDS: FilterField[] = [
+const buildFilterFields = (upcomingCount: number, pastCount: number): FilterField[] => [
+  {
+    kind: "chips",
+    key: "show",
+    label: "Mostrar",
+    defaultValue: "all",
+    options: [
+      { value: "all", label: `Todas (${upcomingCount + pastCount})` },
+      { value: "upcoming", label: `Próximas (${upcomingCount})` },
+      { value: "past", label: `Finalizadas (${pastCount})` },
+    ],
+  },
   { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Salida entre" },
 ];
 
@@ -49,22 +59,6 @@ export default async function CaravanasPage({ searchParams }: { searchParams: Se
     upcomingCount,
     pastCount,
   } = await getMarchesPage(show, page, pageSize, dateFrom, dateTo, country);
-
-  const showHref = (s: Show) => {
-    const params = new URLSearchParams();
-    if (s !== "all") params.set("show", s);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
-    if (pageSize !== 10) params.set("pageSize", String(pageSize));
-    const qs = params.toString();
-    return qs ? `/caravanas?${qs}` : "/caravanas";
-  };
-
-  const CHIPS: { value: Show; label: string }[] = [
-    { value: "all", label: `Todas (${upcomingCount + pastCount})` },
-    { value: "upcoming", label: `Próximas (${upcomingCount})` },
-    { value: "past", label: `Finalizadas (${pastCount})` },
-  ];
 
   const currentParams: Record<string, string> = {};
   if (show !== "all") currentParams.show = show;
@@ -86,30 +80,15 @@ export default async function CaravanasPage({ searchParams }: { searchParams: Se
           }
           description="Coordina idas en grupo a la zona afectada: brigadas, caravanas de ayuda y traslados solidarios. Publica el punto de salida y la hora para que la gente vaya junta y segura."
         />
-        <RegisterMarchButton />
-      </div>
-
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-          {CHIPS.map((c) => (
-            <Link
-              key={c.value}
-              href={showHref(c.value)}
-              className={cn(
-                "press whitespace-nowrap rounded-full border px-3 py-1 text-sm font-medium transition",
-                show === c.value
-                  ? "border-brand-400 bg-brand-50 text-brand-700"
-                  : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300",
-              )}
-            >
-              {c.label}
-            </Link>
-          ))}
-        </div>
+        <RegisterMarchButton country={country} />
       </div>
 
       <div className="mb-4 flex items-center justify-end gap-2">
-        <FilterModal basePath="/caravanas" currentParams={currentParams} fields={FILTER_FIELDS} />
+        <FilterModal
+          basePath="/caravanas"
+          currentParams={currentParams}
+          fields={buildFilterFields(upcomingCount, pastCount)}
+        />
         <PageSizeSelect value={pageSize} />
       </div>
 

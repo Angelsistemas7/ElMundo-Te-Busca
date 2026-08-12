@@ -322,6 +322,9 @@ create index if not exists hospitals_status_idx on hospitals (status);
 alter table hospitals add column if not exists country text not null default 've';
 create index if not exists hospitals_country_idx on hospitals (country);
 
+-- Foto del hospital (ago. 2026): igual que en puntos de ayuda/mascotas.
+alter table hospitals add column if not exists photo_url text;
+
 create table if not exists hospital_patients (
   id uuid primary key default uuid_generate_v4(),
   hospital_id uuid not null references hospitals(id) on delete cascade,

@@ -7,14 +7,27 @@ Venezuela jun. 2026 y Colombia 10 ago. 2026). En producción en
 GitHub Actions + PM2 en cada push a `main`). Español, `npm run build` siempre
 verde.
 
-## 🔴 PRIORIDAD AHORA — pedido del dueño 2026-08-12 (ronda 3, probando en vivo tras publicar en Facebook)
+## ✅ TODO A-G RESUELTO (2026-08-12, ronda 4) — build verde, pusheado
 
 El dueño dijo explícitamente: **ignorar** la sección "🔶 Pendiente — ideas que
 quedaron a medias" de abajo (son ideas de hace varias sesiones) y enfocarse
 primero en seguridad (ver "✅ Cerrado — ronda de seguridad" más abajo, YA
-HECHO) y ahora en esta lista, que salió de probar la app en vivo ya publicada.
-**Ninguno de estos 8 puntos se tocó todavía** — quedan para la próxima sesión,
-en este orden sugerido (de más visible/urgente a menos):
+HECHO) y luego en esta lista de 7 puntos (A-G), que salió de probar la app en
+vivo ya publicada en Facebook. **Los 7 quedaron resueltos** en una sesión con
+dos chats trabajando en paralelo (uno tomó A/B/C, un agente en worktree
+separado tomó D/E/F/G) — detalle punto por punto de qué se hizo en
+"✅ Cerrado en esta sesión (ronda 4)" más abajo. Se compiló todo integrado
+(`npm run build` verde) y se hizo push a `main`.
+
+**Falta validar en el navegador real** (el panel de navegador le sigue
+cerrando la app al dueño, así que solo se verificó con build+typecheck+curl,
+nunca clickeando de verdad): probar cada uno de los 7 puntos en el sitio en
+producción tal como el dueño los describió, especialmente el modal de
+denuncia (E) y los selectores de filtro nuevos (D) que son los que más UI
+nueva tienen.
+
+Se deja el detalle original de los 7 puntos abajo como referencia (qué se
+pidió exactamente), en este orden (de más visible/urgente a menos):
 
 **A. País cruzado: Venezuela aparece con Colombia seleccionado.** Con el
 selector de país en Colombia, el dueño ve:
@@ -114,6 +127,138 @@ comentar) y el componente que renderiza cada comentario.
 > **Nada de este bloque toca datos de Supabase** (son bugs de UI/lógica de la
 > app) — probablemente no requiera migraciones nuevas, salvo si se decide
 > agregar `callingCode`/`exampleCity` a `countries.ts` (eso es código, no SQL).
+
+## ✅ Cerrado en esta sesión (2026-08-12, ronda 4) — build verde, A/B/C del bloque de arriba
+
+Dos chats trabajando en paralelo a pedido del dueño: este resolvió A, B, C;
+otro (worktree separado) tomó D, E, F, G (ver nota arriba).
+
+**A. País cruzado — RESUELTO.** Se agregó `callingCode` ("+58"/"+57"),
+`examplePhone` y `exampleCity` a `CountryConfig` en `src/lib/countries.ts`.
+Se propagó a los 13 archivos (todos ya recibían o ahora reciben `country`
+como prop desde su Server Component padre, o lo derivan de la entidad
+—`march.country`, `point.country`, etc.— cuando es un panel de gestión):
+`RegisterVolunteerButton`, `RegisterMarchButton` (+ prop nueva `country` +
+`caravanas/page.tsx` le pasa `getActiveCountry()`), `RegisterAidPointButton`,
+`RegisterHospitalButton`, `RegisterPetButton`, `RegisterPersonButton`,
+`CreatePostButton`, `ReportStatusButton` (+ prop nueva `personCountry` +
+`persona/[id]/page.tsx` le pasa `person.country`), `AidPointManagePanel`,
+`OwnerManagePanel`, `PetManagePanel`, `PostManagePanel`, `MarchManagePanel`.
+Todos los placeholders/hints de teléfono y ciudad ahora usan el país real en
+vez de "+58"/"Caracas"/"La Guaira" fijos. **No se tocó** `ProposeHeroButton`
+(placeholder de ejemplo de título, no de país) ni el `defaultCenter` de
+fallback interno de `LocationPicker.tsx` (nunca se usa en la práctica, todos
+los llamadores ya pasan `getCountry(country).epicenter`).
+
+**B. Verificación indebida en puntos de ayuda — REVISADO, NO ERA BUG.**
+Confirmado con datos reales de producción (`aid_points`): Colombia tiene 63
+puntos, TODOS con el mismo timestamp exacto (`2026-08-12T15:59:43` /
+`16:42:37`) — son 100% del import masivo del equipo
+(`scripts/import-aid-points.mjs`, que pone `verified: true` por default para
+datos curados por el equipo, correcto por diseño). Venezuela: 22 puntos, solo
+3 verificados (los del equipo) y 19 sin verificar (públicos) — la lógica ya
+distingue bien. `createAidPoint` en `data.ts` (línea ~1671) ya pone
+`verified: false` para registro público; el esquema también default `false`.
+Filtro por país (`getAidPointsPage`, `.eq("country", country)`) confirmado sin
+mezcla. **No se tocó código** — era un malentendido del dueño sobre el origen
+de esos 63 puntos (importados por el equipo = correctamente verificados), no
+un bug.
+
+**C. Hospitales — RESUELTO (foto) + CONFIRMADO (teléfono, mapa).**
+- Bug de teléfono +58/+57: mismo arreglo que el punto A (ya incluido arriba).
+- **Foto en hospitales, de punta a punta (no existía)**: `Hospital.photoUrl`
+  nuevo en `types.ts`; `createHospital` en `data.ts` ahora recibe `photoUrl`
+  como parámetro separado (mismo patrón que `createAidPoint`), ambas ramas
+  (memoria + Supabase); `registerHospitalAction` en `actions.ts` usa
+  `getPhotoUrl(form)`; columna nueva `photo_url` en `hospitals`
+  (`supabase/schema.sql`, migración idempotente al final del archivo);
+  `RegisterHospitalButton.tsx` tiene el mismo widget de subir foto que
+  puntos de ayuda (`compressImage` + `uploadPhoto`); se muestra en
+  `HospitalCard.tsx` (tarjeta) y en `hospitales/[id]/page.tsx` (ficha).
+  `seed.ts` actualizado (`photoUrl: null` en los 19 hospitales semilla).
+  **No existe un panel de gestión con token para hospitales** (a diferencia
+  de puntos de ayuda/caravanas/posts) — se gestionan por consenso comunitario
+  + admin/moderador, así que no hace falta agregar edición de foto ahí.
+- Mapa "marcar lugar exacto" confirmado en TODOS los formularios que lo
+  necesitan: persona, punto de ayuda, hospital, voluntario (los 4 ya llaman
+  `<LocationPicker defaultCenter={getCountry(country).epicenter} />`).
+  Mascotas NO lo tiene y el dueño confirmó que el registro de mascotas ya
+  está completo tal cual — no se agregó (habría requerido migración nueva:
+  `pets` no tiene columnas `lat`/`lng` en el esquema aunque el tipo
+  `Pet.lat/lng` sí las declara — deuda técnica menor, no se tocó por no
+  haber sido pedido y por evitar riesgo de esquema no solicitado).
+
+**⚠️ Falta correr `supabase/schema.sql` de nuevo** — se agregó
+`hospitals.photo_url`. Es idempotente, no rompe nada existente:
+```
+psql "$DATABASE_URL" -f supabase/schema.sql
+```
+
+**Verificado con**: `npm run build` (verde, typecheck incluido) +
+`npm run start` + `curl` a `/hospitales`, `/caravanas`, `/ayuda` (200 en las
+3). No se pudo probar visualmente el flujo completo de subir una foto de
+hospital en un navegador real (misma limitación de siempre — panel de
+navegador le crashea la app al dueño). **Probar en el navegador real antes
+de dar esto por 100% verificado**: registrar un hospital con foto desde
+Colombia y confirmar que el placeholder de teléfono diga +57 y la foto se
+vea en la tarjeta y la ficha.
+
+**D. Filtros movidos al selector de Filtros — RESUELTO.** En `/denuncias`
+(`src/app/denuncias/page.tsx`) y `/voluntarios` (`src/app/voluntarios/page.tsx`)
+las chips sueltas de categoría/tipo (fuera del botón "Filtros") se quitaron;
+la categoría (denuncias: riesgo de niñez, desvío/robo de ayuda, fraude,
+abuso, etc.) y el tipo de voluntario (médico, enfermero, psicólogo,
+electricista...) ahora son un campo `kind: "chips"` más dentro de
+`buildFilterFields(...)`, que ya se pasa a `<FilterModal>` (mismo componente
+reusado en todo el sitio). En `/caravanas` (`src/app/caravanas/page.tsx`) se
+aplicó el mismo patrón al filtro "Todas/Próximas/Finalizadas" que también
+vivía suelto fuera del modal. `FilterModal`/`FilterField` (`src/components/
+FilterModal.tsx`) ya soportaban `kind: "chips"` de antes, no hizo falta
+tocar ese componente. Se quitaron los `Link`+`cn` locales que armaban las
+chips a mano (`showHref`, `typeHref`, `catHref`) por quedar sin uso.
+
+**E. Denuncia como modal — RESUELTO.** El aviso legal ("Antes de publicar,
+por favor...") vivía fijo en la página `/denuncias`, siempre visible aunque
+nadie fuera a denunciar. Se movió dentro de `DenunciaButton.tsx`: el modal
+ahora arranca en un paso nuevo `step === "notice"` (antes arrancaba directo
+en `"form"`) que muestra ese mismo aviso con dos botones, "Cancelar" y "OK,
+entendido" → recién ahí pasa a `"form"` (que a su vez ya redirigía a pedir
+login si no hay sesión, sin cambios). `close()` y el estado inicial de
+`step` se actualizaron para volver a `"notice"` la próxima vez que se abra.
+`src/app/denuncias/page.tsx` perdió el bloque `<ShieldAlert>` fijo de la
+página (el import de `ShieldAlert`/`getEmergency` se movió al componente).
+
+**F. Reacciones anónimas no se pueden quitar — REVISADO, YA ERA ASÍ.**
+`LikeButton.tsx` y `PersonReactions.tsx` ya guardan en `localStorage`
+(`vtb_like_*`/`vtb_preact_*`) apenas se reacciona y deshabilitan el botón
+(`disabled={liked}`/`disabled={reacted[k]}`) — no existe ninguna acción de
+"quitar" en `actions.ts`/`data.ts` (se confirmó con grep, no hay
+`unlike`/`removeLike`/`toggleLike`). Es decir: se puede reaccionar sin
+cuenta, pero nunca deshacerlo, que es exactamente lo pedido. **No se tocó
+código**, era un malentendido — probablemente el dueño vio el botón
+"presionado"/resaltado visualmente y lo interpretó como que se podía volver
+a tocar para desmarcarlo.
+
+**G. Nombre de comentarista fijo + insignia "Sin verificar" — RESUELTO.**
+`CommentSection.tsx`: se agregó `ANON_NAME_KEY = "vtb_anon_comment_name"` en
+`localStorage` — la primera vez que alguien sin cuenta escribe su nombre
+para comentar, `updateName()` lo guarda; un `useEffect` nuevo lo precarga la
+próxima vez (en cualquier publicación, no solo la misma) para no pedirlo de
+nuevo, hasta que la persona se cree una cuenta real (con sesión, el nombre
+ya viene del usuario y ese campo ni se muestra, sin cambios ahí). Cada
+comentario de alguien sin sesión (`c.authorName` sin `<Link>` de perfil)
+ahora muestra una insignia gris "Sin verificar" al lado del nombre.
+
+**Verificado con**: `npm run build` (verde, typecheck incluido) tras
+integrar el trabajo del agente en paralelo con A/B/C, sin conflictos reales
+(solo `caravanas/page.tsx` se fusionó a mano porque A y D tocaban el mismo
+archivo) + `npm run start` + `curl` a `/denuncias`, `/voluntarios`,
+`/caravanas` (200 en las 3, y se confirmó que el aviso legal fijo ya no
+aparece en el HTML de `/denuncias`). **Falta probar en navegador real**:
+abrir el modal de "Denunciar" y confirmar que el aviso aparece primero,
+tocar "Filtros" en denuncias/voluntarios/caravanas y confirmar que las
+categorías/tipos aparecen ahí, comentar sin cuenta dos veces y confirmar que
+el nombre quedó recordado la segunda vez.
 
 ## ✅ Cerrado en esta sesión (2026-08-12, ronda de seguridad) — build+typecheck verdes
 
