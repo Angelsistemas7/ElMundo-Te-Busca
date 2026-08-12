@@ -75,7 +75,15 @@ export function RegisterPetButton({ country = "ve" }: { country?: string } = {})
     <>
       <button
         onClick={() => setOpen(true)}
-        className="press flex items-center gap-2 rounded-xl bg-brand-400 px-4 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-brand-300"
+        aria-label="Reportar mascota"
+        className="press fixed left-1/2 z-30 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-brand-400 text-zinc-900 shadow-lg transition hover:bg-brand-300 sm:hidden"
+        style={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
+      >
+        <PawPrint className="h-6 w-6" />
+      </button>
+      <button
+        onClick={() => setOpen(true)}
+        className="press hidden items-center gap-2 rounded-xl bg-brand-400 px-4 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-brand-300 sm:flex"
       >
         <PawPrint className="h-4 w-4" />
         Reportar mascota
