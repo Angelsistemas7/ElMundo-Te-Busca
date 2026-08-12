@@ -119,7 +119,7 @@ export function MobileNav() {
               cambiar el color del texto. */}
           <span
             aria-hidden
-            className="pointer-events-none absolute top-1 h-8 rounded-2xl bg-brand-50 transition-transform duration-300"
+            className="pointer-events-none absolute left-0 top-1 h-8 rounded-2xl bg-brand-50 transition-transform duration-300"
             style={{
               width: `${100 / TAB_COUNT}%`,
               transform: `translateX(${activeIndex * 100}%)`,
