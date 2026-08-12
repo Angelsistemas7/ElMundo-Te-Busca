@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePathname, useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { getSessionUserAction } from "@/app/actions";
 
@@ -18,6 +19,10 @@ type Step = {
    *  en vez del botón "Más" en sí. Se coordina con MobileNav/SiteHeader por
    *  el evento "vtb:tour-set-more". */
   opensMore?: boolean;
+  /** Si el elemento a resaltar vive en otra página (no solo en el menú), la
+   *  guía navega ahí antes de medir — así entra de verdad a cada sección en
+   *  vez de solo señalar su ítem de navegación. */
+  path?: string;
 };
 
 const INTRO: Step = {
@@ -158,6 +163,76 @@ const DESKTOP_STEPS: Step[] = [
   },
 ];
 
+// Pasos adicionales que ENTRAN de verdad a la página de cada sección para
+// mostrar un elemento real ahí (no solo su ítem en el menú) — se insertan
+// justo después del paso de navegación con el mismo `title` (ver `steps`
+// más abajo), en las dos secuencias (móvil/escritorio) a la vez, porque el
+// contenido de cada página no cambia según el ancho de pantalla.
+const DETAIL_STEPS: Record<string, Step[]> = {
+  Inicio: [
+    {
+      path: "/",
+      selector: '[data-tour="home-country"]',
+      title: "Cambia de país",
+      text: "Este selector cambia todo el sitio a la crisis de Venezuela o Colombia: personas, ayuda, mapa y noticias se filtran por el país activo.",
+    },
+  ],
+  "Se busca": [
+    {
+      path: "/se-busca",
+      selector: '[data-tour="sebusca-tab-reconoces"]',
+      title: "¿La reconoces?",
+      text: "Aquí están las personas que alguien vio pero no sabe bien quién es: foto o rasgos, sin nombre confirmado. Desliza las tarjetas para revisarlas una por una.",
+    },
+    {
+      path: "/se-busca",
+      selector: '[data-tour="filtros-btn"]',
+      title: "Filtra la búsqueda",
+      text: "Región, cercanía a un punto del mapa, o agrupar por hospital — todo desde este botón.",
+    },
+  ],
+  Comunidad: [
+    {
+      path: "/comunidad",
+      selector: '[data-tour="comunidad-publicar"]',
+      title: "Publica en Comunidad",
+      text: "Elige el tipo de publicación (🆘 necesito, 🤲 ofrezco, 🚨 rescate...) y, si aplica, con qué punto de ayuda se relaciona.",
+    },
+  ],
+  "Caravanas benéficas": [
+    {
+      path: "/caravanas",
+      selector: '[data-tour="caravanas-convocar"]',
+      title: "Convoca tu caravana",
+      text: "Ruta, hora de salida y grupo de WhatsApp para coordinarse — y puedes vincularla a un punto de ayuda concreto.",
+    },
+  ],
+  Denuncias: [
+    {
+      path: "/denuncias",
+      selector: '[data-tour="denuncias-nueva"]',
+      title: "Reporta una irregularidad",
+      text: "Desvío o robo de ayuda, fraude, riesgo de niñez, abuso — requiere cuenta para evitar denuncias falsas.",
+    },
+  ],
+  "Ayuda y hospitales": [
+    {
+      path: "/ayuda",
+      selector: '[data-tour="filtros-btn"]',
+      title: "Filtra puntos de ayuda",
+      text: "Por tipo de recurso, nivel de urgencia o cercanía a tu ubicación — mismo botón de filtros que usa todo el sitio.",
+    },
+  ],
+  Mascotas: [
+    {
+      path: "/mascotas",
+      selector: '[data-tour="mascotas-publicar"]',
+      title: "Publica una mascota",
+      text: "Perdida, encontrada, en refugio o en veterinario, con foto y ubicación para que se pueda reconocer.",
+    },
+  ],
+};
+
 type Rect = { top: number; left: number; width: number; height: number };
 
 function rectOf(el: Element): Rect {
@@ -182,6 +257,8 @@ function rectOf(el: Element): Rect {
  * siguiente en vez de mostrar un spotlight vacío.
  */
 export function OnboardingTour() {
+  const pathname = usePathname();
+  const router = useRouter();
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(true);
@@ -242,7 +319,13 @@ export function OnboardingTour() {
     };
   }, []);
 
-  const steps = useMemo(() => [INTRO, ...(isMobile ? MOBILE_STEPS : DESKTOP_STEPS)], [isMobile]);
+  // Cada paso de navegación se sigue, en el mismo orden, de sus pasos de
+  // detalle (si tiene) — así la guía entra a la página real de la sección
+  // justo después de señalar su ítem en el menú.
+  const steps = useMemo(() => {
+    const base = [INTRO, ...(isMobile ? MOBILE_STEPS : DESKTOP_STEPS)];
+    return base.flatMap((s) => [s, ...(DETAIL_STEPS[s.title] ?? [])]);
+  }, [isMobile]);
   const step = steps[Math.min(stepIndex, steps.length - 1)];
 
   const finish = useCallback(() => {
@@ -255,50 +338,78 @@ export function OnboardingTour() {
     }
   }, []);
 
-  const measure = useCallback(() => {
-    if (!step.selector) {
+  useEffect(() => {
+    if (!open) return;
+
+    // Este paso vive en otra página (no solo en el menú): navegar ahí y
+    // esperar a que `pathname` lo confirme (el efecto se reejecuta solo
+    // cuando cambia, está en las dependencias) — no medimos nada hasta estar
+    // ahí, para no resaltar por error el elemento de la página anterior.
+    // `replace` en vez de `push`: la navegación la controla la guía (con sus
+    // propios botones Atrás/Siguiente), no debe apilar el historial del
+    // navegador ni interferir con el botón "atrás" real.
+    if (step.path && pathname !== step.path) {
       setRect(null);
+      router.replace(step.path);
       return;
     }
-    const el = document.querySelector(step.selector);
-    const r = el ? rectOf(el) : null;
-    if (!r || r.width === 0 || r.height === 0) {
-      // El objetivo no existe ahora mismo (p. ej. la campanita sin nada que
-      // mostrar, o la cuenta con sesión ya iniciada): saltar al siguiente
-      // paso en vez de dejar un spotlight vacío. Si es el último paso y
-      // tampoco existe, se cierra la guía en vez de quedar congelada.
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const wantsMore = !!step.opensMore;
+    window.dispatchEvent(new CustomEvent("vtb:tour-set-more", { detail: { open: wantsMore } }));
+
+    let attempts = 0;
+    // Pasos que acaban de navegar a una página nueva, o que necesitan el
+    // desplegable/hoja "Más" abierto, tardan un poco en montar su contenido
+    // real (datos del servidor, sheet/dropdown) — se reintenta varias veces
+    // en vez de dar el elemento por inexistente en el primer intento.
+    const maxAttempts = step.path ? 25 : wantsMore ? 6 : 1;
+
+    const attemptMeasure = () => {
+      if (cancelled) return;
+      attempts++;
+      if (!step.selector) {
+        setRect(null);
+        return;
+      }
+      // Algunos botones se duplican para móvil/escritorio (uno queda oculto
+      // con CSS según el ancho) — se toma el primero con tamaño real en vez
+      // del primero en el DOM, que puede estar oculto en esta pantalla.
+      const candidates = document.querySelectorAll(step.selector);
+      let found: Rect | null = null;
+      let foundEl: Element | null = null;
+      for (const el of Array.from(candidates)) {
+        const r = rectOf(el);
+        if (r.width > 0 && r.height > 0) {
+          found = r;
+          foundEl = el;
+          break;
+        }
+      }
+      if (found) {
+        setRect(found);
+        foundEl?.scrollIntoView({ block: "center", behavior: "smooth" });
+        return;
+      }
+      if (attempts < maxAttempts) {
+        timer = setTimeout(attemptMeasure, 150);
+        return;
+      }
+      // Nunca apareció (sin sesión, sin avisos, o la sección no tiene ese
+      // elemento hoy): saltar al siguiente paso en vez de un spotlight
+      // vacío. Si es el último y tampoco existe, se cierra la guía en vez
+      // de quedar congelada.
       setStepIndex((i) => {
         if (i < steps.length - 1) return i + 1;
         finish();
         return i;
       });
-      return;
-    }
-    setRect(r);
-    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [step, steps.length, finish]);
+    };
 
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    const wantsMore = !!step.opensMore;
-    window.dispatchEvent(new CustomEvent("vtb:tour-set-more", { detail: { open: wantsMore } }));
+    timer = setTimeout(attemptMeasure, wantsMore || step.path ? 150 : 0);
 
-    // Si este paso necesita el desplegable/hoja "Más" abierto, el elemento a
-    // resaltar no existe en el DOM justo después de despachar el evento
-    // (React tiene que montar el sheet/dropdown primero) — se espera un
-    // instante antes de medir, si no `measure()` lo daría por inexistente y
-    // saltaría el paso solo.
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    if (wantsMore) {
-      timer = setTimeout(() => {
-        if (!cancelled) measure();
-      }, 150);
-    } else {
-      measure();
-    }
-
-    const onResize = () => measure();
+    const onResize = () => attemptMeasure();
     window.addEventListener("resize", onResize);
     window.addEventListener("scroll", onResize, true);
     return () => {
@@ -307,7 +418,7 @@ export function OnboardingTour() {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("scroll", onResize, true);
     };
-  }, [open, step, measure]);
+  }, [open, step, pathname, router, steps.length, finish]);
 
   function next() {
     if (stepIndex >= steps.length - 1) {

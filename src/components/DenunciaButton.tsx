@@ -93,6 +93,7 @@ export function DenunciaButton({ country = "ve" }: { country?: string }) {
       <button
         onClick={() => setOpen(true)}
         aria-label="Denunciar una irregularidad"
+        data-tour="denuncias-nueva"
         className="press fixed left-1/2 z-30 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-700 sm:hidden"
         style={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
       >
@@ -100,6 +101,7 @@ export function DenunciaButton({ country = "ve" }: { country?: string }) {
       </button>
       <button
         onClick={() => setOpen(true)}
+        data-tour="denuncias-nueva"
         className="press hidden items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 sm:flex"
       >
         <Megaphone className="h-4 w-4" />

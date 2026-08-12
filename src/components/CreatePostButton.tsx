@@ -104,6 +104,7 @@ export function CreatePostButton({
       {variant === "bar" ? (
         <button
           onClick={() => setOpen(true)}
+          data-tour="comunidad-publicar"
           className="press flex w-full items-center gap-3 rounded-full border border-zinc-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-zinc-50"
         >
           <Avatar src={avatarUrl} size="md" />

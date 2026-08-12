@@ -1,5 +1,5 @@
 import { Users2 } from "lucide-react";
-import { getCommentsForEntities, getPosts, getPostsPage, type PostSort } from "@/lib/data";
+import { getAidPoints, getCommentsForEntities, getPosts, getPostsPage, type PostSort } from "@/lib/data";
 import { POST_TYPE_EMOJI, POST_TYPE_LABEL, type PostType } from "@/lib/types";
 import { getActiveCountry } from "@/lib/country-server";
 import { getAdminLevel } from "@/lib/admin";
@@ -97,12 +97,14 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
   // había que bajar mucho para llegar al muro normal. Un rescate se queda ahí
   // hasta que su autor (o el admin) lo borre — no hay límite de tiempo: un
   // rescate sigue siendo urgente mientras exista, sin importar cuánto lleve.
-  const [featuredPosts, rescuePosts, pageResult, adminLevel] = await Promise.all([
+  const [featuredPosts, rescuePosts, pageResult, adminLevel, aidPoints] = await Promise.all([
     type === "all" ? getPosts({ country, pinnedOnly: true, search: q }) : Promise.resolve([]),
     type === "all" ? getPosts({ country, type: "rescate", search: q }) : Promise.resolve([]),
     getPostsPage({ ...postFilter, country }, page, pageSize, sort),
     getAdminLevel(),
+    getAidPoints(country),
   ]);
+  const aidPointNameById = new Map(aidPoints.map((p) => [p.id, p.name]));
   // Admin o moderador: puede eliminar cualquier post directo desde el muro,
   // sin necesitar el enlace privado del autor (ver deletePostModAction).
   const canModerate = adminLevel !== null;
@@ -181,10 +183,24 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
               </h2>
               <SwipeStaticRow className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-1">
                 {withComments(pinned).map((post) => (
-                  <PinnedPostCard key={post.id} post={post} comments={post.comments} tone="red" canModerate={canModerate} />
+                  <PinnedPostCard
+                    key={post.id}
+                    post={post}
+                    comments={post.comments}
+                    tone="red"
+                    canModerate={canModerate}
+                    aidPointName={post.aidPointId ? aidPointNameById.get(post.aidPointId) : undefined}
+                  />
                 ))}
                 {withComments(featured).map((post) => (
-                  <PinnedPostCard key={post.id} post={post} comments={post.comments} tone="amber" canModerate={canModerate} />
+                  <PinnedPostCard
+                    key={post.id}
+                    post={post}
+                    comments={post.comments}
+                    tone="amber"
+                    canModerate={canModerate}
+                    aidPointName={post.aidPointId ? aidPointNameById.get(post.aidPointId) : undefined}
+                  />
                 ))}
               </SwipeStaticRow>
             </section>
@@ -192,7 +208,13 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
 
           <div className="animate-rise space-y-4">
             {withComments(restPosts).map((post) => (
-              <PostCard key={post.id} post={post} comments={post.comments} canModerate={canModerate} />
+              <PostCard
+                key={post.id}
+                post={post}
+                comments={post.comments}
+                canModerate={canModerate}
+                aidPointName={post.aidPointId ? aidPointNameById.get(post.aidPointId) : undefined}
+              />
             ))}
           </div>
           <div className="mt-6">

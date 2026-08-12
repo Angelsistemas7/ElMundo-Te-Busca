@@ -3,7 +3,7 @@
 import { memo, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Loader2, MapPin, MessageCircle, Pin, Trash2 } from "lucide-react";
+import { ExternalLink, HandHeart, Loader2, MapPin, MessageCircle, Pin, Trash2 } from "lucide-react";
 import type { Comment, Post, ReactionKind } from "@/lib/types";
 import { POST_ORIGIN_EMOJI, POST_ORIGIN_LABEL, POST_TYPE_EMOJI, POST_TYPE_LABEL, REACTION_EMOJI } from "@/lib/types";
 import { cn, timeAgo } from "@/lib/utils";
@@ -33,11 +33,14 @@ export const PostCard = memo(function PostCard({
   post,
   comments,
   canModerate = false,
+  aidPointName,
 }: {
   post: Post;
   comments: Comment[];
   /** Admin o moderador viendo el muro: puede eliminar cualquier post, sin ser el autor. */
   canModerate?: boolean;
+  /** Nombre del punto de ayuda vinculado (post.aidPointId), resuelto por la página que lista los posts. */
+  aidPointName?: string;
 }) {
   const router = useRouter();
   const [counts, setCounts] = useState(post.reactions);
@@ -137,6 +140,16 @@ export const PostCard = memo(function PostCard({
           </div>
         </div>
       </div>
+
+      {post.aidPointId && aidPointName && (
+        <Link
+          href={`/ayuda/${post.aidPointId}`}
+          className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-100"
+        >
+          <HandHeart className="h-3.5 w-3.5" />
+          Vinculado a {aidPointName}
+        </Link>
+      )}
 
       <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-800">{post.body}</p>
 

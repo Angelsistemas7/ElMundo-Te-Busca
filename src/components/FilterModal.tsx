@@ -156,6 +156,7 @@ export function FilterModal({
       <button
         type="button"
         onClick={openModal}
+        data-tour="filtros-btn"
         className="press relative inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-3.5 py-1.5 text-sm font-medium text-zinc-700 transition hover:border-zinc-400"
       >
         <ListFilter className="h-4 w-4" />

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   CalendarClock,
+  HandHeart,
   MapPin,
   MessageSquare,
   Navigation,
@@ -9,7 +10,7 @@ import {
   Settings,
   Users,
 } from "lucide-react";
-import { canManageMarch, getComments, getMarchById } from "@/lib/data";
+import { canManageMarch, getAidPointById, getComments, getMarchById } from "@/lib/data";
 import { formatDateTime } from "@/lib/utils";
 import { LikeButton } from "@/components/LikeButton";
 import { CommentSection } from "@/components/CommentSection";
@@ -21,7 +22,11 @@ export default async function CaravanaPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const march = await getMarchById(id);
   if (!march) notFound();
-  const [comments, canManage] = await Promise.all([getComments("march", id), canManageMarch(id)]);
+  const [comments, canManage, linkedAidPoint] = await Promise.all([
+    getComments("march", id),
+    canManageMarch(id),
+    march.aidPointId ? getAidPointById(march.aidPointId) : Promise.resolve(null),
+  ]);
   const isPast = new Date(march.departAt).getTime() < Date.now();
 
   return (
@@ -59,6 +64,16 @@ export default async function CaravanaPage({ params }: { params: Promise<{ id: s
         </div>
 
         {march.description && <p className="text-sm text-zinc-600">{march.description}</p>}
+
+        {linkedAidPoint && (
+          <Link
+            href={`/ayuda/${linkedAidPoint.id}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-100"
+          >
+            <HandHeart className="h-3.5 w-3.5" />
+            Vinculada a {linkedAidPoint.name}
+          </Link>
+        )}
 
         {march.whatsappUrl && (
           <a

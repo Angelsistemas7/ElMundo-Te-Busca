@@ -1,3 +1,103 @@
+## ✅ Cerrado (2026-08-12, ronda 15) — guía rápida entra a cada página de verdad + vínculo inverso + 2 pendientes resultaron ya estar resueltos
+
+**Nuevo chat, mismo dueño.** Pidió retomar las "ideas menores" desatendidas
+(sección DESPRIORIZADO) y ampliar la guía rápida una vez más. Antes de tocar
+nada se le preguntó explícito (3 preguntas con `AskUserQuestion`) para no
+adivinar de nuevo:
+
+1. **Nombre anónimo**: confirmó dejarlo como está (solo lectura + "¿No eres
+   tú?" para casos legítimos) — "no es que se va a escapar tan seguido eso ya
+   es raro y puede ser fraude". **Sin cambios de código.**
+2. **Guía rápida**: pidió explícito que el tour **entre de verdad a cada
+   página/sección** durante la guía, no solo que describa más texto sobre el
+   ítem del menú. Ver punto grande abajo.
+3. **Ideas menores**: eligió 3 del checklist DESPRIORIZADO — vincular al
+   editar, nested modal + Escape, mostrar vínculo inverso.
+
+**Sorpresa al auditar el código real antes de tocar nada** (mismo hábito que
+costó caro en la ronda 14: nunca confiar en notas viejas sin releer el
+código): **2 de los 3 ítems elegidos YA ESTABAN RESUELTOS**, desde el commit
+`0400dd7` (su propio mensaje dice literal "escape en modal anidado, vincular
+punto de ayuda al editar") — la nota DESPRIORIZADO nunca se actualizó después
+de ese commit:
+- `PostManagePanel.tsx`/`MarchManagePanel.tsx` ya tienen el campo "Vincular a
+  un punto de ayuda" completo al editar, conectado a
+  `ownerUpdatePostAction`/`ownerUpdateMarchAction`.
+- `Modal.tsx` ya tiene una pila global (`modalStack`) y el listener de Escape
+  solo responde si `modalStack[modalStack.length-1] === id` — Escape con dos
+  modales abiertos ya solo cierra el de encima, no los dos.
+
+**Lo único que faltaba de verdad, implementado esta ronda:**
+
+1. **Vínculo inverso (post/caravana → punto de ayuda).** Antes solo se veía
+   desde la ficha del punto de ayuda ("Necesidades y caravanas vinculadas a
+   este punto"); ahora también se ve al revés:
+   - `PostCard.tsx` (y `PinnedPostCard.tsx`, que lo reutiliza en un modal):
+     nuevo chip "Vinculado a {nombre del punto}" con enlace a `/ayuda/[id]`,
+     solo si el post tiene `aidPointId`. `comunidad/page.tsx` resuelve los
+     nombres con una sola consulta `getAidPoints(country)` (evita N+1) y arma
+     un `Map<id, nombre>` que pasa como prop `aidPointName` a cada tarjeta.
+   - `caravanas/[id]/page.tsx`: mismo chip, resuelto con
+     `getAidPointById(march.aidPointId)`.
+   - **No verificable con datos reales de esta sesión**: el seed en memoria
+     no trae ningún post/caravana con `aidPointId` — no se pudo ver el chip
+     renderizado de verdad, solo confirmar que compila y que la lógica es
+     correcta. Probar en producción vinculando un post/caravana real a un
+     punto de ayuda.
+
+2. **Guía rápida — ahora SÍ entra a la página real de cada sección**
+   (`OnboardingTour.tsx`), no solo señala el ítem del menú. Cambio de
+   arquitectura, no solo de texto:
+   - `Step` tiene un campo nuevo opcional `path`: si el paso lo trae, la
+     guía navega ahí (`router.replace`, no `push` — no debe apilar el
+     historial del navegador, eso lo controla la guía con sus propios
+     botones) antes de medir el elemento a resaltar.
+   - `DETAIL_STEPS`: un mapa `título del paso de menú → pasos extra con
+     `path`` que se insertan justo después, en las dos secuencias (móvil y
+     escritorio) a la vez — 7 secciones nuevas que antes solo se nombraban:
+     Inicio (selector de país real en `/`), Se busca (pestaña "¿La
+     reconoces?" real + botón Filtros real, ambos en `/se-busca`), Comunidad
+     (botón "Publicar" real en `/comunidad`), Caravanas (botón "Convocar
+     caravana" real en `/caravanas`), Denuncias (botón "Denunciar" real en
+     `/denuncias`), Ayuda y hospitales (botón Filtros real en `/ayuda`),
+     Mascotas (botón "Reportar mascota" real en `/mascotas`). Mapa se dejó
+     sin paso de detalle a propósito — su panel de capas lo pinta Leaflet
+     directo en el DOM, más frágil para anclar de forma confiable.
+   - El motor de medición se reescribió para tolerar la espera de una
+     navegación real: hasta 25 reintentos (150ms cada uno, ~3.7s) para pasos
+     con `path` en vez del intento único de antes — una página recién
+     navegada tarda en montar sus datos reales. Si nunca aparece, salta al
+     siguiente paso igual que siempre (no se congela).
+   - Se agregaron los anclajes `data-tour` reales que faltaban:
+     `home-country` (`HomeHero.tsx`), `sebusca-tab-reconoces`
+     (`PersonViewToggle.tsx`), `filtros-btn` (`FilterModal.tsx` — un solo
+     anclaje compartido por Se busca Y Ayuda, es el mismo componente),
+     `comunidad-publicar` (`CreatePostButton.tsx`), `caravanas-convocar`
+     (`RegisterMarchButton.tsx`, en los 2 botones móvil/escritorio),
+     `denuncias-nueva` (`DenunciaButton.tsx`, 2 botones), `mascotas-publicar`
+     (`RegisterPetButton.tsx`, 2 botones). Para los botones duplicados
+     móvil/escritorio (uno oculto por CSS según ancho), el motor ahora usa
+     `querySelectorAll` y toma el primero con tamaño real en vez de
+     `querySelector` (que podía enganchar el oculto y fallar).
+   - El tour pasó de 22 pasos (11 duplicados en 2 secuencias) a 29 —
+     bienvenida + 11 de navegación + 7 de detalle nuevo, mismo conteo en
+     móvil/escritorio.
+
+**Verificado con**: `npm run build` (verde, typecheck + ESLint incluidos) +
+`npm run start` + `curl` a `/`, `/comunidad`, `/caravanas`, `/denuncias`,
+`/mascotas`, `/se-busca`, `/ayuda` (200 en las 7) + confirmado con `curl` que
+los 7 anclajes `data-tour` nuevos aparecen en el HTML servido de su página
+correspondiente, con el conteo esperado (2 para los botones duplicados
+móvil/escritorio). **No verificado en navegador real** (panel de navegador
+integrado deshabilitado a propósito para este proyecto — le crashea la app
+al dueño, ver [[feedback_no_browser_pane]]): la navegación real entre
+páginas durante el tour (`router.replace` + reintentos), el chip de vínculo
+inverso con datos reales, y que el spotlight siga viéndose bien tras cada
+salto de página, todo eso solo se puede confirmar con los ojos. **Probar en
+el sitio real**: abrir la guía "?" del header y avanzar paso a paso — debería
+notarse un cambio de página real (URL cambia) en 7 puntos del recorrido, no
+solo un cambio de tarjeta de texto.
+
 ## ✅ Cerrado (2026-08-12, ronda 14) — bug real encontrado y corregido: el nombre anónimo NO estaba bloqueado en comentarios
 
 **El dueño probó en vivo y encontró que la ronda 13 estaba incompleta**: en
@@ -1458,12 +1558,12 @@ falta volver a correrlo por lo que sea, no rompe nada existente.
      `photo_hash`/`possible_duplicate`/`duplicate_match_id` en `persons`,
      `category_status` en `aid_points`, `aid_point_id` en `posts` y `marches`).
    - **Commitear y pushear** (nada de esta sesión se subió todavía).
-   - Vincular posts/caravanas a un punto de ayuda **solo se agregó al crear**,
-     no al editar uno ya publicado (`PostManagePanel`/`MarchManagePanel`) — si
-     el dueño lo pide, es la siguiente extensión natural.
-   - Opcional, no pedido: aplicar el mismo "vincular a un recurso" en sentido
-     inverso (que la ficha de un post muestre a qué punto está ligado, no solo
-     al revés) — hoy solo se ve desde la ficha del punto de ayuda.
+   - ~~Vincular posts/caravanas a un punto de ayuda solo se agregó al
+     crear~~ — **✅ resuelto** (commit `0400dd7`, confirmado en ronda 15):
+     `PostManagePanel`/`MarchManagePanel` ya lo permiten al editar también.
+   - ~~Vínculo inverso~~ — **✅ resuelto en ronda 15**: `PostCard`/
+     `PinnedPostCard` y `caravanas/[id]/page.tsx` ahora muestran a qué punto
+     de ayuda están ligados, con enlace a su ficha.
    - Las 4 tarjetas duplicadas de la familia Saavedra/Caycedo (Colombia) se
      dejaron sin tocar a pedido explícito del dueño — no es un pendiente, es
      una decisión tomada.
@@ -1489,13 +1589,11 @@ falta volver a correrlo por lo que sea, no rompe nada existente.
    revisó para que respete `nearLat/nearLng/radiusKm` — si alguien aplica el
    filtro de cercanía Y está en una vista agrupada a la vez, revisar que no
    se ignore el radio silenciosamente.
-5. **Nested Modal (recuadro dentro de recuadro)**: `LocationPicker` y el
-   campo `mapPoint` de `FilterModal` abren un `Modal` propio estando ya
-   dentro de otro `Modal` (el del formulario/filtros). Funciona porque
-   ambos usan portal a `document.body`, pero si alguna vez se presiona
-   Escape con AMBOS abiertos, los dos se cierran a la vez (cada `Modal`
-   escucha `keydown` en `document` mientras esté abierto). Bug menor, no
-   se corrigió — nadie lo reportó todavía.
+5. ~~**Nested Modal (recuadro dentro de recuadro)**~~ — **✅ YA RESUELTO**
+   (confirmado en ronda 15, releyendo el código real): `Modal.tsx` usa una
+   pila global (`modalStack`) y el listener de Escape solo responde si
+   `modalStack[modalStack.length-1] === id`. Esta nota estaba obsoleta desde
+   el commit `0400dd7`.
 6. **Filtros por radio/cercanía solo en Se busca / ¿La reconoces?**: no se
    replicó en Comunidad, Ayuda, Hospitales, etc. — no se pidió ahí, se dejó
    fuera de alcance a propósito.

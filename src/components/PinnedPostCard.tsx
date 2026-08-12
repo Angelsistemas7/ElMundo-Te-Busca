@@ -16,11 +16,13 @@ export function PinnedPostCard({
   comments,
   tone,
   canModerate = false,
+  aidPointName,
 }: {
   post: Post;
   comments: Comment[];
   tone: "amber" | "red";
   canModerate?: boolean;
+  aidPointName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const toneClass =
@@ -44,7 +46,7 @@ export function PinnedPostCard({
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title={POST_TYPE_LABEL[post.type]}>
-        <PostCard post={post} comments={comments} canModerate={canModerate} />
+        <PostCard post={post} comments={comments} canModerate={canModerate} aidPointName={aidPointName} />
       </Modal>
     </>
   );

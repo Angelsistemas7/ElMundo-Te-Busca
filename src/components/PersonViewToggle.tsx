@@ -20,6 +20,7 @@ export function PersonViewToggle({ view }: { view: "busca" | "reconoces" }) {
       </Link>
       <Link
         href="/se-busca?view=reconoces"
+        data-tour="sebusca-tab-reconoces"
         aria-current={view === "reconoces" ? "page" : undefined}
         className={cn(base, view === "reconoces" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800")}
       >
