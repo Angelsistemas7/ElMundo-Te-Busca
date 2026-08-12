@@ -1,4 +1,4 @@
-## ✅ Cerrado (2026-08-12, ronda 7) — build verde, SIN PUSHEAR TODAVÍA
+## ✅ Cerrado (2026-08-12, ronda 7) — build verde, pusheado (commit b65d351)
 
 Pedido del dueño: que "atrás" del navegador vuelva de verdad a donde estaba
 (cualquier página/formulario/sección), una guía rápida tipo spotlight para
@@ -121,8 +121,28 @@ servido trae `10`/`20`/`50` con `20` marcado por defecto (`selected=""`) y
 el `<nav aria-label="Paginación">` presente. **Lo único que sigue sin
 poder verificarse de verdad sin un navegador real** son los cambios de
 interacción pura (botón atrás cerrando modales, el spotlight de la guía) —
-`curl` no puede simular eso. **Sin pushear todavía**, queda para que el dueño lo
-pruebe primero o decida cuándo subirlo.
+`curl` no puede simular eso. **Se confirmó que no había commits nuevos del
+compañero** (`git fetch` + `git log main..origin/main` vacío, `main` local
+ya estaba sincronizado con `origin/main`) antes de commitear y pushear
+(commit `b65d351`, a pedido explícito del dueño). **Falta probar en el
+navegador real** (la sesión de origen no puede usar el panel de navegador
+integrado, le crashea la app al dueño — ver nota crónica más abajo) los 3
+cambios de interacción de esta ronda, en este orden de importancia:
+1. Abrir cualquier formulario (p. ej. "Publicar" en Comunidad) y presionar
+   el botón "atrás" del navegador (NO el botón X): debe cerrar solo el
+   modal, sin perder lo escrito ni salir de la página.
+2. Con dos modales anidados abiertos (p. ej. el selector de ubicación en el
+   mapa, dentro de un formulario ya abierto), "atrás" debe cerrar primero
+   el de encima, no los dos de golpe.
+3. Dentro del modal "Reconocidos" (Se busca/¿La reconoces?), tocar "Ver
+   ficha" de una persona: debe navegar bien a `/persona/[id]` (este es el
+   caso concreto que motivó el guard de href en `Modal.tsx` — si "atrás"
+   te devuelve a la lista en vez de mostrar la ficha, ese guard tiene un bug).
+4. La guía rápida: que aparezca sola en la primera visita (borrar
+   `localStorage` para simularlo), que el aro resalte el elemento correcto
+   tanto en móvil como en escritorio, y que el botón "?" la reabra.
+5. Comunidad con paginación: que los botones de página y el selector
+   "Mostrar X por página" se vean y funcionen igual que en Ayuda.
 
 ## ✅ Cerrado (2026-08-12, ronda 6) — build verde, pusheado
 
