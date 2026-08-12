@@ -1,3 +1,80 @@
+## ✅ Cerrado (2026-08-12, ronda 8) — build verde, pusheado (commit 634f32b)
+
+Continuación de la ronda 7, mismo chat. Pedido del dueño tras probar el sitio real:
+mover el botón "?" de la guía al header junto a "Entrar" (confirmado con
+`AskUserQuestion` tras un malentendido — el dueño había probado producción, que
+todavía tenía la versión vieja flotante, antes de que esto se pusheara), que la
+campanita de avisos se vea con sesión iniciada aunque no haya avisos, que la
+guía cubra Inicio/Ayuda-hospitales/Mascotas (antes solo mencionados de pasada o
+ausentes), que el selector de país explique que VE/CO son los únicos activos
+hoy, y que la cuadrícula de estadísticas del perfil de voluntario digital no
+quede con una fila suelta.
+
+1. **Botón "?" al header, ya no flotante.** `OnboardingTour.tsx` ya no
+   renderiza su propio botón fijo — escucha el evento `vtb:tour-open` (mismo
+   patrón que `AuthMenu` con `vtb:auth-open`). El trigger real vive en
+   `SiteHeader.tsx`, entre la campanita y "Entrar" (visible en cualquier
+   pantalla, esa fila del header no está oculta en móvil).
+2. **La guía ya no se abre sola si hay sesión iniciada.** Antes solo miraba
+   `localStorage` (visitante nuevo = nunca vista). Ahora, si no se ha visto,
+   consulta `getSessionUserAction()`: si hay sesión, se marca como "vista" sin
+   abrir sola (alguien con cuenta ya conoce el sitio) — pero el botón "?" del
+   header la sigue abriendo manual en cualquier momento, con o sin sesión.
+3. **Tour ampliado** (mismo tour de navegación de siempre, no tours nuevos por
+   página — se le preguntó al dueño y eligió esta opción, no la de construir
+   mini-tours dentro de cada sección): se agregó el paso "Inicio" que faltaba
+   por completo (selector Venezuela/Colombia, noticias verificadas, botón de
+   voluntariado), se separó "Ayuda y hospitales" y "Mascotas" en dos pasos
+   propios (mismo ancla `mnav-mas`/`dnav-mas`, dos tarjetas de texto — antes
+   iban mencionados de pasada dentro de un solo paso "Más"), se completó el
+   texto de Comunidad, y se sumó una línea en el paso de bienvenida sobre que
+   casi todas las listas tienen un botón "Filtros" arriba (a pedido del dueño,
+   sin apuntar a cada filtro individual — sería mucho ruido).
+4. **Campanita visible con sesión, aunque esté vacía.** `useNotifications.ts`
+   ahora expone `loggedIn` (via `getSessionUserAction()`). `NotificationBell`
+   ya no se oculta si `entries.length === 0` y hay sesión — muestra un estado
+   vacío ("Aún no tienes publicaciones ni guardados...") en vez de nada. Sin
+   sesión y sin nada local, sigue oculta (no tendría qué mostrar). El paso
+   `tour-bell` de la guía se beneficia de esto: con sesión, ya no se salta.
+5. **Selector de país con contexto de misión.** `CountryIntroModal.tsx`:
+   burbuja nueva (estilo tarjeta con ícono `Globe2`) arriba de la grilla
+   explicando que Venezuela y Colombia son los únicos países activos hoy, y
+   que a futuro se piensa sumar más ante cualquier desastre natural. Las
+   tarjetas de VE/CO se resaltan más que las inactivas (borde y fondo
+   `brand`, insignia "Activo · M{magnitud}" en vez de solo la magnitud).
+6. **Cuadrícula del perfil de voluntario digital, pareja.** El dueño notó
+   "2/2/2/1" en su perfil — causa real: `DigitalVolunteerCard.tsx` tiene 6
+   estadísticas en un `.map()` + una 7ª aparte ("Personas revisadas en '¿La
+   reconoces?'"), sin espacio para acomodarla par. Se evaluó agregar
+   "reacciones dadas" (idea del dueño) pero **no es una cifra real
+   calculable hoy**: ninguna de las 8 acciones de reacción/like
+   (`likeAidPointAction`, `reactToPostAction`, etc.) recibe ni guarda
+   `userId` — solo incrementan un contador agregado (mismo motivo por el que
+   una reacción no se puede "quitar", ronda 4 punto F). Inventar la cifra
+   rompería el principio ya establecido de "solo cifras reales" del propio
+   código; trackearla de verdad requeriría una tabla nueva + tocar los 8
+   endpoints, cambio grande para un ajuste visual. Se aplicó la solución
+   honesta: la 7ª estadística ocupa la fila completa (`col-span-2
+   sm:col-span-3`) en vez de quedar sola con espacio vacío al lado. Mismo
+   ajuste (más simple, genérico) en la ficha pública compartible
+   (`/perfil/publico/[username]`, 5 estadísticas, mismo problema de fila
+   suelta en móvil).
+
+**Verificado con**: `npm run build` (verde, typecheck + ESLint incluidos) +
+`npm run start` + `curl` a `/`, `/comunidad`, `/se-busca`, `/mapa`, `/perfil`
+(200 en las 5) + confirmado con `curl` que el botón "Ver guía rápida" y los
+anclajes `data-tour="mnav-inicio"`/`"dnav-inicio"` aparecen en el HTML
+servido. **No se pudo verificar con curl** (son overlays montados con
+`createPortal`, solo existen client-side tras hidratar, igual que en rondas
+anteriores): el contenido de `CountryIntroModal` (burbuja nueva), el
+spotlight del tour ampliado, y el estado vacío de la campanita. **Se
+confirmó que no había commits nuevos del compañero** antes de pushear
+(commit `634f32b`).
+
+**El dueño va a probar esto en el sitio real y va a dar una revisión
+profunda** — el próximo chat debería empezar leyendo su feedback antes de
+tocar código nuevo, no asumir que esta ronda quedó 100% validada visualmente.
+
 ## ✅ Cerrado (2026-08-12, ronda 7) — build verde, pusheado (commit b65d351)
 
 Pedido del dueño: que "atrás" del navegador vuelva de verdad a donde estaba
