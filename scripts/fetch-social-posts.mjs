@@ -86,7 +86,7 @@ loadEnv();
 // TypeScript), así que no puede importar ese archivo .ts directamente.
 const DEFAULT_HASHTAGS = {
   ve: "TerremotoVE,TerremotoVenezuela,laguaira",
-  co: "TerremotoColombia,SismoColombia,TerremotoChoco,Quibdo,Quibdó,Choco,Chocó,Pereira,Risaralda,Manizales,Cali,hidroituango,SOScolombia,Dosquebradas",
+  co: "TerremotoColombia,SismoColombia,TerremotoChoco,Quibdo,Quibdó,Choco,Chocó,Pereira,Risaralda,Manizales,Cali,hidroituango,SOScolombia,Dosquebradas,ValleDelCauca,Caldas,Buenaventura",
 };
 const COUNTRY_META = {
   ve: { name: "Venezuela", quakeLabel: "el terremoto de Venezuela del 24-25 de junio de 2026" },
