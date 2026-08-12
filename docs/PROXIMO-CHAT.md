@@ -1,3 +1,54 @@
+## ✅ Cerrado (2026-08-12, ronda 9) — build verde, pusheado (commit 7a17bc5)
+
+Continuación de la ronda 8, mismo chat. El dueño probó el sitio real (capturas
+de pantalla desde el teléfono) y reportó dos cosas nuevas:
+
+1. **Barra inferior de móvil "se levanta" con scroll fuerte/largo — RESUELTO
+   (solo Chrome Android; confirmado por el dueño que en Safari no pasa).**
+   Es un bug conocido: Chrome Android oculta/muestra su barra de direcciones
+   al hacer scroll y los elementos `position: fixed` de abajo "saltan"
+   durante esa transición porque el navegador tarda en recalcular su
+   posición contra el viewport de layout. `MobileNav.tsx` ya no confía en
+   que el navegador la reposicione solo: sigue `window.visualViewport`
+   (se actualiza tanto con ese caso como cuando se abre el teclado) y
+   traduce la barra hacia arriba lo que haga falta, con una transición
+   corta (150ms) para que el ajuste no se vea brusco. Mismo mecanismo
+   resuelve de paso el otro pedido del dueño ("que no se vea mal con el
+   teclado abierto"): al seguir el viewport visual real, la barra queda
+   pegada arriba del teclado en vez de saltar o desaparecer detrás de él.
+   **Falta confirmar en un Android real** (no verificable con `curl`, es un
+   bug de scroll/viewport puro): hacer scroll fuerte hacia abajo varias
+   veces seguidas en Chrome Android y confirmar que la barra ya no se
+   "levanta"; abrir un formulario con teclado (p. ej. "Publicar" en
+   Comunidad) y confirmar que no se ve mal.
+2. **Lentitud del widget de estadísticas de Inicio — NO ES BUG NUEVO, sigue
+   pendiente de verificar en el VPS (mismo diagnóstico de la ronda de
+   seguridad, nunca confirmado).** El dueño reportó que el widget de cifras
+   de arriba de Inicio (`HomeHero` → `getCrisisStats` en `src/lib/news.ts`)
+   se siente lento en CADA recarga, no solo la primera. Se revisó de nuevo
+   el código: depende de la misma fuente lenta que las noticias (GDELT + una
+   llamada a IA para extraer las cifras de los titulares), con caché de 3h
+   en memoria + disco (`/tmp/elmundotebusca-news-cache-*.json`) para no
+   repetir esa espera, y ya está en su propio `<Suspense>` con skeleton (el
+   resto de la página no espera por esto). Se confirmó que
+   `ecosystem.config.cjs` corre en un solo proceso PM2 (`instances: 1,
+   exec_mode: "fork"`), así que no es un problema de caché fragmentada entre
+   workers. **No se tocó código** — sin acceso al VPS real desde este
+   sandbox, no se puede confirmar si la causa es que el cron de
+   precalentamiento (`docs/DESPLIEGUE-VPS.md` línea ~201,
+   `/api/cron/warm-news` cada hora) está instalado y corriendo de verdad.
+   **Pendiente para el dueño, antes de tocar más código en esto**: correr en
+   el VPS `crontab -l`, `tail -50 logs/warm-news.log`, y
+   `ls -la /tmp/elmundotebusca-news-cache-*.json` (confirmar que el archivo
+   existe y tiene fecha reciente). Si el cron falta o falla, ahí está la
+   causa real — no es algo que se arregle con más cambios de código.
+
+**Verificado con**: `npm run build` (verde, typecheck + ESLint incluidos) +
+`npm run start` + `curl` a `/`, `/comunidad` (200 en ambas). El fix del
+`visualViewport` es puramente de interacción de scroll/teclado — no
+verificable con `curl`, solo en un Android real. **Se confirmó que no había
+commits nuevos del compañero** antes de pushear (commit `7a17bc5`).
+
 ## ✅ Cerrado (2026-08-12, ronda 8) — build verde, pusheado (commit 634f32b)
 
 Continuación de la ronda 7, mismo chat. Pedido del dueño tras probar el sitio real:
