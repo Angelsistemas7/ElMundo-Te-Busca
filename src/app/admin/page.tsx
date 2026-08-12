@@ -8,6 +8,7 @@ import {
   getHeroesForAdmin,
   getHospitals,
   getPendingExternalPosts,
+  getPendingManagerRequests,
   getPendingReports,
   getPersons,
   getPersonsByIds,
@@ -54,12 +55,17 @@ export default async function AdminPage() {
   let heroes: Hero[] = [];
   let complaintsByCountry: Complaint[] = [];
   let roles: AppRoleGrant[] = [];
+  let pendingManagerRequests: Awaited<ReturnType<typeof getPendingManagerRequests>> = [];
   if (fullAdmin) {
-    [managers, heroes, complaintsByCountry, roles] = await Promise.all([
+    [managers, heroes, complaintsByCountry, roles, pendingManagerRequests] = await Promise.all([
       getAllResourceManagers(),
       getHeroesForAdmin(),
       getAllCountries((country) => getComplaints({ country }, 1, 25).then((r) => r.items)),
       getAllAppRoles(),
+      // Tabla nueva (manager_requests): si la migración de supabase/schema.sql
+      // todavía no corrió en producción, que falte esta tabla no debe tumbar
+      // TODO el panel de admin — se degrada a "sin solicitudes" en su lugar.
+      getPendingManagerRequests().catch(() => []),
     ]);
   }
   const complaintsPage = { items: complaintsByCountry.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)) };
@@ -91,6 +97,7 @@ export default async function AdminPage() {
       complaints={complaintsPage.items}
       roles={roles}
       pendingExternalPosts={pendingExternalPosts}
+      pendingManagerRequests={pendingManagerRequests}
       demoOpen={!adminConfigured}
       isFullAdmin={fullAdmin}
     />

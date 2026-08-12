@@ -37,6 +37,7 @@ import type {
   Person,
   PersonCause,
   PersonReaction,
+  ManagerRequest,
   PersonStatus,
   Pet,
   PetStatus,
@@ -143,6 +144,7 @@ const mem = {
   resourceOwners: [] as { entityType: ResourceOwnerEntity; entityId: string; token: string }[],
   // Gestores delegados que asigna el admin (hospital / punto de ayuda).
   resourceManagers: [] as ResourceManager[],
+  managerRequests: [] as ManagerRequest[],
   // Roles globales por cuenta (admin completo, moderador de hospitales/ayuda).
   appRoles: [] as AppRoleGrant[],
   // Un voto de consenso por cuenta y recurso (clave `${tipo}:${id}:${userId}`):
@@ -1180,6 +1182,114 @@ export async function removeResourceManager(
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
     .eq("user_id", userId);
+  if (error) throw error;
+}
+
+// ── Solicitudes de gestor delegado (el voluntario pide, el admin aprueba) ───
+/** Crea una solicitud para gestionar un hospital/punto de ayuda concreto. */
+export async function createManagerRequest(
+  entityType: ManagedEntity,
+  entityId: string,
+  entityName: string,
+  userId: string,
+  username: string,
+  message: string,
+): Promise<void> {
+  const id = randomUUID();
+  const createdAt = new Date().toISOString();
+  if (!getSupabase()) {
+    mem.managerRequests.push({
+      id,
+      entityType,
+      entityId,
+      entityName,
+      userId,
+      username,
+      message,
+      status: "pending",
+      createdAt,
+    });
+    return;
+  }
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  const { error } = await sb
+    .from("manager_requests")
+    .insert({ entity_type: entityType, entity_id: entityId, entity_name: entityName, user_id: userId, message });
+  if (error) throw error;
+}
+
+/** Solicitudes pendientes, con nombre de usuario, para la cola del panel admin. */
+export async function getPendingManagerRequests(): Promise<ManagerRequest[]> {
+  if (!getSupabase()) return mem.managerRequests.filter((r) => r.status === "pending");
+  const sb = getSupabaseAdmin();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("manager_requests")
+    .select("id, entity_type, entity_id, entity_name, user_id, message, status, created_at")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const rows = data ?? [];
+  const ids = [...new Set(rows.map((r) => r.user_id as string))];
+  const nameById: Record<string, string> = {};
+  if (ids.length > 0) {
+    const { data: profs } = await sb.from("profiles").select("user_id, username").in("user_id", ids);
+    for (const p of profs ?? []) nameById[p.user_id as string] = p.username as string;
+  }
+  return rows.map((r) => ({
+    id: r.id as string,
+    entityType: r.entity_type as ManagedEntity,
+    entityId: r.entity_id as string,
+    entityName: r.entity_name as string,
+    userId: r.user_id as string,
+    username: nameById[r.user_id as string] ?? "Usuario",
+    message: r.message as string,
+    status: r.status as ManagerRequest["status"],
+    createdAt: r.created_at as string,
+  }));
+}
+
+/** Aprueba una solicitud: crea el `ResourceManager` y marca la solicitud resuelta. */
+export async function approveManagerRequest(requestId: string, grantedBy: string): Promise<void> {
+  if (!getSupabase()) {
+    const req = mem.managerRequests.find((r) => r.id === requestId);
+    if (!req) return;
+    req.status = "approved";
+    await addResourceManager(req.entityType, req.entityId, req.userId, req.username, grantedBy);
+    return;
+  }
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  const { data, error } = await sb
+    .from("manager_requests")
+    .select("entity_type, entity_id, user_id")
+    .eq("id", requestId)
+    .single();
+  if (error) throw error;
+  if (!data) return;
+  const { data: prof } = await sb.from("profiles").select("username").eq("user_id", data.user_id).single();
+  await addResourceManager(
+    data.entity_type as ManagedEntity,
+    data.entity_id as string,
+    data.user_id as string,
+    (prof?.username as string) ?? "Usuario",
+    grantedBy,
+  );
+  const { error: updateError } = await sb.from("manager_requests").update({ status: "approved" }).eq("id", requestId);
+  if (updateError) throw updateError;
+}
+
+/** Rechaza una solicitud sin crear ningún permiso. */
+export async function rejectManagerRequest(requestId: string): Promise<void> {
+  if (!getSupabase()) {
+    const req = mem.managerRequests.find((r) => r.id === requestId);
+    if (req) req.status = "rejected";
+    return;
+  }
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  const { error } = await sb.from("manager_requests").update({ status: "rejected" }).eq("id", requestId);
   if (error) throw error;
 }
 

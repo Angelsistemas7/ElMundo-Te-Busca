@@ -155,7 +155,7 @@ export async function HomeHero() {
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
-              href="/comunidad"
+              href="/voluntarios/guia"
               className="press rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600"
             >
               ¿Cómo puedo ayudar?
