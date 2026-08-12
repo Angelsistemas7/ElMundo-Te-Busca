@@ -1,3 +1,44 @@
+## ✅ Cerrado (2026-08-12, ronda 6) — build verde, pusheado
+
+Pedido del dueño: confirmar que Turnstile avisa bien al expirar en TODOS
+lados, confirmar nombre de comentarista persistente, que "¿Cómo puedo
+ayudar?" tenga peso propio (no ir directo al formulario), y que el
+marcador rojo de zonas afectadas en el mapa lleve a "Se busca" (como ya
+hacen los demás pines).
+
+1. **Turnstile — CONFIRMADO, sin cambios de código.** Los 12 formularios
+   que lo usan (login/registro de cuenta, comentarios, y los 10 de
+   publicar/proponer/reportar) llaman `turnstileRef.current?.reset()` al
+   fallar el envío, y el propio `Turnstile.tsx` ya detecta expiración
+   (`expired-callback`) y muestra "La verificación expiró — vuelve a
+   marcarla" con botón para renovar sin perder el formulario. Denuncias no
+   usa Turnstile a propósito (exige sesión real en su lugar, ya
+   suficientemente anti-abuso).
+2. **Nombre de comentarista persistente + insignia — CONFIRMADO** (ya
+   resuelto en la ronda 4, punto G): sigue ahí, sin cambios.
+3. **"¿Cómo puedo ayudar?" — CONFIRMADO, ya tiene el peso pedido.** El
+   botón del inicio (`HomeHero.tsx`) va a `/voluntarios/guia`, una página
+   explicativa (qué es un voluntario digital, dos opciones claras:
+   "Quiero ser voluntario digital" / "Quiero gestionar un hospital o punto
+   de ayuda") — NO va directo al formulario. Se verificó en vivo con
+   `curl` que la página renderiza completa. Puede que el dueño estuviera
+   viendo una versión vieja en caché del navegador.
+4. **Zona afectada en el mapa sin enlace — BUG REAL, corregido.** El
+   marcador rojo "🔴 Zonas afectadas" (`MapView.tsx`) mostraba estadísticas
+   (por localizar / localizados / sin vida) en su popup pero, a diferencia
+   de TODOS los demás pines (ayuda, hospital, caravana, personas,
+   rescates, necesito/puedo ayudar), no tenía ningún enlace de salida. Se
+   agregó `href` al tipo `Zone` y un link "Ver en Se busca →" en su popup,
+   apuntando a `/se-busca?estado=<nombre de la región>` — reusa el filtro
+   por región que ya existe en Se busca (más preciso que un radio en km,
+   porque coincide exactamente con la agrupación que ya usa el propio
+   marcador). Construido en `src/app/mapa/page.tsx` al armar `zones`.
+
+**Verificado con**: `npm run build` (verde) + `npm run start` + `curl` a
+`/mapa` y `/se-busca?estado=La Guaira` (200 en ambas). **Falta probar en
+navegador real**: tocar un marcador rojo en el mapa y confirmar que el
+enlace "Ver en Se busca →" filtra bien por esa región.
+
 ## ✅ Cerrado (2026-08-12, ronda 5) — build verde, pusheado
 
 Pedido del dueño: "botón + flotante en móvil (como en Se busca) para publicar

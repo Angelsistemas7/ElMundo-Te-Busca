@@ -89,6 +89,7 @@ export default async function MapaPage() {
         toLocate: b.toLocate,
         located: b.located,
         deceased: b.deceased,
+        href: `/se-busca?estado=${encodeURIComponent(estado)}`,
       };
     });
 

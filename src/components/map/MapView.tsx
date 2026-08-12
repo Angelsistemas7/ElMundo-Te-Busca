@@ -52,6 +52,7 @@ export type Zone = {
   toLocate: number;
   located: number;
   deceased: number;
+  href: string;
 };
 export type AidMarker = {
   id: string;
@@ -429,6 +430,8 @@ export default function MapView({
                   {z.count.toLocaleString("es-VE")} personas registradas · {z.toLocate} por localizar ·{" "}
                   {z.located} localizados
                   {z.deceased > 0 ? ` · ${z.deceased} sin vida` : ""}.
+                  <br />
+                  <a href={z.href} style={popupLink}>Ver en Se busca →</a>
                 </Popup>
               </Marker>
             ))}
