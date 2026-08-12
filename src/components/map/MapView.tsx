@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   LayerGroup,
   LayersControl,
@@ -13,24 +13,34 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// El panel de capas (LayersControl) forzado siempre abierto ocupa mucho del
-// mapa en pantallas chicas. En móvil arranca colapsado (icono que se
-// despliega al tocar, comportamiento nativo de Leaflet); en escritorio sigue
-// abierto de una vez, hay espacio de sobra.
-function useIsMobile(): boolean {
-  // Este componente (CrisisMap) solo se carga en el cliente (`dynamic(...,
-  // {ssr:false})`), así que leer `window` en el estado inicial es seguro: no
-  // hay hidratación de servidor con la que desincronizarse. Se evalúa una
-  // vez ANTES de que `LayersControl` monte, para que arranque colapsado en
-  // móvil desde el primer render en vez de abrirse y cerrarse de golpe.
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 639px)").matches);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return isMobile;
+// El control nativo de Leaflet, con `collapsed:false` (como estaba antes en
+// escritorio), desactiva POR COMPLETO su interactividad — nunca instala
+// ningún manejador de expandir/colapsar, queda forzado abierto para siempre,
+// ni con el mouse se puede ocultar. Y con `collapsed:true` (como ya estaba en
+// móvil), el ícono que abre el panel solo sabe EXPANDIR: al tocarlo una
+// segunda vez no hace nada (su propio manejador de clic solo llama a
+// `expand()`), y encima el CSS de Leaflet oculta ese mismo ícono mientras
+// está expandido (`.leaflet-control-layers-expanded .leaflet-control-layers-
+// toggle{display:none}`) — no queda ningún botón visible para volver a
+// cerrarlo. Por eso ahora el control SIEMPRE arranca colapsado (mismo
+// comportamiento en escritorio y móvil, para poder ocultarlo en los dos) y,
+// tras montarse, se reemplaza el manejador de clic del ícono por uno propio
+// que sí alterna abierto/cerrado — ver `wireLayersToggle` más abajo. El
+// desplegable de hover en escritorio (mouseenter/mouseleave) sigue intacto,
+// esto solo cambia qué pasa al hacer CLIC.
+function wireLayersToggle(container: HTMLElement) {
+  const toggle = container.querySelector<HTMLElement>(".leaflet-control-layers-toggle");
+  if (!toggle) return;
+  function onClick(e: Event) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    container.classList.toggle("leaflet-control-layers-expanded");
+  }
+  // Captura (antes de que burbujee): así se adelanta al manejador propio de
+  // Leaflet en el mismo ícono (que solo expande) y lo reemplaza sin pelear
+  // con él en el mismo ciclo de evento.
+  toggle.addEventListener("click", onClick, true);
+  return () => toggle.removeEventListener("click", onClick, true);
 }
 
 export type Zone = {
@@ -187,9 +197,26 @@ export default function MapView({
   center: [number, number];
   zoom?: number;
 }) {
-  const isMobile = useIsMobile();
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    // El contenedor del control lo crea Leaflet directamente en el DOM (no es
+    // un nodo que React renderice), así que se busca después de montar. Un
+    // solo intento con `requestAnimationFrame` de respaldo alcanza: Leaflet
+    // ya lo pinta de forma síncrona al agregar el control al mapa.
+    const container = root.querySelector<HTMLElement>(".leaflet-control-layers");
+    if (container) return wireLayersToggle(container);
+    const raf = requestAnimationFrame(() => {
+      const late = root.querySelector<HTMLElement>(".leaflet-control-layers");
+      if (late) wireLayersToggle(late);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   return (
-    <div className="flex h-[68vh] min-h-[460px] w-full flex-col">
+    <div ref={rootRef} className="flex h-[68vh] min-h-[460px] w-full flex-col">
       <MapContainer
         center={center}
         zoom={zoom}
@@ -217,7 +244,7 @@ export default function MapView({
       {/* Control nativo de Leaflet (checkboxes flotando sobre el mapa, esquina
           superior derecha) para encender/apagar cada capa. En móvil arranca
           colapsado (ver useIsMobile) para no tapar el mapa. */}
-      <LayersControl position="topright" collapsed={isMobile}>
+      <LayersControl position="topright" collapsed>
         <LayersControl.Overlay checked name="🆘 Necesito ayuda">
           <LayerGroup>
             {needs.map((n) => (

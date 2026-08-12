@@ -76,7 +76,15 @@ export function SiteHeader() {
   }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/85 backdrop-blur">
+    // `translateZ(0)` fuerza una capa de composición propia: mismo fix que ya
+    // tiene MobileNav.tsx (barra fija de abajo) — sin esto, en Chrome/Safari
+    // móvil este header "sticky" se queda un frame atrás cuando la barra de
+    // direcciones del navegador se oculta al hacer scroll, dejando ver un
+    // hueco blanco momentáneo entre el header y el borde real de la pantalla.
+    <header
+      className="sticky top-0 z-40 border-b border-zinc-200 bg-white/85 backdrop-blur will-change-transform"
+      style={{ transform: "translateZ(0)" }}
+    >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="flex shrink-0 items-center gap-2">
           <Image

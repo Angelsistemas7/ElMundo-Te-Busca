@@ -7,7 +7,7 @@ import { PERSON_STATUS_LABEL, type PersonStatus } from "@/lib/types";
 import { getSessionUserAction, reportStatusAction, type ActionResult } from "@/app/actions";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
-import { Turnstile } from "./Turnstile";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 
 const REPORTABLE: PersonStatus[] = ["localizado", "hospitalizado", "fallecido", "por_localizar"];
 
@@ -34,6 +34,7 @@ export function ReportStatusButton({
   const [reportedStatus, setReportedStatus] = useState<PersonStatus>("localizado");
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -63,6 +64,7 @@ export function ReportStatusButton({
       const res = await reportStatusAction(new FormData(e.currentTarget));
       setResult(res);
       if (res.ok) router.refresh();
+      else turnstileRef.current?.reset();
     } finally {
       setSubmitting(false);
     }
@@ -176,7 +178,7 @@ export function ReportStatusButton({
                   <Textarea id="notes" name="notes" placeholder="Cuenta lo que sabes para ayudar a verificar..." />
                 </Field>
 
-                <Turnstile />
+                <Turnstile ref={turnstileRef} />
 
                 <label className="flex cursor-pointer items-start gap-2.5 text-sm text-zinc-600">
                   <input

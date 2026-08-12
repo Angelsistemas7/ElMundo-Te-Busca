@@ -6,7 +6,7 @@ import { CheckCircle2, Loader2, Plus } from "lucide-react";
 import { registerMarchAction, type ActionResult } from "@/app/actions";
 import { Modal } from "./Modal";
 import { Field, Input, Textarea } from "./FormControls";
-import { Turnstile } from "./Turnstile";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { ManageLinkBox } from "./ManageLinkBox";
 
 export function RegisterMarchButton() {
@@ -16,6 +16,7 @@ export function RegisterMarchButton() {
   const [result, setResult] = useState<ActionResult | null>(null);
   const [title, setTitle] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   function close() {
     setOpen(false);
@@ -36,6 +37,7 @@ export function RegisterMarchButton() {
       const res = await registerMarchAction(form);
       setResult(res);
       if (res.ok) router.refresh();
+      else turnstileRef.current?.reset();
     } finally {
       setSubmitting(false);
     }
@@ -127,7 +129,7 @@ export function RegisterMarchButton() {
               <Textarea id="description" name="description" placeholder="Llevar agua y alimentos no perecederos. Encuentro 6:30 a. m..." />
             </Field>
 
-            <Turnstile />
+            <Turnstile ref={turnstileRef} />
 
             {result && !result.ok && (
               <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">

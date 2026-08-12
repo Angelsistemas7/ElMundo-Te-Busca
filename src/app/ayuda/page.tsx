@@ -1,4 +1,3 @@
-import Link from "next/link";
 import nextDynamic from "next/dynamic";
 import { HeartHandshake } from "lucide-react";
 import { getAidPointsPage, getCommentsForEntities, getHeroes, getNewsItems } from "@/lib/data";
@@ -7,12 +6,11 @@ import { isAdmin } from "@/lib/admin";
 import { getActiveCountry } from "@/lib/country-server";
 import { getCountry } from "@/lib/countries";
 import { AID_POINT_TYPE_LABEL, type AidPointType } from "@/lib/types";
-import { cn, clampPageSize } from "@/lib/utils";
+import { clampPageSize } from "@/lib/utils";
 import { AidPointCard } from "@/components/AidPointCard";
 const RegisterAidPointButton = nextDynamic(() =>
   import("@/components/RegisterAidPointButton").then((m) => m.RegisterAidPointButton),
 );
-import { SwipeHintRowOnce } from "@/components/SwipeHint";
 import { Pagination } from "@/components/Pagination";
 import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
@@ -52,6 +50,23 @@ const TYPE_CHIPS: { value: AidPointType | "all"; label: string }[] = [
 function buildFilterFields(regions: readonly string[]): FilterField[] {
   return [
     {
+      kind: "chips",
+      key: "type",
+      label: "Tipo de ayuda",
+      defaultValue: "all",
+      options: TYPE_CHIPS,
+    },
+    {
+      kind: "chips",
+      key: "avail",
+      label: "Disponibilidad",
+      defaultValue: "0",
+      options: [
+        { value: "0", label: "Todos los puntos" },
+        { value: "1", label: "Solo disponibles" },
+      ],
+    },
+    {
       kind: "select",
       key: "estado",
       label: "Estado (región)",
@@ -90,29 +105,6 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
     getCommentsForEntities("news_item", curatedAyuda.map((n) => n.id)),
   ]);
 
-  const chipHref = (t: AidPointType | "all") => {
-    const params = new URLSearchParams();
-    if (t !== "all") params.set("type", t);
-    if (availOnly) params.set("avail", "1");
-    if (estado !== "all") params.set("estado", estado);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
-    if (pageSize !== 10) params.set("pageSize", String(pageSize));
-    const qs = params.toString();
-    return qs ? `/ayuda?${qs}` : "/ayuda";
-  };
-  const availHref = () => {
-    const params = new URLSearchParams();
-    if (type !== "all") params.set("type", type);
-    if (!availOnly) params.set("avail", "1");
-    if (estado !== "all") params.set("estado", estado);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
-    if (pageSize !== 10) params.set("pageSize", String(pageSize));
-    const qs = params.toString();
-    return qs ? `/ayuda?${qs}` : "/ayuda";
-  };
-
   const currentParams: Record<string, string> = {};
   if (type !== "all") currentParams.type = type;
   if (availOnly) currentParams.avail = "1";
@@ -136,36 +128,6 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
           description="Donatones de comida, agua, refugios y medicinas. Registra un punto físico real con foto y datos de contacto para que la comunidad lo verifique y la ayuda llegue a donde se necesita."
         />
         <RegisterAidPointButton country={country} />
-      </div>
-
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <SwipeHintRowOnce className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-          {TYPE_CHIPS.map((c) => (
-            <Link
-              key={c.value}
-              href={chipHref(c.value)}
-              className={cn(
-                "press whitespace-nowrap rounded-full border px-3 py-1 text-sm font-medium transition",
-                type === c.value
-                  ? "border-brand-400 bg-brand-50 text-brand-700"
-                  : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300",
-              )}
-            >
-              {c.label}
-            </Link>
-          ))}
-        </SwipeHintRowOnce>
-        <Link
-          href={availHref()}
-          className={cn(
-            "press inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-sm font-medium transition",
-            availOnly
-              ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-              : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300",
-          )}
-        >
-          {availOnly ? "✓ " : ""}Solo disponibles
-        </Link>
       </div>
 
       <div className="mb-4 flex items-center justify-end gap-2">

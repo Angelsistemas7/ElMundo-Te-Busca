@@ -167,7 +167,7 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
         <PersonViewToggle view={view} />
       </div>
 
-      <div className="mt-2 flex flex-col gap-4">
+      <div className="mt-2 flex flex-col gap-3">
         <SearchAndFilters unidentified={isReconoces} country={country}>
           {/* Publicar solo vive en "Se busca" — "¿La reconoces?" es una forma
               de RECORRER lo ya publicado, no un lugar distinto para publicar. */}
@@ -182,7 +182,7 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
         )}
 
         {!isReconoces && showAgeSections && (
-          <div className="space-y-8 border-t border-zinc-100 pt-6">
+          <div className="space-y-8 border-t border-zinc-100 pt-3">
             {/* Da esperanza primero: lo que más motiva a seguir usando la
                 plataforma va arriba, antes de explorar por edad. */}
             {showBuscaExtras && <RecentlyLocated persons={recentlyLocated} />}

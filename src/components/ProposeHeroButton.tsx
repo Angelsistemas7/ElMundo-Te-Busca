@@ -8,7 +8,7 @@ import { getCountry } from "@/lib/countries";
 import { registerHeroAction, type ActionResult } from "@/app/actions";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
-import { Turnstile } from "./Turnstile";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 
 const CATEGORIES = Object.keys(HERO_CATEGORY_LABEL) as HeroCategory[];
 
@@ -19,6 +19,7 @@ export function ProposeHeroButton({ country = "ve" }: { country?: string } = {})
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   function close() {
     setOpen(false);
@@ -37,6 +38,7 @@ export function ProposeHeroButton({ country = "ve" }: { country?: string } = {})
       const res = await registerHeroAction(new FormData(e.currentTarget));
       setResult(res);
       if (res.ok) router.refresh();
+      else turnstileRef.current?.reset();
     } finally {
       setSubmitting(false);
     }
@@ -121,7 +123,7 @@ export function ProposeHeroButton({ country = "ve" }: { country?: string } = {})
               </Field>
             </div>
 
-            <Turnstile />
+            <Turnstile ref={turnstileRef} />
 
             {result && !result.ok && (
               <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{result.error}</p>

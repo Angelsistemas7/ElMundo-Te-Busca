@@ -11,7 +11,7 @@ import { compressImage } from "@/lib/image";
 import { Modal } from "./Modal";
 import { LocationPicker } from "./map/LocationPicker";
 import { Field, Input, Select, Textarea } from "./FormControls";
-import { Turnstile } from "./Turnstile";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 
 const TYPES = Object.keys(VOLUNTEER_TYPE_LABEL) as VolunteerType[];
 
@@ -25,6 +25,7 @@ export function RegisterVolunteerButton({ country = "ve" }: { country?: string }
   const [preview, setPreview] = useState<string | null>(null);
   const fileRef = useRef<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   // Deep-link desde la guía "¿Cómo puedo ayudar?" (/voluntarios/guia): llega
   // con ?registrar=1 y abre el formulario directo, sin que haya que buscar el
@@ -62,6 +63,7 @@ export function RegisterVolunteerButton({ country = "ve" }: { country?: string }
       const res = await registerVolunteerAction(form);
       setResult(res);
       if (res.ok) router.refresh();
+      else turnstileRef.current?.reset();
     } finally {
       setSubmitting(false);
     }
@@ -163,7 +165,7 @@ export function RegisterVolunteerButton({ country = "ve" }: { country?: string }
               label="¿Estás en la zona? Marca tu ubicación (opcional)"
               hint="Si estás en el terreno, toca el mapa o usa tu GPS para que el equipo te ubique."
             >
-              <LocationPicker />
+              <LocationPicker defaultCenter={getCountry(country).epicenter} />
             </Field>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -181,7 +183,7 @@ export function RegisterVolunteerButton({ country = "ve" }: { country?: string }
             </div>
 
             <input type="hidden" name="photoUrl" />
-            <Turnstile />
+            <Turnstile ref={turnstileRef} />
 
             {result && !result.ok && (
               <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{result.error}</p>

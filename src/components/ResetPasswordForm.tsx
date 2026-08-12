@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { updatePasswordAction, type AuthActionResult } from "@/app/actions";
-import { Field, Input } from "./FormControls";
+import { Field, PasswordInput } from "./FormControls";
 
 export function ResetPasswordForm() {
   const [submitting, setSubmitting] = useState(false);
@@ -49,7 +49,7 @@ export function ResetPasswordForm() {
         error={fieldErrors?.password}
         hint="Mínimo 10 caracteres. No uses la misma de tu correo o redes, pero elige una que recuerdes."
       >
-        <Input id="password" name="password" type="password" autoComplete="new-password" placeholder="••••••••••" />
+        <PasswordInput id="password" name="password" autoComplete="new-password" placeholder="••••••••••" />
       </Field>
 
       {result && !result.ok && (

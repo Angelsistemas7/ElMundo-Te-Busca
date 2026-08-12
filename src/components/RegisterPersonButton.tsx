@@ -25,7 +25,7 @@ import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
-import { Turnstile } from "./Turnstile";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { ManageLinkBox } from "./ManageLinkBox";
 import { LocationPicker } from "./map/LocationPicker";
 
@@ -49,6 +49,7 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
   const skipDuplicateCheck = useRef(false);
   const fileRef = useRef<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   function reset() {
     setResult(null);
@@ -122,6 +123,8 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
       if (res.ok) {
         setDone(true);
         router.refresh();
+      } else {
+        turnstileRef.current?.reset();
       }
     } finally {
       setSubmitting(false);
@@ -415,7 +418,7 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
               label={isSighting ? "Señala en el mapa dónde la viste" : "Señala el lugar en el mapa (opcional)"}
               hint="Toca el mapa o usa tu GPS. Ayuda a ubicarla con precisión."
             >
-              <LocationPicker />
+              <LocationPicker defaultCenter={getCountry(country).epicenter} />
             </Field>
 
             {isSighting && (
@@ -474,7 +477,7 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
 
             <input type="hidden" name="photoUrl" />
             <input type="hidden" name="isUnidentified" value={isSighting ? "on" : ""} />
-            <Turnstile />
+            <Turnstile ref={turnstileRef} />
 
             <p className="text-xs text-zinc-500">
               {isSighting

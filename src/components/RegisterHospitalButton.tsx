@@ -8,7 +8,7 @@ import { getCountry } from "@/lib/countries";
 import { registerHospitalAction, type ActionResult } from "@/app/actions";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
-import { Turnstile } from "./Turnstile";
+import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { LocationPicker } from "./map/LocationPicker";
 
 const STATUSES = Object.keys(HOSPITAL_STATUS_LABEL) as HospitalStatus[];
@@ -20,6 +20,7 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   function close() {
     setOpen(false);
@@ -40,6 +41,8 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
       if (res.ok) {
         router.refresh();
         close();
+      } else {
+        turnstileRef.current?.reset();
       }
     } finally {
       setSubmitting(false);
@@ -105,7 +108,7 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
             </Field>
 
             <Field label="Señala el hospital en el mapa" hint="Toca el mapa o usa tu GPS para ubicarlo exacto.">
-              <LocationPicker />
+              <LocationPicker defaultCenter={getCountry(country).epicenter} />
             </Field>
 
             <Field
@@ -134,7 +137,7 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
               </Field>
             </div>
 
-            <Turnstile />
+            <Turnstile ref={turnstileRef} />
 
             {result && !result.ok && (
               <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{result.error}</p>

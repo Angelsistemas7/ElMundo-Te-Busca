@@ -1,4 +1,4 @@
-import { Megaphone, Users2 } from "lucide-react";
+import { Users2 } from "lucide-react";
 import { getCommentsForEntities, getPosts, getPostsPage, type PostSort } from "@/lib/data";
 import { POST_TYPE_EMOJI, POST_TYPE_LABEL, type PostType } from "@/lib/types";
 import { getActiveCountry } from "@/lib/country-server";
@@ -135,22 +135,6 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
         />
         <CommunityIllustration className="hidden h-20 w-28 shrink-0 sm:block" />
       </div>
-
-      {/* Lo primero que se ve al entrar: reportar algo urgente no debe esperar
-          a que alguien baje hasta el final de la página. */}
-      <section className="reveal-up mb-5 flex flex-col items-center gap-3 rounded-3xl border border-teal-200 bg-teal-50 p-5 text-center">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-500 text-white">
-          <Megaphone className="h-5 w-5" />
-        </span>
-        <div>
-          <h3 className="font-bold text-zinc-900">¿Tienes información urgente?</h3>
-          <p className="text-sm text-zinc-600">
-            Si ves una emergencia o situación crítica, repórtala para que la comunidad y los
-            equipos de ayuda puedan actuar lo más rápido posible.
-          </p>
-        </div>
-        <CreatePostButton variant="urgent" initialType="rescate" country={country} />
-      </section>
 
       <div className="mb-5">
         <CreatePostButton variant="bar" country={country} />
