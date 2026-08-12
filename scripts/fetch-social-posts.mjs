@@ -86,7 +86,11 @@ loadEnv();
 // TypeScript), así que no puede importar ese archivo .ts directamente.
 const DEFAULT_HASHTAGS = {
   ve: "TerremotoVE,TerremotoVenezuela,laguaira",
-  co: "TerremotoColombia,SismoColombia,TerremotoChoco,Quibdo,Quibdó,Choco,Chocó,Pereira,Risaralda,Manizales,Cali,hidroituango,SOScolombia,Dosquebradas,ValleDelCauca,Caldas,Buenaventura",
+  // "hidroituango" quitado (2026-08-12): es un tema aparte (represa en
+  // Antioquia, sin relación con el terremoto) y traía publicaciones fuera de
+  // tema. "SanJoseDelPalmar" es el municipio del epicentro (ver quakeInfo en
+  // countries.ts), Calarca/Quindío y Yumbo son zonas afectadas cercanas.
+  co: "TerremotoColombia,SismoColombia,TerremotoChoco,Quibdo,Quibdó,Choco,Chocó,Pereira,Risaralda,Manizales,Cali,SOScolombia,Dosquebradas,ValleDelCauca,Caldas,Buenaventura,SanJoseDelPalmar,Calarca,Quindio,Quindío,Yumbo",
 };
 const COUNTRY_META = {
   ve: { name: "Venezuela", quakeLabel: "el terremoto de Venezuela del 24-25 de junio de 2026" },
