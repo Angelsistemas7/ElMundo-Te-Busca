@@ -262,6 +262,9 @@ async function fetchFromGdelt(fetchLimit: number, country: CountryCode): Promise
     for (const a of json.articles ?? []) {
       if (!a.url || !a.title || seen.has(a.url)) continue;
       if (/facebook|twitter|x\.com|instagram|tiktok|youtube|reddit/i.test(a.domain ?? "")) continue;
+      // Mismo colador que `getWorldPress` (matchesCountry) — ver nota igual
+      // en `fetchGdeltForCrisisStats` más abajo.
+      if (!matchesCountry(country, a.title, a.domain)) continue;
       seen.add(a.url);
       const article: NewsArticle = {
         id: a.url,
@@ -339,6 +342,9 @@ async function fetchFromGNews(fetchLimit: number, country: CountryCode): Promise
     const out: NewsArticle[] = [];
     for (const a of json.articles ?? []) {
       if (!a.url || !a.title || seen.has(a.url)) continue;
+      // Mismo colador que `getWorldPress` (matchesCountry) — ver nota igual
+      // en `fetchGdeltForCrisisStats` más abajo.
+      if (!matchesCountry(country, a.title, a.source?.name)) continue;
       seen.add(a.url);
       out.push({
         id: a.url,
@@ -510,6 +516,13 @@ async function fetchGdeltForCrisisStats(
     for (const a of json.articles ?? []) {
       if (!a.url || !a.title || seen.has(a.url)) continue;
       if (/facebook|twitter|x\.com|instagram|tiktok|youtube|reddit/i.test(a.domain ?? "")) continue;
+      // Mismo colador que `getVerifiedNews`/`getWorldPress` (matchesCountry): la
+      // búsqueda de GDELT ya viene orientada al país, pero eso no basta — un
+      // titular que solo lo menciona de pasada (o es del otro sismo) puede
+      // colarse igual. Sin esto, con dos países activos compitiendo por los
+      // mismos términos ("terremoto", "sismo"), la IA podía sacarle a un país
+      // una cifra de víctimas que en realidad era del otro.
+      if (!matchesCountry(country, a.title, a.domain)) continue;
       seen.add(a.url);
       out.push({
         title: a.title.trim(),
