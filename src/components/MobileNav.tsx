@@ -39,8 +39,8 @@ const PRIMARY = [
 ];
 
 const MORE = [
-  { href: "/ayuda", label: "Ayuda y hospitales", icon: HeartHandshake },
-  { href: "/mascotas", label: "Mascotas", icon: PawPrint },
+  { href: "/ayuda", label: "Ayuda y hospitales", icon: HeartHandshake, tour: "mnav-mas-ayuda" },
+  { href: "/mascotas", label: "Mascotas", icon: PawPrint, tour: "mnav-mas-mascotas" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -65,6 +65,19 @@ export function MobileNav() {
     : Math.max(0, PRIMARY.findIndex((t) => isActive(pathname, t.href)));
 
   const navRef = useRef<HTMLElement>(null);
+
+  // La guía rápida (OnboardingTour.tsx) necesita abrir esta hoja sola para
+  // resaltar "Ayuda y hospitales"/"Mascotas" (viven detrás de "Más", no hay
+  // otra forma de mostrarlos) y cerrarla al terminar — se coordinan por
+  // evento, mismo patrón que "vtb:auth-open"/"vtb:tour-open".
+  useEffect(() => {
+    const onSetMore = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { open?: boolean } | undefined;
+      if (typeof detail?.open === "boolean") setMoreOpen(detail.open);
+    };
+    window.addEventListener("vtb:tour-set-more", onSetMore);
+    return () => window.removeEventListener("vtb:tour-set-more", onSetMore);
+  }, []);
 
   // Chrome Android "salta" los elementos `fixed` de abajo cuando su barra de
   // direcciones se oculta/muestra al hacer scroll (Safari no tiene este bug
@@ -109,12 +122,13 @@ export function MobileNav() {
               </IconButton>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {MORE.map(({ href, label, icon: Icon }) => {
+              {MORE.map(({ href, label, icon: Icon, tour }) => {
                 const active = isActive(pathname, href);
                 return (
                   <Link
                     key={href}
                     href={href}
+                    data-tour={tour}
                     onClick={() => setMoreOpen(false)}
                     className={cn(
                       "tap-card flex items-center gap-2.5 rounded-2xl border px-3 py-3 text-sm font-medium",

@@ -32,8 +32,8 @@ const PRIMARY = [
 ];
 
 const MORE = [
-  { href: "/ayuda", label: "Ayuda y hospitales", icon: HeartHandshake },
-  { href: "/mascotas", label: "Mascotas", icon: PawPrint },
+  { href: "/ayuda", label: "Ayuda y hospitales", icon: HeartHandshake, tour: "dnav-mas-ayuda" },
+  { href: "/mascotas", label: "Mascotas", icon: PawPrint, tour: "dnav-mas-mascotas" },
 ];
 
 // Sub-secciones que viven bajo cada pestaña "paraguas" (se resaltan con ella).
@@ -75,6 +75,18 @@ export function SiteHeader() {
   useEffect(() => {
     setMoreOpen(false);
   }, [pathname]);
+
+  // La guía rápida (OnboardingTour.tsx) necesita abrir este desplegable sola
+  // para resaltar "Ayuda y hospitales"/"Mascotas" (viven detrás de "Más", no
+  // hay otra forma de mostrarlos) y cerrarlo al terminar.
+  useEffect(() => {
+    const onSetMore = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { open?: boolean } | undefined;
+      if (typeof detail?.open === "boolean") setMoreOpen(detail.open);
+    };
+    window.addEventListener("vtb:tour-set-more", onSetMore);
+    return () => window.removeEventListener("vtb:tour-set-more", onSetMore);
+  }, []);
 
   return (
     // `translateZ(0)` fuerza una capa de composición propia: mismo fix que ya
@@ -146,12 +158,13 @@ export function SiteHeader() {
 
               {moreOpen && (
                 <div className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-2xl border border-zinc-200 bg-white py-1.5 shadow-xl">
-                  {MORE.map(({ href, label, icon: Icon }) => {
+                  {MORE.map(({ href, label, icon: Icon, tour }) => {
                     const active = isActive(pathname, href);
                     return (
                       <Link
                         key={href}
                         href={href}
+                        data-tour={tour}
                         aria-current={active ? "page" : undefined}
                         className={cn(
                           "flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition",

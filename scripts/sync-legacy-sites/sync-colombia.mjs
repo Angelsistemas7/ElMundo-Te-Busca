@@ -28,7 +28,12 @@ async function fetchHtml(url, retries = 3) {
 function extractPersonIds(html) {
   const $ = cheerio.load(html);
   const ids = new Set();
-  $('a[href*="?person="]').each((_, el) => {
+  // El sitio empezó a anteponer "tab=persons&page=N&" antes de "person=" en
+  // sus enlaces (antes el parámetro iba justo después de "?") — el selector
+  // exigía el "?" pegado y dejó de encontrar nada desde entonces. La regex
+  // ya valida el formato exacto "person=<uuid>", así que basta con que el
+  // href contenga esa cadena en cualquier posición.
+  $('a[href*="person="]').each((_, el) => {
     const m = ($(el).attr("href") || "").match(/person=([0-9a-f-]{36})/i);
     if (m) ids.add(m[1]);
   });

@@ -13,6 +13,11 @@ type Step = {
   selector: string;
   title: string;
   text: string;
+  /** Ayuda y hospitales/Mascotas viven detrás de "Más" — este paso necesita
+   *  que ese desplegable/hoja esté abierto para poder resaltar el ítem real
+   *  en vez del botón "Más" en sí. Se coordina con MobileNav/SiteHeader por
+   *  el evento "vtb:tour-set-more". */
+  opensMore?: boolean;
 };
 
 const INTRO: Step = {
@@ -36,7 +41,22 @@ const MOBILE_STEPS: Step[] = [
   {
     selector: '[data-tour="mnav-comunidad"]',
     title: "Comunidad",
-    text: "Todo lo que no es \"busco a alguien\": pide o da ayuda, súmate como voluntario digital, mira caravanas benéficas o denuncia una irregularidad — publica cualquiera desde aquí.",
+    text: "Todo lo que no es \"busco a alguien\" vive aquí: pide o da ayuda, publica lo que necesites. Los próximos 3 pasos son sus secciones.",
+  },
+  {
+    selector: '[data-tour="mnav-comunidad"]',
+    title: "Voluntariado digital",
+    text: "Súmate sin salir de casa: comenta, verifica publicaciones, comparte lo que importa. No necesitas estar en el terreno.",
+  },
+  {
+    selector: '[data-tour="mnav-comunidad"]',
+    title: "Caravanas benéficas",
+    text: "Caravanas de ayuda organizadas, con su ruta y contacto por WhatsApp para coordinar.",
+  },
+  {
+    selector: '[data-tour="mnav-comunidad"]',
+    title: "Denuncias",
+    text: "Reporta irregularidades reales: desvío o robo de ayuda, fraude, riesgo de niñez, abuso. Requiere cuenta, para evitar denuncias falsas.",
   },
   {
     selector: '[data-tour="mnav-mapa"]',
@@ -49,14 +69,16 @@ const MOBILE_STEPS: Step[] = [
     text: "Líneas de emergencia y qué hacer si estás viviendo la crisis ahora mismo.",
   },
   {
-    selector: '[data-tour="mnav-mas"]',
+    selector: '[data-tour="mnav-mas-ayuda"]',
     title: "Ayuda y hospitales",
     text: "Puntos de ayuda con sus recursos por categoría (agua, comida, medicinas...) y hospitales con su capacidad e insumos — vive detrás de \"Más\".",
+    opensMore: true,
   },
   {
-    selector: '[data-tour="mnav-mas"]',
+    selector: '[data-tour="mnav-mas-mascotas"]',
     title: "Mascotas",
     text: "Mascotas perdidas o encontradas durante la emergencia, con foto y ubicación — también detrás de \"Más\".",
+    opensMore: true,
   },
   {
     selector: '[data-tour="tour-bell"]',
@@ -85,7 +107,22 @@ const DESKTOP_STEPS: Step[] = [
   {
     selector: '[data-tour="dnav-comunidad"]',
     title: "Comunidad",
-    text: "Todo lo que no es \"busco a alguien\": pide o da ayuda, súmate como voluntario digital, mira caravanas benéficas o denuncia una irregularidad — publica cualquiera desde aquí.",
+    text: "Todo lo que no es \"busco a alguien\" vive aquí: pide o da ayuda, publica lo que necesites. Los próximos 3 pasos son sus secciones.",
+  },
+  {
+    selector: '[data-tour="dnav-comunidad"]',
+    title: "Voluntariado digital",
+    text: "Súmate sin salir de casa: comenta, verifica publicaciones, comparte lo que importa. No necesitas estar en el terreno.",
+  },
+  {
+    selector: '[data-tour="dnav-comunidad"]',
+    title: "Caravanas benéficas",
+    text: "Caravanas de ayuda organizadas, con su ruta y contacto por WhatsApp para coordinar.",
+  },
+  {
+    selector: '[data-tour="dnav-comunidad"]',
+    title: "Denuncias",
+    text: "Reporta irregularidades reales: desvío o robo de ayuda, fraude, riesgo de niñez, abuso. Requiere cuenta, para evitar denuncias falsas.",
   },
   {
     selector: '[data-tour="dnav-mapa"]',
@@ -98,14 +135,16 @@ const DESKTOP_STEPS: Step[] = [
     text: "Líneas de emergencia y qué hacer si estás viviendo la crisis ahora mismo.",
   },
   {
-    selector: '[data-tour="dnav-mas"]',
+    selector: '[data-tour="dnav-mas-ayuda"]',
     title: "Ayuda y hospitales",
     text: "Puntos de ayuda con sus recursos por categoría (agua, comida, medicinas...) y hospitales con su capacidad e insumos — vive detrás de \"Más\".",
+    opensMore: true,
   },
   {
-    selector: '[data-tour="dnav-mas"]',
+    selector: '[data-tour="dnav-mas-mascotas"]',
     title: "Mascotas",
     text: "Mascotas perdidas o encontradas durante la emergencia, con foto y ubicación — también detrás de \"Más\".",
+    opensMore: true,
   },
   {
     selector: '[data-tour="tour-bell"]',
@@ -208,6 +247,7 @@ export function OnboardingTour() {
 
   const finish = useCallback(() => {
     setOpen(false);
+    window.dispatchEvent(new CustomEvent("vtb:tour-set-more", { detail: { open: false } }));
     try {
       localStorage.setItem(SEEN_KEY, "1");
     } catch {
@@ -240,15 +280,34 @@ export function OnboardingTour() {
 
   useEffect(() => {
     if (!open) return;
-    measure();
+    let cancelled = false;
+    const wantsMore = !!step.opensMore;
+    window.dispatchEvent(new CustomEvent("vtb:tour-set-more", { detail: { open: wantsMore } }));
+
+    // Si este paso necesita el desplegable/hoja "Más" abierto, el elemento a
+    // resaltar no existe en el DOM justo después de despachar el evento
+    // (React tiene que montar el sheet/dropdown primero) — se espera un
+    // instante antes de medir, si no `measure()` lo daría por inexistente y
+    // saltaría el paso solo.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (wantsMore) {
+      timer = setTimeout(() => {
+        if (!cancelled) measure();
+      }, 150);
+    } else {
+      measure();
+    }
+
     const onResize = () => measure();
     window.addEventListener("resize", onResize);
     window.addEventListener("scroll", onResize, true);
     return () => {
+      cancelled = true;
+      clearTimeout(timer);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("scroll", onResize, true);
     };
-  }, [open, measure]);
+  }, [open, step, measure]);
 
   function next() {
     if (stepIndex >= steps.length - 1) {
