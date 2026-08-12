@@ -1,3 +1,111 @@
+## 🔴 URGENTE — próxima sesión debe empezar por aquí (2026-08-12, ronda 11)
+
+**Hallazgo crítico, sin cerrar todavía**: la migración de `supabase/schema.sql`
+de la sesión de "duplicados" (hace varias rondas) **quedó commiteada en el
+código pero NUNCA se corrió en la base real de producción**. Ya se había
+avisado con un "⚠️" en su momento y no se confirmó. Se descubrió al intentar
+arreglar el scraping de Colombia (ver ronda 10 abajo): el fix del selector
+sí funciona, pero al intentar guardar cada persona falla con
+`column persons.duplicate_match_id does not exist` (error real de Postgres,
+`42703`, verificado en vivo contra la base real — no es caché).
+
+Se revisaron además otras 3 columnas de esa misma migración pendiente y
+**ninguna existe en producción**:
+- `persons.photo_hash` / `possible_duplicate` / `duplicate_match_id` →
+  **rompe el registro de personas desaparecidas en el sitio real** (no solo
+  el scraper — `createPerson` en `src/lib/data.ts` escribe estas 3 columnas
+  en CADA publicación nueva, manual o automática). Esto es lo más grave:
+  cualquiera que intente registrar a alguien desaparecido en producción
+  ahora mismo probablemente está fallando.
+- `aid_points.category_status` → rompe los niveles de urgencia por
+  categoría en puntos de ayuda.
+- `posts.aid_point_id` / `marches.aid_point_id` → rompe vincular
+  publicaciones/caravanas a un punto de ayuda.
+- `hospitals.photo_url` → rompe la foto al registrar un hospital.
+
+**No se pudo correr la migración desde este sandbox**: no hay `DATABASE_URL`
+(conexión directa a Postgres) en `.env.local`, solo la API REST de Supabase
+(anon + service role), y esa API no permite `ALTER TABLE` (PostgREST solo
+hace lectura/escritura de datos, no cambios de esquema). Se le envió el
+archivo `supabase/schema.sql` al dueño para que lo pegue completo en el SQL
+Editor de Supabase (Dashboard → SQL Editor → pegar → Run) — es idempotente,
+ya se corrió varias veces antes, no rompe nada existente.
+
+**Verificación pendiente en la próxima sesión, en este orden**:
+1. Confirmar con el dueño si ya corrió `supabase/schema.sql` en el SQL
+   Editor. Si no, es la prioridad #1 antes de cualquier otra cosa — el
+   registro de personas puede seguir roto en producción.
+2. Repetir el chequeo de solo lectura que se hizo hoy (pedir a
+   `NEXT_PUBLIC_SUPABASE_URL + /rest/v1/persons?select=duplicate_match_id&limit=1`
+   con la service role key) para confirmar que las 4 columnas ya existen.
+3. Volver a disparar el workflow `sync-legacy-sites.yml`
+   (`gh workflow run sync-legacy-sites.yml`) y revisar con
+   `gh run list --workflow=sync-legacy-sites.yml --limit 1` +
+   `gh run view <id> --log | grep "Colombia:"` que ahora diga "X nuevas"
+   con X>0 en vez de errores — recién ahí el scraping de Colombia queda
+   confirmado funcionando de punta a punta (el selector ya está arreglado
+   y pusheado, commit `49e123f`; solo falta que la migración desbloquee el
+   guardado).
+4. Probar en el sitio real registrar una persona nueva (formulario público)
+   y confirmar que ya no falla.
+
+### Checklist consolidado de TODO lo pendiente de hoy (2026-08-12), para no perder nada
+
+Pedido explícito del dueño al cerrar la sesión: dejar anotado todo lo que
+falta, sin que se escape nada. En orden de prioridad:
+
+1. **🔴 Migración `supabase/schema.sql` sin correr en producción** (ver
+   bloque de arriba) — bloquea el registro de personas, categorías de
+   ayuda, vincular posts/caravanas a puntos de ayuda, y foto de hospitales.
+   Prioridad #1 absoluta.
+2. **🔴 Scraping de Colombia** — selector arreglado y pusheado (commit
+   `49e123f`), pero el guardado real sigue fallando hasta que se corra la
+   migración del punto 1. Volver a disparar el workflow después.
+3. **Widget de estadísticas de Inicio lento** (`getCrisisStats`,
+   `src/lib/news.ts`) — sigue sin confirmarse si el cron de precalentamiento
+   (`/api/cron/warm-news`) está instalado y corriendo en el VPS real. No se
+   pudo revisar por SSH desde este sandbox (puerto 22 bloqueado saliendo de
+   aquí, confirmado con `Connection timed out`; sí hay salida HTTPS normal).
+   El dueño tiene la llave en `Desktop/vps/oracle-vps.key`, IP
+   `158.101.105.13`, usuario `ubuntu`. Pendiente que el dueño mismo corra:
+   ```
+   crontab -l
+   tail -50 logs/warm-news.log
+   ls -la /tmp/elmundotebusca-news-cache-*.json
+   ```
+4. **Guía rápida (OnboardingTour) — el dueño la sintió corta DOS veces
+   seguidas.** Ronda 9 la enriqueció (textos más completos, paso "Inicio"
+   nuevo). Ronda 10 la amplió más en serio: abre "Más" de verdad para
+   resaltar Ayuda/Mascotas, y separó "Comunidad" en 4 pasos (13 pasos + 1 de
+   bienvenida = 14 total, antes 9+1). **Si en la próxima sesión el dueño
+   sigue sintiéndola corta**, la opción que rechazó en ronda 9 (guías
+   separadas DENTRO de cada página, no solo del menú de navegación) es
+   probablemente lo que en realidad quiere — reconsiderarla en vez de seguir
+   agregando texto al mismo tour de navegación.
+5. **Todo lo de interacción pura de las rondas 8-10 sigue sin probarse en un
+   navegador/teléfono real** (este sandbox no puede usar el panel de
+   navegador — le crashea la app al dueño, y `curl` no sirve para overlays
+   `createPortal`/estado que revela solo tras `useEffect`):
+   - Barra inferior de móvil ya no debería "saltar" en Chrome Android con
+     scroll fuerte, y debería verse bien con el teclado abierto (ronda 9).
+   - Los 3 avisos superiores (niñez/emergencia/quiero-ayudar) deberían
+     aparecer una vez al día, cada uno llevando a su destino correcto
+     (modal, `/emergencias`, `/voluntarios/guia`) (ronda 10).
+   - La guía debería abrir sola el desplegable/hoja "Más" en los pasos de
+     Ayuda y Mascotas, resaltar el ítem real, y cerrarlo al avanzar
+     (ronda 10) — es el cambio más nuevo y menos probado de la sesión.
+   - Modales respetando "atrás" del navegador, spotlight de la guía en
+     ambos tamaños de pantalla (ronda 7-8, sigue sin confirmarse).
+6. **`FieldVolunteerBar.tsx` ("¿Estás en la zona del terremoto?") se dejó
+   intacto a propósito** — es voluntariado de TERRENO (gente físicamente en
+   la zona), un concepto distinto al voluntariado digital que se enlazó en
+   los 3 avisos nuevos. No es un pendiente, es una decisión tomada.
+7. `sync-venezuela.mjs` no tiene el mismo bug de selector (usa Playwright,
+   no cheerio) y sigue funcionando bien — no necesita el mismo fix, pero SÍ
+   depende de la misma migración pendiente del punto 1 si intenta guardar
+   una persona con `photo_hash`/`duplicate_match_id` (no se confirmó si le
+   pega el mismo error, revisar si sigue dando errores tras la migración).
+
 ## ✅ Cerrado (2026-08-12, ronda 10) — build verde, pusheado (commit 49e123f)
 
 Continuación de la ronda 9, mismo chat. Tres pedidos del dueño:
