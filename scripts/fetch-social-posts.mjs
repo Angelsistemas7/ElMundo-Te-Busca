@@ -93,8 +93,16 @@ const DEFAULT_HASHTAGS = {
   co: "TerremotoColombia,SismoColombia,TerremotoChoco,Quibdo,Quibdó,Choco,Chocó,Pereira,Risaralda,Manizales,Cali,SOScolombia,Dosquebradas,ValleDelCauca,Caldas,Buenaventura,SanJoseDelPalmar,Calarca,Quindio,Quindío,Yumbo",
 };
 const COUNTRY_META = {
-  ve: { name: "Venezuela", quakeLabel: "el terremoto de Venezuela del 24-25 de junio de 2026" },
-  co: { name: "Colombia", quakeLabel: "el terremoto de Colombia del 10 de agosto de 2026" },
+  ve: {
+    name: "Venezuela",
+    quakeLabel: "el terremoto de Venezuela del 24-25 de junio de 2026",
+    quakeDate: "2026-06-24",
+  },
+  co: {
+    name: "Colombia",
+    quakeLabel: "el terremoto de Colombia del 10 de agosto de 2026",
+    quakeDate: "2026-08-10",
+  },
 };
 const COUNTRY_CODES = Object.keys(COUNTRY_META);
 
@@ -425,16 +433,29 @@ async function main() {
   // producción: 303 aprobadas pero solo 262 guardadas). Si el mismo post
   // apareciera por error bajo dos países, se queda con el primero que lo
   // encontró (ve antes que co).
+  // Además, descarta publicaciones de ANTES del sismo de su país: la búsqueda
+  // por palabra clave no distingue fecha, así que un post viejo que solo
+  // coincide con el hashtag por casualidad (p. ej. "Chocó" o "Cali" de hace
+  // años) se colaba igual. No hace falta IA para esto: cada fuente ya trae
+  // su fecha real de publicación (`created_at`), así que es una comparación
+  // directa — más barato y más confiable que pedírselo al modelo.
+  let discardedOld = 0;
   const seenExternalIds = new Set();
   const rows = [];
   for (const r of found) {
     if (!r.body || !r.body.trim()) continue;
     if (seenExternalIds.has(r.external_id)) continue;
+    const cutoff = COUNTRY_META[r.country]?.quakeDate;
+    if (cutoff && new Date(r.created_at).getTime() < new Date(cutoff).getTime()) {
+      discardedOld++;
+      continue;
+    }
     seenExternalIds.add(r.external_id);
     rows.push(r);
   }
   const byCountry = COUNTRY_CODES.map((c) => `${c}: ${rows.filter((r) => r.country === c).length}`).join(", ");
   console.log(`🔎 ${rows.length} publicaciones encontradas (${byCountry}).`);
+  if (discardedOld > 0) console.log(`🕰️  ${discardedOld} descartadas por ser de antes del sismo de su país.`);
 
   if (DRY_RUN) {
     for (const r of rows) {
