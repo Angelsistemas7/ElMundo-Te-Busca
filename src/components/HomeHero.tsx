@@ -79,6 +79,20 @@ function StaticQuakeStat({ active }: { active: CountryConfig }) {
   );
 }
 
+// Una cifra corroborada por varias fuentes puede seguir citando un titular de
+// semanas atrás si nadie publicó una cifra distinta desde entonces (a
+// propósito: ver `extractCrisisFigures` en `lib/news.ts`, prioriza
+// corroboración sobre novedad). Es honesto, pero una fecha muy vieja en el
+// banner del inicio da la impresión de que el sitio no se actualiza. Pasado
+// este límite, mejor caer al bloque estático curado (sin fecha de prensa) que
+// mostrar una cita de hace más de un mes como si fuera "según prensa reciente".
+const CRISIS_STAT_FRESHNESS_MS = 30 * 24 * 60 * 60 * 1000;
+function isFreshStat(stat: CrisisStat): boolean {
+  if (!stat.asOf) return true; // sin fecha: no hay forma de juzgar antigüedad, se deja pasar
+  const publishedAt = new Date(stat.asOf).getTime();
+  return Number.isFinite(publishedAt) && Date.now() - publishedAt <= CRISIS_STAT_FRESHNESS_MS;
+}
+
 // Extraído en su propio Suspense: GDELT puede tardar varios segundos (o
 // agotar su tiempo de espera y caer a GNews, otros varios segundos más) en
 // una caché fría. Antes esto bloqueaba TODO el hero (país, cifras propias,
@@ -97,9 +111,9 @@ async function CrisisStatsPanel({ country }: { country: CountryCode }) {
   // tiene sentido (títulos reales, no un número resumen).
   const crisisRows =
     country === "ve"
-      ? [crisisStats.fallecidos, crisisStats.heridos, crisisStats.desaparecidos, crisisStats.afectados].filter(
-          (s): s is CrisisStat => Boolean(s),
-        )
+      ? [crisisStats.fallecidos, crisisStats.heridos, crisisStats.desaparecidos, crisisStats.afectados]
+          .filter((s): s is CrisisStat => Boolean(s))
+          .filter(isFreshStat)
       : [];
   if (crisisRows.length === 0) return <StaticQuakeStat active={active} />;
   return (
