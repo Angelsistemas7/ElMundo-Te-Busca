@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { getSupabase, getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
 import { getCurrentUser } from "./auth";
 import { COUNTRIES, COUNTRY_CODES, DEFAULT_COUNTRY, isCountryCode, type CountryCode } from "./countries";
+import { haversineKm } from "./geo";
 import {
   seedAidPoints,
   seedComments,
@@ -75,7 +76,7 @@ import { isSafePhotoUrl } from "./validation";
 // La UI nunca habla con la base de datos directamente: siempre pasa por aquí.
 // ─────────────────────────────────────────────────────────────────────────
 
-export type PersonSort = "recent" | "name" | "estado";
+export type PersonSort = "recent" | "name" | "estado" | "distance";
 
 // Cuántos días después del sismo del país activo "Se busca" prioriza los
 // casos ligados al desastre por encima de cualquier otro (dentro del orden
@@ -111,6 +112,9 @@ export interface PersonQuery {
   unresolvedOnly?: boolean;
   hospitalizedOnly?: boolean;
   sort?: PersonSort;
+  /** Punto de referencia para sort:"distance" (buscar personas cercanas a un lugar del mapa). */
+  nearLat?: number;
+  nearLng?: number;
   page?: number;
   pageSize?: number;
 }
@@ -267,6 +271,16 @@ function queryMemoryPersons(q: PersonQuery): PersonResult {
     case "estado":
       items.sort((a, b) => (a.estado ?? "").localeCompare(b.estado ?? ""));
       break;
+    case "distance":
+      if (typeof q.nearLat === "number" && typeof q.nearLng === "number") {
+        items = items.filter((p) => p.lat != null && p.lng != null);
+        items.sort(
+          (a, b) =>
+            haversineKm(q.nearLat!, q.nearLng!, a.lat!, a.lng!) -
+            haversineKm(q.nearLat!, q.nearLng!, b.lat!, b.lng!),
+        );
+      }
+      break;
     default:
       if (isWithinPriorityWindow(country)) {
         items.sort(
@@ -306,6 +320,29 @@ export async function getPersons(q: PersonQuery = {}): Promise<PersonResult> {
   if (q.dateFrom) query = query.gte("created_at", q.dateFrom);
   if (q.dateTo) query = query.lte("created_at", `${q.dateTo}T23:59:59.999Z`);
   if (q.search) query = query.textSearch("search_doc", q.search, { type: "websearch", config: "spanish" });
+
+  // "Cerca de un punto": no hay PostGIS, así que se calcula la distancia en
+  // JS. Se piden hasta 500 candidatos (con lat/lng) ordenados por fecha, se
+  // calcula la distancia de cada uno y se ordena/pagina en memoria. Con
+  // muchas más de 500 coincidencias, las más lejanas dentro de ese cupo
+  // podrían ganarle a alguna más cercana publicada antes — trade-off
+  // aceptable para esta funcionalidad, sin motor geoespacial de por medio.
+  if (q.sort === "distance" && typeof q.nearLat === "number" && typeof q.nearLng === "number") {
+    query = query.not("lat", "is", null).not("lng", "is", null).order("created_at", { ascending: false }).limit(500);
+    const { data, error } = await query;
+    if (error) throw error;
+    const withDist = (data ?? [])
+      .map(rowToPerson)
+      .map((p) => ({ p, d: haversineKm(q.nearLat!, q.nearLng!, p.lat!, p.lng!) }))
+      .sort((a, b) => a.d - b.d);
+    const start = (page - 1) * pageSize;
+    return {
+      items: withDist.slice(start, start + pageSize).map((x) => x.p),
+      total: withDist.length,
+      page,
+      pageSize,
+    };
+  }
 
   if (q.sort === "name") query = query.order("first_name", { ascending: true });
   else if (q.sort === "estado") query = query.order("estado", { ascending: true });

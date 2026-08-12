@@ -83,7 +83,16 @@ function buildFilterFields(regions: readonly string[], statusChips: typeof STATU
         { value: "recent", label: "Más recientes" },
         { value: "name", label: "Nombre (A–Z)" },
         { value: "estado", label: "Estado (región)" },
+        { value: "distance", label: "Más cercanas" },
       ],
+    },
+    {
+      kind: "mapPoint",
+      latKey: "nearLat",
+      lngKey: "nearLng",
+      sortKey: "sort",
+      sortValue: "distance",
+      label: "Buscar cerca de un punto",
     },
     { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Registrado entre" },
   ];
@@ -139,7 +148,7 @@ export function SearchAndFilters({
   // "view" decide Se busca / ¿La reconoces? en la misma ruta — hay que
   // conservarlo siempre o el modal te devolvería a "Se busca" al aplicar.
   const currentParams: Record<string, string> = {};
-  for (const key of ["view", "estado", "gender", "cause", "sort", "minAge", "maxAge", "dateFrom", "dateTo", "q", "status", "pageSize"]) {
+  for (const key of ["view", "estado", "gender", "cause", "sort", "minAge", "maxAge", "dateFrom", "dateTo", "q", "status", "pageSize", "nearLat", "nearLng"]) {
     const v = params.get(key);
     if (v) currentParams[key] = v;
   }

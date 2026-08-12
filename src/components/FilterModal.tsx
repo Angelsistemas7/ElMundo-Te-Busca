@@ -1,11 +1,21 @@
 "use client";
 
 import { useMemo, useState, type ComponentType } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { ListFilter } from "lucide-react";
+import { Crosshair, ListFilter, Loader2, MapPin, X as XIcon } from "lucide-react";
 import { Modal } from "./Modal";
 import { SearchableSelect } from "./SearchableSelect";
 import { cn } from "@/lib/utils";
+
+const PickerMap = dynamic(() => import("./map/LocationPickerMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-56 w-full items-center justify-center rounded-xl bg-zinc-100 text-sm text-zinc-400">
+      Cargando mapa…
+    </div>
+  ),
+});
 
 export type FilterOption = { value: string; label: string; icon?: ComponentType<{ className?: string }> };
 
@@ -20,7 +30,17 @@ export type FilterField =
       options: { label: string; min: string; max: string; icon?: ComponentType<{ className?: string }> }[];
     }
   | { kind: "dateRange"; fromKey: string; toKey: string; label: string }
-  | { kind: "numberRange"; fromKey: string; toKey: string; label: string; min?: number; max?: number };
+  | { kind: "numberRange"; fromKey: string; toKey: string; label: string; min?: number; max?: number }
+  | {
+      kind: "mapPoint";
+      latKey: string;
+      lngKey: string;
+      /** Campo "Ordenar" a activar automáticamente al marcar un punto (y a soltar si se quita el punto). */
+      sortKey: string;
+      sortValue: string;
+      label: string;
+      defaultCenter?: [number, number];
+    };
 
 // Ventana de filtros reutilizable: mismo diseño en toda la app (Comunidad,
 // Se busca, Voluntarios, Caravanas...), pero cada página decide qué campos
@@ -42,12 +62,16 @@ export function FilterModal({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>(currentParams);
+  const [mapOpenFor, setMapOpenFor] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
 
   const activeCount = useMemo(() => {
     let n = 0;
     for (const f of fields) {
       if (f.kind === "dateRange" || f.kind === "numberRange" || f.kind === "chipsRange") {
         if (currentParams[f.fromKey] || currentParams[f.toKey]) n++;
+      } else if (f.kind === "mapPoint") {
+        if (currentParams[f.latKey] && currentParams[f.lngKey]) n++;
       } else if ((currentParams[f.key] ?? "") !== (f.defaultValue ?? "")) {
         n++;
       }
@@ -57,6 +81,7 @@ export function FilterModal({
 
   function openModal() {
     setDraft(currentParams);
+    setMapOpenFor(null);
     setOpen(true);
   }
 
@@ -83,11 +108,42 @@ export function FilterModal({
       if (f.kind === "dateRange" || f.kind === "numberRange" || f.kind === "chipsRange") {
         delete cleared[f.fromKey];
         delete cleared[f.toKey];
+      } else if (f.kind === "mapPoint") {
+        delete cleared[f.latKey];
+        delete cleared[f.lngKey];
+        if (cleared[f.sortKey] === f.sortValue) delete cleared[f.sortKey];
       } else {
         delete cleared[f.key];
       }
     }
     setDraft(cleared);
+  }
+
+  function setPoint(field: Extract<FilterField, { kind: "mapPoint" }>, lat: number, lng: number) {
+    setDraft((d) => ({ ...d, [field.latKey]: String(lat), [field.lngKey]: String(lng), [field.sortKey]: field.sortValue }));
+  }
+
+  function clearPoint(field: Extract<FilterField, { kind: "mapPoint" }>) {
+    setDraft((d) => {
+      const next = { ...d };
+      delete next[field.latKey];
+      delete next[field.lngKey];
+      if (next[field.sortKey] === field.sortValue) delete next[field.sortKey];
+      return next;
+    });
+  }
+
+  function useMyLocation(field: Extract<FilterField, { kind: "mapPoint" }>) {
+    if (!("geolocation" in navigator)) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setPoint(field, p.coords.latitude, p.coords.longitude);
+        setLocating(false);
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
   }
 
   return (
@@ -194,6 +250,61 @@ export function FilterModal({
                     options={f.options}
                     placeholder={f.placeholder ?? "Todos"}
                   />
+                </div>
+              );
+            }
+
+            if (f.kind === "mapPoint") {
+              const lat = draft[f.latKey] ? Number(draft[f.latKey]) : null;
+              const lng = draft[f.lngKey] ? Number(draft[f.lngKey]) : null;
+              const point: [number, number] | null = lat != null && lng != null ? [lat, lng] : null;
+              const mapOpen = mapOpenFor === f.latKey;
+              return (
+                <div key={f.latKey}>
+                  <p className="mb-1.5 text-sm font-semibold text-zinc-900">{f.label}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMapOpenFor(mapOpen ? null : f.latKey)}
+                      className="press inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:border-zinc-400"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      {point ? "Editar punto" : "Elegir en el mapa"}
+                    </button>
+                    {point && (
+                      <button
+                        type="button"
+                        onClick={() => clearPoint(f)}
+                        className="press inline-flex items-center gap-1 text-sm font-medium text-rose-600 transition hover:underline"
+                      >
+                        <XIcon className="h-3.5 w-3.5" />
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  {mapOpen && (
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500">
+                          {point ? `Marcado: ${point[0].toFixed(4)}, ${point[1].toFixed(4)}` : "Toca el mapa para marcar"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => useMyLocation(f)}
+                          disabled={locating}
+                          className="press inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-60"
+                        >
+                          {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Crosshair className="h-3.5 w-3.5" />}
+                          Mi ubicación
+                        </button>
+                      </div>
+                      <PickerMap
+                        value={point}
+                        center={point ?? f.defaultCenter ?? [10.601, -66.931]}
+                        onChange={(la, lo) => setPoint(f, la, lo)}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             }
