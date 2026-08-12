@@ -40,6 +40,9 @@ export type FilterField =
       sortValue: string;
       label: string;
       defaultCenter?: [number, number];
+      /** Radio opcional (km) para excluir a quien quede más lejos del punto marcado. */
+      radiusKey?: string;
+      radiusOptions?: number[];
     };
 
 // Ventana de filtros reutilizable: mismo diseño en toda la app (Comunidad,
@@ -111,6 +114,7 @@ export function FilterModal({
       } else if (f.kind === "mapPoint") {
         delete cleared[f.latKey];
         delete cleared[f.lngKey];
+        if (f.radiusKey) delete cleared[f.radiusKey];
         if (cleared[f.sortKey] === f.sortValue) delete cleared[f.sortKey];
       } else {
         delete cleared[f.key];
@@ -128,6 +132,7 @@ export function FilterModal({
       const next = { ...d };
       delete next[field.latKey];
       delete next[field.lngKey];
+      if (field.radiusKey) delete next[field.radiusKey];
       if (next[field.sortKey] === field.sortValue) delete next[field.sortKey];
       return next;
     });
@@ -303,6 +308,38 @@ export function FilterModal({
                         center={point ?? f.defaultCenter ?? [10.601, -66.931]}
                         onChange={(la, lo) => setPoint(f, la, lo)}
                       />
+                    </div>
+                  )}
+                  {point && f.radiusKey && f.radiusOptions && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-zinc-500">Radio:</span>
+                      {f.radiusOptions.map((km) => {
+                        const active = draft[f.radiusKey!] === String(km);
+                        return (
+                          <button
+                            key={km}
+                            type="button"
+                            onClick={() => setDraft((d) => ({ ...d, [f.radiusKey!]: String(km) }))}
+                            className={cn(
+                              "press rounded-full border px-2.5 py-1 text-xs font-medium transition",
+                              active
+                                ? "border-brand-400 bg-brand-50 text-brand-700"
+                                : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300",
+                            )}
+                          >
+                            {km} km
+                          </button>
+                        );
+                      })}
+                      {draft[f.radiusKey] && (
+                        <button
+                          type="button"
+                          onClick={() => setDraft((d) => { const n = { ...d }; delete n[f.radiusKey!]; return n; })}
+                          className="press text-xs font-medium text-rose-600 hover:underline"
+                        >
+                          Sin límite
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

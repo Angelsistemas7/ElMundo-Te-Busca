@@ -112,9 +112,11 @@ export interface PersonQuery {
   unresolvedOnly?: boolean;
   hospitalizedOnly?: boolean;
   sort?: PersonSort;
-  /** Punto de referencia para sort:"distance" (buscar personas cercanas a un lugar del mapa). */
+  /** Punto de referencia para buscar cerca de un lugar del mapa (con sort:"distance" u opcionalmente `radiusKm`). */
   nearLat?: number;
   nearLng?: number;
+  /** Con nearLat/nearLng: excluye a quien esté más lejos de este radio en km. */
+  radiusKm?: number;
   page?: number;
   pageSize?: number;
 }
@@ -264,6 +266,16 @@ function queryMemoryPersons(q: PersonQuery): PersonResult {
     );
   }
 
+  // "Cerca de un punto": solo quien tenga coordenada marcada puede evaluarse;
+  // con radiusKm además se descarta a quien quede más lejos de ese radio.
+  const hasNearPoint = typeof q.nearLat === "number" && typeof q.nearLng === "number";
+  if (hasNearPoint) {
+    items = items.filter((p) => p.lat != null && p.lng != null);
+    if (typeof q.radiusKm === "number") {
+      items = items.filter((p) => haversineKm(q.nearLat!, q.nearLng!, p.lat!, p.lng!) <= q.radiusKm!);
+    }
+  }
+
   switch (q.sort) {
     case "name":
       items.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
@@ -272,8 +284,7 @@ function queryMemoryPersons(q: PersonQuery): PersonResult {
       items.sort((a, b) => (a.estado ?? "").localeCompare(b.estado ?? ""));
       break;
     case "distance":
-      if (typeof q.nearLat === "number" && typeof q.nearLng === "number") {
-        items = items.filter((p) => p.lat != null && p.lng != null);
+      if (hasNearPoint) {
         items.sort(
           (a, b) =>
             haversineKm(q.nearLat!, q.nearLng!, a.lat!, a.lng!) -
@@ -321,20 +332,22 @@ export async function getPersons(q: PersonQuery = {}): Promise<PersonResult> {
   if (q.dateTo) query = query.lte("created_at", `${q.dateTo}T23:59:59.999Z`);
   if (q.search) query = query.textSearch("search_doc", q.search, { type: "websearch", config: "spanish" });
 
-  // "Cerca de un punto": no hay PostGIS, así que se calcula la distancia en
-  // JS. Se piden hasta 500 candidatos (con lat/lng) ordenados por fecha, se
-  // calcula la distancia de cada uno y se ordena/pagina en memoria. Con
-  // muchas más de 500 coincidencias, las más lejanas dentro de ese cupo
+  // "Cerca de un punto" (con radio opcional): no hay PostGIS, así que la
+  // distancia se calcula en JS. Se piden hasta 500 candidatos (con lat/lng)
+  // ordenados por fecha, se calcula la distancia de cada uno, se descarta a
+  // quien quede fuera del radio (si se pidió) y se ordena/pagina en memoria.
+  // Con muchas más de 500 coincidencias, las más lejanas dentro de ese cupo
   // podrían ganarle a alguna más cercana publicada antes — trade-off
   // aceptable para esta funcionalidad, sin motor geoespacial de por medio.
-  if (q.sort === "distance" && typeof q.nearLat === "number" && typeof q.nearLng === "number") {
+  if (typeof q.nearLat === "number" && typeof q.nearLng === "number") {
     query = query.not("lat", "is", null).not("lng", "is", null).order("created_at", { ascending: false }).limit(500);
     const { data, error } = await query;
     if (error) throw error;
-    const withDist = (data ?? [])
+    let withDist = (data ?? [])
       .map(rowToPerson)
-      .map((p) => ({ p, d: haversineKm(q.nearLat!, q.nearLng!, p.lat!, p.lng!) }))
-      .sort((a, b) => a.d - b.d);
+      .map((p) => ({ p, d: haversineKm(q.nearLat!, q.nearLng!, p.lat!, p.lng!) }));
+    if (typeof q.radiusKm === "number") withDist = withDist.filter((x) => x.d <= q.radiusKm!);
+    withDist.sort((a, b) => a.d - b.d);
     const start = (page - 1) * pageSize;
     return {
       items: withDist.slice(start, start + pageSize).map((x) => x.p),
