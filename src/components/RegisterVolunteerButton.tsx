@@ -12,6 +12,7 @@ import { Modal } from "./Modal";
 import { LocationPicker } from "./map/LocationPicker";
 import { Field, Input, Select, Textarea } from "./FormControls";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
+import { AuthorNameField, useAuthorName } from "./AuthorNameField";
 
 const TYPES = Object.keys(VOLUNTEER_TYPE_LABEL) as VolunteerType[];
 
@@ -26,6 +27,7 @@ export function RegisterVolunteerButton({ country = "ve" }: { country?: string }
   const fileRef = useRef<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
+  const volunteerName = useAuthorName("vtb_anon_publisher_name");
 
   // Deep-link desde la guía "¿Cómo puedo ayudar?" (/voluntarios/guia): llega
   // con ?registrar=1 y abre el formulario directo, sin que haya que buscar el
@@ -62,8 +64,10 @@ export function RegisterVolunteerButton({ country = "ve" }: { country?: string }
       }
       const res = await registerVolunteerAction(form);
       setResult(res);
-      if (res.ok) router.refresh();
-      else turnstileRef.current?.reset();
+      if (res.ok) {
+        volunteerName.commit();
+        router.refresh();
+      } else turnstileRef.current?.reset();
     } finally {
       setSubmitting(false);
     }
@@ -141,9 +145,7 @@ export function RegisterVolunteerButton({ country = "ve" }: { country?: string }
               </Select>
             </Field>
 
-            <Field label="Tu nombre" htmlFor="name" required error={fieldErrors?.name}>
-              <Input id="name" name="name" placeholder="Nombre y apellido" />
-            </Field>
+            <AuthorNameField fieldName="name" error={fieldErrors?.name} state={volunteerName} />
 
             <Field label="¿Qué puedes aportar?" htmlFor="skillsText" hint="Idiomas, oficio, experiencia...">
               <Textarea id="skillsText" name="skillsText" placeholder="Inglés y portugués; primeros auxilios; camioneta para insumos..." />

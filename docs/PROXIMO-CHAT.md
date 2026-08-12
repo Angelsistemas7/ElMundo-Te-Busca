@@ -1,4 +1,131 @@
-## 🔴 URGENTE — próxima sesión debe empezar por aquí (2026-08-12, ronda 11)
+## 🔴 URGENTE — próxima sesión debe empezar por aquí (2026-08-12, ronda 12)
+
+**Sesión cortada a mitad por el dueño** ("voy a continuar en otro chat, deja
+listo") — no se llegó a cerrar todo lo que se abrió. Leer esto completo antes
+de tocar nada.
+
+### 1. La migración de `supabase/schema.sql` SIGUE SIN CORRERSE — reconfirmado en vivo hoy
+
+La ronda 11 avisó de esto y le pasó el archivo al dueño para que lo corriera
+en el SQL Editor de Supabase. **Se volvió a verificar en vivo al abrir esta
+sesión (consulta de solo lectura contra la base real con la service role
+key) y las 4 columnas siguen sin existir**:
+```
+persons.duplicate_match_id → 42703 column does not exist
+aid_points.category_status → 42703 column does not exist
+posts.aid_point_id         → 42703 column does not exist
+hospitals.photo_url        → 42703 column does not exist
+```
+**Se encontró algo peor que en la ronda 11**: no es solo que el registro de
+personas esté roto — se revisó `src/lib/data.ts` a fondo y **`createPost`
+(cualquier publicación nueva en Comunidad), `createAidPoint` (cualquier punto
+de ayuda nuevo) y `createHospital` (cualquier hospital nuevo) escriben SIEMPRE
+esas columnas que no existen en el INSERT**, sin importar lo que haya llenado
+el usuario en el formulario — así que **ahora mismo, en producción, casi
+ningún formulario de "Publicar" funciona en absoluto**: ni personas, ni
+posts de Comunidad, ni puntos de ayuda, ni hospitales. Probablemente esto
+explica el reporte del dueño de "me da error cuando voy a publicar, por
+ejemplo en Comunidad" — no es (solo) el campo de nombre, es esto.
+
+**Sigue sin poder correrse desde este sandbox** (mismo motivo que ronda 11:
+solo hay API REST de Supabase, PostgREST no permite `ALTER TABLE`; no hay
+`DATABASE_URL` en `.env.local`). **Acción #1 de la próxima sesión, antes de
+cualquier otra cosa**: confirmar con el dueño si ya pegó `supabase/schema.sql`
+completo en el SQL Editor de Supabase (Dashboard → SQL Editor → pegar → Run,
+es idempotente). Si no, es la prioridad absoluta — repetir la consulta de
+solo lectura de arriba para confirmar antes de seguir con cualquier feature
+nueva.
+
+### 2. Nombre pedido pese a tener sesión iniciada — RESUELTO PARCIALMENTE
+
+El dueño reportó: varios formularios piden "Tu nombre" aunque ya esté
+logueado, y eso (junto al bug de arriba) causa el error al publicar en
+Comunidad. Causa real: `CreatePostButton`, `ReportStatusButton` y
+`RegisterVolunteerButton` tenían un campo `authorName`/`reporterName`/`name`
+**obligatorio y siempre vacío**, sin mirar la sesión — a diferencia de
+`CommentSection.tsx`, que YA resolvía esto bien desde la ronda 4 (con sesión
+oculta el campo y comenta con el username; sin sesión recuerda el nombre en
+`localStorage` por dispositivo).
+
+Se creó `src/components/AuthorNameField.tsx` (hook `useAuthorName(storageKey)`
++ componente `<AuthorNameField>`) que generaliza ese mismo patrón, con un
+agregado nuevo pedido explícito por el dueño: **sin sesión, una vez que el
+nombre se guarda en el dispositivo (tras publicar con éxito), el campo queda
+de solo lectura** (ya no se puede cambiar libremente en cada publicación —
+antes solo se "recordaba" pero seguía editable) — con un enlace "¿No eres
+tú?" para desbloquearlo a propósito si hace falta. Con sesión, el campo se
+reemplaza por un input oculto con el username de la cuenta (el servidor ya lo
+impone igual vía `userId`).
+
+**Aplicado a 3 de los formularios con este problema**:
+`CreatePostButton.tsx` (authorName, Comunidad — el que el dueño mencionó
+explícito), `ReportStatusButton.tsx` (reporterName), `RegisterVolunteerButton.tsx`
+(name). Los 3 comparten la misma clave de `localStorage`
+(`vtb_anon_publisher_name`) para que el nombre quede consistente entre
+formularios de publicar (no es la misma clave que usa `CommentSection`,
+`vtb_anon_comment_name` — se dejaron separadas a propósito para no tocar el
+comportamiento de comentarios, que ya funcionaba bien).
+
+**Sin tocar todavía, quedó a medias** (se identificaron con el mismo grep
+pero no se llegó a aplicar el mismo patrón antes de que el dueño pidiera
+cortar la sesión):
+- `RegisterMarchButton.tsx` — campo "Organiza" (`organizerName`, requerido).
+  Nota: a diferencia de los otros, este puede legítimamente ser un nombre de
+  colectivo distinto al usuario de la cuenta (p. ej. "Cruz Roja local"), así
+  que probablemente conviene solo **prellenarlo** con el nombre de sesión/
+  `localStorage` como valor por defecto editable, NO bloquearlo como los
+  otros — revisar con el dueño si prefiere igual el mismo bloqueo.
+- `PostManagePanel.tsx` — campo `authorName` al EDITAR un post ya publicado
+  (`defaultValue={post.authorName}`, ya trae el nombre original del post, así
+  que el bug es menos grave aquí, pero convendría mismo tratamiento por
+  consistencia).
+- Revisar si hace falta lo mismo en `RegisterAidPointButton.tsx` /
+  `RegisterHospitalButton.tsx` / `RegisterPersonButton.tsx` — esos tienen
+  campo "Responsable / organización" / "Nombre de contacto" pero son
+  **opcionales**, no bloquean publicar, así que no son el mismo bug (revisado
+  hoy, confirmado opcionales) — bajo impacto, no se tocaron.
+
+**No verificado en navegador real** (mismo motivo crónico: el panel de
+navegador le crashea la app al dueño) — solo `npm run build` en verde. Antes
+de dar esto por cerrado, probar en el sitio real: publicar un post en
+Comunidad sin sesión (el nombre debe pedirse la primera vez y quedar fijo
+después), y con sesión iniciada (el campo no debe aparecer, debe decir
+"Publicando como tu-usuario").
+
+### 3. Bug nuevo encontrado y corregido: foto ampliada tapada mal (header y comentarios se sobreponen)
+
+El dueño mandó una captura: al tocar la foto de una persona para verla
+completa, el header de arriba queda SIN oscurecer (visible por encima del
+visor) y la caja de comentarios/reacciones se ve encima de la foto ampliada,
+en vez de quedar detrás del fondo oscuro. **Causa raíz encontrada**:
+`src/app/persona/[id]/page.tsx` pone `style={{ viewTransitionName:
+"person-photo-<id>" }}` en el `div` que envuelve `<PersonPhoto zoomable />`
+— la propiedad CSS `view-transition-name` hace que ese elemento reciba
+`contain: layout` (parte del spec de View Transitions), lo que lo convierte
+en el "containing block" de cualquier descendiente `position: fixed` dentro
+de él. `PhotoLightbox.tsx` (el visor de pantalla completa) es descendiente de
+ese `div` a través de `PersonPhoto`, así que su `fixed inset-0` quedaba
+atrapado dentro de los límites de esa cajita de la foto en vez de cubrir la
+pantalla completa — de ahí que el header y el resto del contenido de la
+página se sigan viendo "por encima".
+
+**Corregido**: `PhotoLightbox.tsx` ahora se monta con `createPortal` directo
+en `document.body` (mismo patrón que ya usa `Modal.tsx` y
+`OnboardingTour.tsx` para evitar exactamente este tipo de problema de
+contención CSS) — así queda fuera del árbol DOM de cualquier ancestro con
+`view-transition-name`/`transform`/`will-change`, sin importar dónde se use
+`PhotoLightbox` en el futuro. Con `npm run build` verde. **No verificado en
+navegador real** — es un bug puramente visual/de stacking, no se puede
+confirmar con `curl`. Probar en el sitio real: abrir la ficha de una persona,
+tocar la foto para ampliarla, confirmar que el header y la caja de
+comentarios quedan detrás del fondo oscuro (no encima) y que cerrar/arrastrar
+sigue funcionando igual. El dueño avisó "no sé dónde más pasará" — si el
+mismo patrón de `viewTransitionName` envolviendo un elemento zoomable se usa
+en otro lado (revisar `PhotoView.tsx`, que comparte el mismo
+`PhotoLightbox.tsx` y ya queda cubierto por el mismo fix), confirmarlo ahí
+también.
+
+
 
 **Hallazgo crítico, sin cerrar todavía**: la migración de `supabase/schema.sql`
 de la sesión de "duplicados" (hace varias rondas) **quedó commiteada en el

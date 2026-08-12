@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { IconButton } from "./IconButton";
 import { useDragDismiss } from "@/lib/useDragDismiss";
@@ -20,6 +21,9 @@ export function PhotoLightbox({
   onClose: () => void;
 }) {
   const { dragY, dragging, dragHandlers } = useDragDismiss(onClose);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (!open) return;
@@ -32,11 +36,11 @@ export function PhotoLightbox({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const backdropOpacity = Math.max(0.4, 0.85 - dragY / 400);
 
-  return (
+  return createPortal(
     <div
       className="animate-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ background: `rgba(0,0,0,${backdropOpacity})` }}
@@ -65,6 +69,7 @@ export function PhotoLightbox({
           transition: dragging ? "none" : "transform 0.25s var(--ease-ios)",
         }}
       />
-    </div>
+    </div>,
+    document.body,
   );
 }

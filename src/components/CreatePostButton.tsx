@@ -13,6 +13,7 @@ import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { ManageLinkBox } from "./ManageLinkBox";
+import { AuthorNameField, useAuthorName } from "./AuthorNameField";
 
 const TYPES = Object.keys(POST_TYPE_LABEL) as PostType[];
 
@@ -37,6 +38,7 @@ export function CreatePostButton({
   const fileRef = useRef<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
+  const authorName = useAuthorName("vtb_anon_publisher_name");
 
   // Solo hace falta para la barra compositora (muestra tu foto, como en
   // Facebook); el botón simple no la necesita.
@@ -86,8 +88,10 @@ export function CreatePostButton({
       }
       const res = await createPostAction(form);
       setResult(res);
-      if (res.ok) router.refresh();
-      else turnstileRef.current?.reset();
+      if (res.ok) {
+        authorName.commit();
+        router.refresh();
+      } else turnstileRef.current?.reset();
     } finally {
       setSubmitting(false);
     }
@@ -227,9 +231,12 @@ export function CreatePostButton({
             )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Tu nombre" htmlFor="authorName" required error={fieldErrors?.authorName}>
-                <Input id="authorName" name="authorName" placeholder="Nombre o colectivo" />
-              </Field>
+              <AuthorNameField
+                fieldName="authorName"
+                placeholder="Nombre o colectivo"
+                error={fieldErrors?.authorName}
+                state={authorName}
+              />
               <Field
                 label="Teléfono (opcional)"
                 htmlFor="contactPhone"

@@ -10,6 +10,7 @@ import { getCountry } from "@/lib/countries";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
+import { AuthorNameField, useAuthorName } from "./AuthorNameField";
 
 const REPORTABLE: PersonStatus[] = ["localizado", "hospitalizado", "fallecido", "por_localizar"];
 
@@ -41,6 +42,7 @@ export function ReportStatusButton({
   const [phoneWarning, setPhoneWarning] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
+  const reporterName = useAuthorName("vtb_anon_publisher_name");
 
   useEffect(() => {
     if (!open) return;
@@ -70,8 +72,10 @@ export function ReportStatusButton({
     try {
       const res = await reportStatusAction(new FormData(e.currentTarget));
       setResult(res);
-      if (res.ok) router.refresh();
-      else turnstileRef.current?.reset();
+      if (res.ok) {
+        reporterName.commit();
+        router.refresh();
+      } else turnstileRef.current?.reset();
     } finally {
       setSubmitting(false);
     }
@@ -148,9 +152,11 @@ export function ReportStatusButton({
             {!blockedByLogin && (
               <>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Tu nombre" htmlFor="reporterName" required error={fieldErrors?.reporterName}>
-                    <Input id="reporterName" name="reporterName" placeholder="Nombre y apellido" />
-                  </Field>
+                  <AuthorNameField
+                    fieldName="reporterName"
+                    error={fieldErrors?.reporterName}
+                    state={reporterName}
+                  />
                   <Field
                     label="Tu teléfono"
                     htmlFor="reporterPhone"
