@@ -1,3 +1,88 @@
+## 🔵 CIERRE DE SESIÓN (2026-08-12, ronda 15 completa) — leer esto primero
+
+El dueño pidió mostrar el sitio en vivo a mitad de sesión ("necesito
+mostrarla en estos momentos"), así que esta ronda tiene 4 commits en vez de
+uno, todos pusheados y **desplegados con éxito al VPS** (confirmado con
+`gh run list --workflow=deploy.yml`, los 4 en estado `success`). El deploy es
+automático: cada push a `main` dispara `.github/workflows/deploy.yml`, que
+compila y sube al VPS por SSH + reinicia con PM2 — **no hace falta que el
+dueño toque el VPS a mano**, eso se confirmó explícito esta ronda porque
+hubo un malentendido momentáneo al respecto.
+
+**Los 4 commits, en orden:**
+1. `c10dd56` — guía rápida entra a la página real de 7 secciones + vínculo
+   inverso post/caravana↔punto de ayuda + corrección de docs. Ver detalle
+   completo en "✅ Cerrado (ronda 15)" más abajo.
+2. `c087705` — imagen de compartir del enlace general (`app/opengraph-image.tsx`)
+   pasada a fondo claro tipo iOS — pedido urgente del dueño a mitad de
+   sesión, era la única tarjeta de compartir que había quedado con el
+   degradado oscuro/azul viejo (persona y mascota ya se habían corregido en
+   una sesión anterior).
+3. (sin commit de código) — el dueño preguntó si el scraping de Colombia
+   duplica nombres/cédulas (~5.100 personas). Se verificó EN VIVO contra la
+   base real de producción (no en teoría): las 5.163 personas de Colombia
+   tienen `external_id` único, cero duplicados exactos por scraping repetido
+   — el dedup por `(external_source, external_id)` en `lib.mjs` funciona.
+   84 (~1.6%) están marcadas `possible_duplicate` (nombre parecido/misma
+   foto/cédula) y visibles en `/admin` para revisión de un moderador — eso
+   es el comportamiento esperado, no un bug.
+4. `472a154` — bug real reportado por el dueño probando en vivo: en
+   escritorio, al llegar la guía al paso nuevo "Cambia de país" (el primero
+   de los 7 pasos de detalle agregados en el commit 1), la pantalla se veía
+   completamente oscura tapando el selector de países en vez de resaltarlo.
+   Causa: Inicio (`HomeHero`) está en su propio `<Suspense>` con datos que
+   tardan en cargar (cifras + noticias) — mientras tanto el elemento a
+   resaltar no existe, y la guía llenaba toda la pantalla de un fondo oscuro
+   opaco sin ventana de spotlight. Corregido: mientras espera a que cargue
+   la página destino, el fondo ahora es tenue (se ve la página cargando
+   detrás) y la tarjeta dice "Cargando esta sección…" con spinner, en vez de
+   texto sin sentido sobre una pantalla negra. También se subió el margen de
+   reintentos de ~3.7s a 6s. **El dueño solo probó esto en escritorio** —
+   avisó que no sabe si en teléfono pasa lo mismo. Como el mismo mecanismo
+   (`step.path` + Suspense de la página destino) aplica a las 7 secciones
+   nuevas por igual (Se busca, Comunidad, Caravanas, Denuncias, Ayuda,
+   Mascotas), lo más probable es que el fix ya cubra todos los casos — pero
+   **falta confirmar en el sitio real, en escritorio Y en teléfono**, que
+   los 7 pasos de detalle nuevos carguen bien sin quedarse pegados en
+   "Cargando esta sección…" por mucho tiempo ni saltarse solos antes de
+   tiempo.
+
+**Pendiente genuino para la próxima sesión, sin forma de resolverlo desde
+aquí:**
+- **Confirmar en navegador real (escritorio y teléfono) toda la guía
+  rápida completa**, paso por paso — este chat no pudo usar el panel de
+  navegador (le crashea la app al dueño) y todo el trabajo de la guía se
+  verificó solo con `curl` (confirma que el HTML trae los `data-tour`
+  correctos, pero no la experiencia de navegación/spotlight en sí). Esto
+  incluye el fix del punto 4 de arriba.
+- **Vínculo inverso (commit 1) sin datos reales para probar**: el seed en
+  memoria no tiene ningún post/caravana con `aidPointId`, así que el chip
+  "Vinculado a {punto}" nunca se vio renderizado de verdad esta sesión —
+  solo se confirmó que compila y que la lógica (`comunidad/page.tsx`,
+  `PostCard.tsx`, `caravanas/[id]/page.tsx`) es correcta. Probar en
+  producción vinculando un post o caravana real a un punto de ayuda.
+- **Caché de WhatsApp/redes en la imagen de compartir (commit 2)**: aunque
+  el VPS ya sirve el fondo claro nuevo, cualquier link ya compartido antes
+  puede seguir mostrando en WhatsApp la vista previa vieja (oscura) por
+  varios días — es caché del lado de WhatsApp, no del sitio. Si hace falta
+  forzar la actualización de un link puntual, se puede usar el debugger de
+  Facebook/WhatsApp para invalidar ese caché (no se hizo esta sesión, no se
+  pidió).
+- **Cron del VPS** (precalentamiento de noticias) sigue sin confirmarse —
+  mismo pendiente crónico de rondas anteriores, puerto SSH bloqueado desde
+  este sandbox.
+- **Nombre anónimo con enlace "¿No eres tú?"**: el dueño confirmó esta ronda
+  que lo deja como está (no lo quiere 100% inmutable) — **esto ya NO es un
+  pendiente**, quedó resuelto por decisión explícita, no hace falta
+  retomarlo.
+
+**No tocado esta ronda, a propósito** (el dueño no lo pidió): guías por
+página/rediseño de la guía rápida más allá de lo ya hecho (eligió "ampliar
+el tour actual" con navegación real, no el rediseño completo); el resto del
+checklist DESPRIORIZADO que no se mencionó explícito (región/estado sin
+asignar, límite de 500 en filtro de cercanía, `getPersonGroups` sin radio,
+`docs/kit-prensa/`, etc. — sigue igual que antes, ver esa sección más abajo).
+
 ## ✅ Cerrado (2026-08-12, ronda 15) — guía rápida entra a cada página de verdad + vínculo inverso + 2 pendientes resultaron ya estar resueltos
 
 **Nuevo chat, mismo dueño.** Pidió retomar las "ideas menores" desatendidas
