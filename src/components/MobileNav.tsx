@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -64,6 +64,32 @@ export function MobileNav() {
     ? PRIMARY.length
     : Math.max(0, PRIMARY.findIndex((t) => isActive(pathname, t.href)));
 
+  const navRef = useRef<HTMLElement>(null);
+
+  // Chrome Android "salta" los elementos `fixed` de abajo cuando su barra de
+  // direcciones se oculta/muestra al hacer scroll (Safari no tiene este bug
+  // — confirmado probando ambos) y, en cualquier navegador, un `fixed`
+  // normal queda oculto DEBAJO del teclado en vez de pegarse encima de él.
+  // En vez de confiar en que el navegador recalcule solo la posición, se
+  // sigue el viewport VISUAL real (`visualViewport`, se actualiza en los dos
+  // casos) y se traduce la barra hacia arriba lo que haga falta.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const el = navRef.current;
+    if (!vv || !el) return;
+    const update = () => {
+      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      el.style.transform = offset > 0 ? `translate3d(0, -${offset}px, 0)` : "translateZ(0)";
+    };
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    update();
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
   return (
     <>
       {moreOpen && (
@@ -105,13 +131,11 @@ export function MobileNav() {
         </div>
       )}
 
-      {/* `translateZ(0)` fuerza una capa de composición propia: sin esto, en
-          Chrome/Safari móvil la barra fija se queda un frame atrás cuando la
-          barra de direcciones del navegador se oculta al hacer scroll, y se
-          ve un hueco blanco momentáneo entre la barra y el borde real de la
-          pantalla. */}
+      {/* `translateZ(0)` fuerza una capa de composición propia (base, antes
+          de que el efecto de arriba la ajuste según el viewport visual). */}
       <nav
-        className="pb-safe-nav fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur will-change-transform md:hidden"
+        ref={navRef}
+        className="pb-safe-nav fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur transition-transform duration-150 ease-out will-change-transform md:hidden"
         style={{ transform: "translateZ(0)" }}
       >
         <ul className="relative mx-auto flex max-w-md items-stretch justify-around">
