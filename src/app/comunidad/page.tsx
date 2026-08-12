@@ -4,14 +4,11 @@ import { POST_TYPE_EMOJI, POST_TYPE_LABEL, type PostType } from "@/lib/types";
 import { getActiveCountry } from "@/lib/country-server";
 import { getAdminLevel } from "@/lib/admin";
 import { getCountry } from "@/lib/countries";
-import { clampPageSize } from "@/lib/utils";
 import { CreatePostButton } from "@/components/CreatePostButton";
 import { CommunityTabs } from "@/components/CommunityTabs";
 import { EmptyState } from "@/components/EmptyState";
-import { PostCard } from "@/components/PostCard";
 import { PinnedPostCard } from "@/components/PinnedPostCard";
-import { PageSizeSelect } from "@/components/PageSizeSelect";
-import { Pagination } from "@/components/Pagination";
+import { InfiniteFeed } from "@/components/InfiniteFeed";
 import { SwipeStaticRow } from "@/components/SwipeHint";
 import { CommunitySearchBar } from "@/components/CommunitySearchBar";
 import type { FilterField } from "@/components/FilterModal";
@@ -25,11 +22,6 @@ export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const num = (v: string | string[] | undefined) => {
-  const s = str(v);
-  const n = s ? Number(s) : NaN;
-  return Number.isFinite(n) ? n : undefined;
-};
 
 function buildFilterFields(regions: readonly string[]): FilterField[] {
   return [
@@ -79,15 +71,17 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
   const estado = str(sp.estado) ?? "all";
   const dateFrom = str(sp.dateFrom);
   const dateTo = str(sp.dateTo);
-  const page = num(sp.page) ?? 1;
-  const pageSize = clampPageSize(num(sp.pageSize));
+  // Tamaño de cada tanda del scroll infinito (ver InfiniteFeed) — a
+  // diferencia de mascotas/ayuda/hospitales, esta sección se quiere sentir
+  // como un feed de red social común, no como una lista con paginación
+  // numerada: no hay un tamaño de página que elegir, solo seguir bajando.
+  const PAGE_SIZE = 10;
+  const postFilter = { type, search: q, estado, dateFrom, dateTo };
 
   // Los widgets decorativos (temas, mapa, FAQ) solo aportan en la vista
   // limpia — igual que en el inicio, para no estorbar cuando alguien ya
   // está filtrando o buscando algo puntual dentro del muro.
-  const hasActiveQuery = Boolean(
-    q || type !== "all" || sort !== "recent" || estado !== "all" || dateFrom || dateTo || page > 1,
-  );
+  const hasActiveQuery = Boolean(q || type !== "all" || sort !== "recent" || estado !== "all" || dateFrom || dateTo);
 
   // Destacados (fijados por el equipo) y rescates: se ven SIEMPRE arriba, en
   // una fila que se desliza de lado — antes se apilaban uno debajo del otro y
@@ -97,10 +91,9 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
   const [featuredPosts, rescuePosts, pageResult, adminLevel] = await Promise.all([
     type === "all" ? getPosts({ country, pinnedOnly: true, search: q }) : Promise.resolve([]),
     type === "all" ? getPosts({ country, type: "rescate", search: q }) : Promise.resolve([]),
-    // Antes: hasta 100 publicaciones completas en cada visita, sin límite —
-    // pasados los 100 posts no había forma de ver algo más antiguo. Ahora
-    // pagina de verdad (10/20/50 a elegir), con orden real en la base de datos.
-    getPostsPage({ country, type, search: q, estado, dateFrom, dateTo }, page, pageSize, sort),
+    // Primera tanda en el servidor (SEO, enlaces compartibles, funciona sin
+    // JS); el resto lo trae InfiniteFeed vía scroll, igual que Instagram/X.
+    getPostsPage({ ...postFilter, country }, 1, PAGE_SIZE, sort),
     getAdminLevel(),
   ]);
   // Admin o moderador: puede eliminar cualquier post directo desde el muro,
@@ -125,7 +118,6 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
   if (dateFrom) currentParams.dateFrom = dateFrom;
   if (dateTo) currentParams.dateTo = dateTo;
   if (q) currentParams.q = q;
-  if (pageSize !== 10) currentParams.pageSize = String(pageSize);
 
   return (
     <PullToRefresh>
@@ -167,9 +159,6 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
       <div className="mb-5 flex items-center justify-between gap-2">
         <CommunitySearchBar currentParams={currentParams} fields={FILTER_FIELDS} />
       </div>
-      <div className="-mt-3 mb-5 flex justify-end">
-        <PageSizeSelect value={pageSize} />
-      </div>
 
       {q && (
         <p className="mb-3 text-sm text-zinc-500">
@@ -206,14 +195,16 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
             </section>
           )}
 
-          <div className="space-y-4">
-            {withComments(restPosts).map((post) => (
-              <PostCard key={post.id} post={post} comments={post.comments} canModerate={canModerate} />
-            ))}
-          </div>
-          <div className="mt-6">
-            <Pagination page={pageResult.page} pageSize={pageResult.pageSize} total={pageResult.total} />
-          </div>
+          <InfiniteFeed
+            initialItems={withComments(restPosts)}
+            initialPage={1}
+            pageSize={PAGE_SIZE}
+            hasMoreInitially={PAGE_SIZE < pageResult.total}
+            filter={postFilter}
+            sort={sort}
+            excludeIds={[...pinnedIds]}
+            canModerate={canModerate}
+          />
         </>
       )}
 
