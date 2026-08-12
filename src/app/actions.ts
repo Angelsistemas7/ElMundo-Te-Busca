@@ -18,6 +18,9 @@ import {
   createPost,
   createStatusReport,
   createVolunteer,
+  createManagerRequest,
+  getAidPointById,
+  getHospitalById,
   createHero,
   likeHero,
   likeNewsItem,
@@ -95,6 +98,7 @@ import {
   hospitalSchema,
   isSafePhotoUrl,
   loginSchema,
+  managerRequestSchema,
   marchSchema,
   personSchema,
   petSchema,
@@ -905,6 +909,52 @@ export async function registerVolunteerAction(form: FormData): Promise<ActionRes
     return { ok: true, id: volunteer.id, message: "¡Gracias por ofrecerte! Tu disponibilidad ya es visible." };
   } catch {
     return { ok: false, error: "No se pudo publicar. Intenta de nuevo." };
+  }
+}
+
+// ── Solicitud de gestor delegado ("quiero mantener este hospital/punto
+// actualizado") ─────────────────────────────────────────────────────────────
+// Requiere cuenta: el admin necesita saber a quién le está dando el permiso.
+// No otorga nada por sí sola — solo queda pendiente en /admin hasta que un
+// admin la apruebe (crea el ResourceManager) o la rechace.
+export async function createManagerRequestAction(form: FormData): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { ok: false, error: "Inicia sesión para solicitar el rol de gestor." };
+  }
+
+  const parsed = managerRequestSchema.safeParse({
+    entityType: getField(form, "entityType"),
+    entityId: getField(form, "entityId"),
+    message: getField(form, "message"),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+  }
+
+  const entity =
+    parsed.data.entityType === "hospital"
+      ? await getHospitalById(parsed.data.entityId)
+      : await getAidPointById(parsed.data.entityId);
+  if (!entity) {
+    return { ok: false, error: "Ese hospital o punto de ayuda ya no existe." };
+  }
+
+  try {
+    await createManagerRequest(
+      parsed.data.entityType,
+      parsed.data.entityId,
+      entity.name,
+      user.id,
+      user.username,
+      parsed.data.message,
+    );
+    return {
+      ok: true,
+      message: "Solicitud enviada. Un moderador la revisará y te avisaremos cuando se apruebe.",
+    };
+  } catch {
+    return { ok: false, error: "No se pudo enviar la solicitud. Intenta de nuevo." };
   }
 }
 

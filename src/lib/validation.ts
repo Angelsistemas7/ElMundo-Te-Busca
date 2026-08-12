@@ -255,6 +255,18 @@ export const roleAssignSchema = z.object({
 
 export type RoleAssignInput = z.infer<typeof roleAssignSchema>;
 
+export const managerRequestSchema = z.object({
+  entityType: z.enum(["aid_point", "hospital"]),
+  entityId: z.string().min(1, "Elige el hospital o punto de ayuda."),
+  message: z
+    .string()
+    .trim()
+    .min(10, "Cuenta qué información puedes aportar (mínimo 10 caracteres).")
+    .max(800),
+});
+
+export type ManagerRequestInput = z.infer<typeof managerRequestSchema>;
+
 // ── Denuncias de irregularidades ─────────────────────────────────────────────
 export const complaintSchema = z.object({
   country: countryEnum.optional(),

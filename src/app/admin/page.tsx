@@ -8,6 +8,7 @@ import {
   getHeroesForAdmin,
   getHospitals,
   getPendingExternalPosts,
+  getPendingManagerRequests,
   getPendingReports,
   getPersons,
   getPersonsByIds,
@@ -43,6 +44,7 @@ export default async function AdminPage() {
     complaintsByCountry,
     roles,
     pendingExternalPosts,
+    pendingManagerRequests,
   ] = await Promise.all([
     getPendingReports(),
     getAllCountries((country) => getPersons({ sort: "recent", pageSize: 30, country }).then((r) => r.items)),
@@ -54,6 +56,7 @@ export default async function AdminPage() {
     getAllCountries((country) => getComplaints({ country }, 1, 25).then((r) => r.items)),
     getAllAppRoles(),
     getPendingExternalPosts(),
+    getPendingManagerRequests(),
   ]);
   const complaintsPage = { items: complaintsByCountry.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) };
   persons.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -86,6 +89,7 @@ export default async function AdminPage() {
       complaints={complaintsPage.items}
       roles={roles}
       pendingExternalPosts={pendingExternalPosts}
+      pendingManagerRequests={pendingManagerRequests}
       demoOpen={!adminConfigured}
     />
   );

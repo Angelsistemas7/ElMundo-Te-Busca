@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, HandHeart, ImagePlus, Loader2 } from "lucide-react";
 import { VOLUNTEER_TYPE_LABEL, type VolunteerType } from "@/lib/types";
 import { getCountry } from "@/lib/countries";
@@ -18,12 +18,20 @@ const TYPES = Object.keys(VOLUNTEER_TYPE_LABEL) as VolunteerType[];
 export function RegisterVolunteerButton({ country = "ve" }: { country?: string }) {
   const regions = getCountry(country).regions;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const fileRef = useRef<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Deep-link desde la guía "¿Cómo puedo ayudar?" (/voluntarios/guia): llega
+  // con ?registrar=1 y abre el formulario directo, sin que haya que buscar el
+  // botón en la página.
+  useEffect(() => {
+    if (searchParams.get("registrar") === "1") setOpen(true);
+  }, [searchParams]);
 
   function close() {
     setOpen(false);

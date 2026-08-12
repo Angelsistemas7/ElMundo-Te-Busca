@@ -160,6 +160,30 @@ create table if not exists resource_managers (
 create index if not exists resource_managers_entity_idx on resource_managers (entity_type, entity_id);
 create index if not exists resource_managers_user_idx   on resource_managers (user_id);
 
+-- ── Solicitudes de gestor delegado (las envía el voluntario, las aprueba el
+-- admin) ─────────────────────────────────────────────────────────────────
+-- Puente entre "quiero ayudar" y `resource_managers`: el usuario logueado
+-- pide permiso sobre UN hospital/punto de ayuda concreto y explica qué
+-- información puede aportar; el admin la ve en /admin y con un clic la
+-- aprueba (crea la fila en resource_managers) o la rechaza. `entity_name` se
+-- desnormaliza para no tener que resolver el nombre del recurso en cada
+-- lectura del panel. Tabla PRIVADA: solo el servidor (service role).
+create table if not exists manager_requests (
+  id          uuid primary key default uuid_generate_v4(),
+  entity_type text not null check (entity_type in ('aid_point','hospital')),
+  entity_id   uuid not null,
+  entity_name text not null default '',
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  message     text not null default '' check (length(message) <= 800),
+  status      text not null default 'pending' check (status in ('pending','approved','rejected')),
+  created_at  timestamptz not null default now()
+);
+create index if not exists manager_requests_status_idx on manager_requests (status, created_at desc);
+create index if not exists manager_requests_user_idx   on manager_requests (user_id);
+alter table manager_requests enable row level security;
+-- Sin políticas a propósito: solo el servidor (service role) la lee/escribe;
+-- quién pidió qué permiso no es público.
+
 -- ── Roles globales (no atados a un recurso concreto) ─────────────────────────
 -- A diferencia de resource_managers (UN punto de ayuda u hospital), estos roles
 -- aplican a TODA una categoría (ej. "puede actualizar cualquier hospital") o dan

@@ -368,6 +368,26 @@ export interface ResourceManager {
 }
 
 /**
+ * Solicitud de un usuario logueado para convertirse en gestor delegado de UN
+ * hospital o punto de ayuda concreto (p. ej. "trabajo en este hospital, puedo
+ * mantener actualizado el estado/insumos"). El admin la revisa en /admin y, si
+ * la aprueba, se crea el `ResourceManager` correspondiente. Distinta del
+ * registro general de voluntario ("Puedo ayudar"): esta pide un permiso
+ * concreto sobre un recurso, no solo aparecer en el directorio público.
+ */
+export interface ManagerRequest {
+  id: string;
+  entityType: ManagedEntity;
+  entityId: string;
+  entityName: string;
+  userId: string;
+  username: string;
+  message: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+}
+
+/**
  * Roles globales (no atados a un recurso concreto), asignados por el admin a
  * una cuenta. Distinto de `ResourceManager` (que gestiona UN punto de ayuda u
  * hospital específico): estos roles aplican a TODA una categoría.

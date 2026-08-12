@@ -7,12 +7,14 @@ import {
   addAppRole,
   addResourceManager,
   approveExternalPost,
+  approveManagerRequest,
   createNewsItem,
   deleteComplaint,
   deleteHero,
   deleteNewsItem,
   dismissReport,
   rejectExternalPost,
+  rejectManagerRequest,
   removeAppRole,
   removeResourceManager,
   setAidPointVerified,
@@ -222,6 +224,23 @@ export async function removeManagerAction(
 ): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
   await removeResourceManager(entityType, entityId, userId);
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+// ── Solicitudes de gestor delegado (las envía el voluntario desde /voluntarios) ──
+/** Aprueba una solicitud: crea el permiso y la marca resuelta. */
+export async function approveManagerRequestAction(requestId: string): Promise<{ ok: boolean }> {
+  if (!(await isAdmin())) return { ok: false };
+  await approveManagerRequest(requestId, "admin");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/** Rechaza una solicitud sin otorgar ningún permiso. */
+export async function rejectManagerRequestAction(requestId: string): Promise<{ ok: boolean }> {
+  if (!(await isAdmin())) return { ok: false };
+  await rejectManagerRequest(requestId);
   revalidatePath("/admin");
   return { ok: true };
 }
