@@ -1,3 +1,90 @@
+## ✅ Cerrado (2026-08-12, ronda 10) — build verde, pusheado (commit 49e123f)
+
+Continuación de la ronda 9, mismo chat. Tres pedidos del dueño:
+
+1. **Scraping de colombiatebusca.com dejado de funcionar — BUG REAL,
+   ENCONTRADO Y CORREGIDO.** El dueño notó que hace rato no se importaban
+   personas nuevas de colombiatebusca.com. Diagnóstico con `gh run list`/
+   `gh run view --log` sobre el workflow `sync-legacy-sites.yml` (corre cada
+   hora en GitHub Actions, no en el VPS): confirmó que colombiatebusca.com
+   cambió el formato de sus enlaces (ahora anteponen `tab=persons&page=N&`
+   antes de `person=`, antes iba pegado al `?`), y el selector
+   `a[href*="?person="]` en `scripts/sync-legacy-sites/sync-colombia.mjs`
+   dejó de encontrar nada desde ~2026-08-12 08:15 UTC (antes encontraba
+   decenas de personas nuevas por corrida; desde esa hora, 0/0/0 sin errores
+   en cada una de las ~10 corridas siguientes). Se confirmó con una petición
+   real a colombiatebusca.com + cheerio que el selector ampliado
+   (`a[href*="person="]`, sin el `?`) sí encuentra los 20 IDs de la página 1
+   — la regex que valida el UUID ya filtraba cualquier falso positivo, así
+   que ampliar el selector es seguro. **Se disparó el workflow a mano**
+   (`gh workflow run sync-legacy-sites.yml`) para confirmar en vivo que
+   volvió a encontrar personas nuevas en vez de esperar a la próxima hora en
+   punto — revisar el resultado de esa corrida si no quedó confirmado antes
+   de cerrar la sesión. `sync-venezuela.mjs` no tiene el mismo patrón de
+   selector (usa Playwright, no cheerio) y seguía funcionando bien
+   (confirmado, 0 nuevas pero 495 ya existían en la última corrida antes del
+   fix) — no se tocó.
+2. **Avisos superiores separados y limitados a una vez al día.** El dueño se
+   refería a dos cosas que YA existían por separado (`SafetyBanner.tsx`,
+   global en todas las páginas, texto de niñez+911 pegado sin fecha de
+   reaparición; y `FieldVolunteerBar.tsx`, "¿Estás en la zona del
+   terremoto?", solo en `/se-busca`, reinicia con cada recarga — voluntario
+   de TERRENO, no se tocó, es un concepto distinto al voluntariado digital).
+   Se separó `SafetyBanner` en 3 avisos de una línea, cada uno con su
+   destino: "Protege a la niñez" (abre un modal con la info completa),
+   "¿Emergencia ahora mismo?" (lleva a `/emergencias`), y "¿Quieres ayudar?"
+   (lleva a `/voluntarios/guia`, el mismo destino que "¿Cómo puedo ayudar?"
+   del inicio). Ahora se muestran una vez al día por dispositivo
+   (`localStorage` con la fecha, no con un flag permanente) en vez de en
+   cada carga de página.
+3. **Guía rápida ampliada de verdad — la ronda pasada quedó corta según el
+   dueño.** Dos cambios:
+   - `OnboardingTour.tsx` ahora ABRE el desplegable ("Más" en escritorio) o
+     la hoja inferior (móvil) DE VERDAD durante los pasos "Ayuda y
+     hospitales"/"Mascotas", y resalta el ítem real dentro de ese panel (no
+     el botón "Más" en sí) — se coordina con `MobileNav.tsx`/`SiteHeader.tsx`
+     por el evento nuevo `vtb:tour-set-more` (mismo patrón que
+     `vtb:tour-open`/`vtb:auth-open`). Se cierra solo al avanzar al
+     siguiente paso. Nuevos anclajes `data-tour="mnav-mas-ayuda"` /
+     `"mnav-mas-mascotas"` (y `dnav-*` en escritorio) en los ítems reales
+     del menú, ya no apuntan al botón "Más" genérico.
+   - El paso único "Comunidad" se separó en 4: resumen + "Voluntariado
+     digital" + "Caravanas benéficas" + "Denuncias" (mismo ancla
+     `dnav-comunidad`/`mnav-comunidad`, cuatro tarjetas de texto). El tour
+     pasó de 9 pasos (10 con el de bienvenida) a 13 (14 con bienvenida).
+   - **Ojo para la próxima sesión**: el dueño pidió esto dos veces y en la
+     ronda 9 se interpretó "enriquecer el tour existente" de forma más
+     conservadora de lo que quería — si sigue pareciendo corto, probablemente
+     haya que reconsiderar la opción que rechazó antes (guías separadas
+     dentro de cada página, no solo del menú de navegación).
+
+**Intentado y NO logrado — limitación de este sandbox, no del VPS**: el
+dueño ofreció la llave SSH de `Desktop/vps/oracle-vps.key` para revisar en
+el VPS real por qué el widget de estadísticas de Inicio (`getCrisisStats`,
+ver ronda 9) se sigue sintiendo lento. El puerto 22 (SSH) está bloqueado
+para salir de este sandbox (confirmado: sí hay salida HTTPS/443 normal,
+`curl` a colombiatebusca.com y GitHub funcionan bien; SSH da
+`Connection timed out`). La llave se copió a un directorio temporal SOLO
+para el intento, con permisos 600, y se borró esa copia al fallar — el
+archivo original en el Desktop del dueño no se tocó. **Sigue pendiente que
+el dueño mismo corra en el VPS** (IP `158.101.105.13`, usuario `ubuntu`):
+```
+crontab -l
+tail -50 logs/warm-news.log
+ls -la /tmp/elmundotebusca-news-cache-*.json
+```
+
+**Verificado con**: `npm run build` (verde, typecheck + ESLint incluidos) +
+`npm run start` + `curl` a `/`, `/comunidad`, `/se-busca` (200 en las 3) +
+petición real a colombiatebusca.com con cheerio confirmando que el selector
+nuevo encuentra los IDs reales de personas (20 en la página 1, el viejo
+encontraba 0) + workflow de GitHub Actions disparado a mano para confirmar
+el fix en producción real (revisar resultado, run
+`31636155560`). El contenido de `SafetyBanner` (client-only, revela tras
+`useEffect`) y la apertura de "Más" durante el tour no son verificables con
+`curl` — solo en un navegador real. **Se confirmó que no había commits
+nuevos del compañero** antes de pushear (commit `49e123f`).
+
 ## ✅ Cerrado (2026-08-12, ronda 9) — build verde, pusheado (commit 7a17bc5)
 
 Continuación de la ronda 8, mismo chat. El dueño probó el sitio real (capturas
