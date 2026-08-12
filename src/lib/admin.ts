@@ -107,6 +107,25 @@ export async function isAdmin(): Promise<boolean> {
   return hasAppRole(user.id, "admin");
 }
 
+/**
+ * Nivel de acceso de la sesión actual al panel de moderación: "admin" (todo,
+ * vía ADMIN_TOKEN o rol "admin"), "moderator" (subset: reportes de hallazgos,
+ * posts de comunidad, visto bueno a personas/puntos de ayuda/hospitales — sin
+ * Colaboradores, gestores, héroes ni denuncias) o null (sin acceso).
+ */
+export async function getAdminLevel(): Promise<"admin" | "moderator" | null> {
+  if (await isAdmin()) return "admin";
+  const user = await getCurrentUser();
+  if (!user) return null;
+  if (await hasAppRole(user.id, "moderator")) return "moderator";
+  return null;
+}
+
+/** ¿Puede esta sesión entrar a `/admin`, al menos con el subset de moderador? */
+export async function isModerator(): Promise<boolean> {
+  return (await getAdminLevel()) !== null;
+}
+
 export async function signInAdmin(password: string): Promise<boolean> {
   if (!ADMIN_TOKEN) return process.env.NODE_ENV !== "production";
   const ip = await clientIp();

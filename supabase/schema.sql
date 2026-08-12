@@ -167,12 +167,19 @@ create index if not exists resource_managers_user_idx   on resource_managers (us
 -- solo el servidor (service role) la lee/escribe.
 create table if not exists app_roles (
   user_id    uuid not null references auth.users(id) on delete cascade,
-  role       text not null check (role in ('admin','hospital_moderator','aid_point_moderator')),
+  role       text not null check (role in ('admin','moderator','hospital_moderator','aid_point_moderator')),
   granted_by text,
   created_at timestamptz not null default now(),
   primary key (user_id, role)
 );
 create index if not exists app_roles_role_idx on app_roles (role);
+
+-- Migración para bases ya creadas: rol 'moderator' (reportes de hallazgos,
+-- posts de comunidad, visto bueno a personas/puntos de ayuda/hospitales —
+-- SIN Colaboradores, gestores, héroes ni denuncias, eso sigue solo para 'admin').
+alter table app_roles drop constraint if exists app_roles_role_check;
+alter table app_roles add constraint app_roles_role_check
+  check (role in ('admin','moderator','hospital_moderator','aid_point_moderator'));
 
 alter table app_roles enable row level security;
 -- Sin políticas a propósito: quién tiene qué rol no es público, y asignarlo

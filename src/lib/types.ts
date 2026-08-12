@@ -375,10 +375,11 @@ export interface ResourceManager {
  *   • hospital_moderator → puede actualizar estado/insumos de CUALQUIER hospital.
  *   • aid_point_moderator→ puede fijar disponible/agotado en CUALQUIER punto.
  */
-export type AppRole = "admin" | "hospital_moderator" | "aid_point_moderator";
+export type AppRole = "admin" | "moderator" | "hospital_moderator" | "aid_point_moderator";
 
 export const APP_ROLE_LABEL: Record<AppRole, string> = {
   admin: "Admin completo",
+  moderator: "Moderador",
   hospital_moderator: "Moderador de hospitales",
   aid_point_moderator: "Moderador de puntos de ayuda",
 };

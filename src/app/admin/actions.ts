@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isAdmin, signInAdmin, signOutAdmin } from "@/lib/admin";
+import { getAdminLevel, isAdmin, isModerator, signInAdmin, signOutAdmin } from "@/lib/admin";
 import { findUserByUsername } from "@/lib/auth";
 import {
   addAppRole,
@@ -38,8 +38,15 @@ export async function logoutAdminAction(): Promise<void> {
   revalidatePath("/admin");
 }
 
+/** Nivel de acceso de la sesión actual a `/admin` (o null). Para mostrar/ocultar
+ *  el atajo "Panel de moderación" en el menú de usuario sin obligar a nadie a
+ *  teclear la URL a ciegas. */
+export async function getAdminLevelAction(): Promise<"admin" | "moderator" | null> {
+  return getAdminLevel();
+}
+
 export async function approveReportAction(reportId: string): Promise<{ ok: boolean }> {
-  if (!(await isAdmin())) return { ok: false };
+  if (!(await isModerator())) return { ok: false };
   await verifyAndApplyReport(reportId);
   revalidatePath("/admin");
   revalidatePath("/");
@@ -47,7 +54,7 @@ export async function approveReportAction(reportId: string): Promise<{ ok: boole
 }
 
 export async function dismissReportAction(reportId: string): Promise<{ ok: boolean }> {
-  if (!(await isAdmin())) return { ok: false };
+  if (!(await isModerator())) return { ok: false };
   await dismissReport(reportId);
   revalidatePath("/admin");
   return { ok: true };
@@ -57,7 +64,7 @@ export async function togglePersonVerifiedAction(
   personId: string,
   value: boolean,
 ): Promise<{ ok: boolean }> {
-  if (!(await isAdmin())) return { ok: false };
+  if (!(await isModerator())) return { ok: false };
   await setPersonVerified(personId, value);
   revalidatePath("/admin");
   revalidatePath("/");
@@ -69,7 +76,7 @@ export async function toggleAidPointVerifiedAction(
   id: string,
   value: boolean,
 ): Promise<{ ok: boolean }> {
-  if (!(await isAdmin())) return { ok: false };
+  if (!(await isModerator())) return { ok: false };
   await setAidPointVerified(id, value);
   revalidatePath("/admin");
   revalidatePath("/ayuda");
@@ -82,7 +89,7 @@ export async function toggleHospitalVerifiedAction(
   id: string,
   value: boolean,
 ): Promise<{ ok: boolean }> {
-  if (!(await isAdmin())) return { ok: false };
+  if (!(await isModerator())) return { ok: false };
   await setHospitalVerified(id, value);
   revalidatePath("/admin");
   revalidatePath("/hospitales");
@@ -159,7 +166,7 @@ export async function togglePostPinnedAction(
   id: string,
   value: boolean,
 ): Promise<{ ok: boolean }> {
-  if (!(await isAdmin())) return { ok: false };
+  if (!(await isModerator())) return { ok: false };
   await setPostPinned(id, value);
   revalidatePath("/admin");
   revalidatePath("/comunidad");
@@ -168,7 +175,7 @@ export async function togglePostPinnedAction(
 
 // ── Cola de moderación: publicaciones importadas de otras redes por hashtag ──
 export async function approveExternalPostAction(id: string): Promise<{ ok: boolean }> {
-  if (!(await isAdmin())) return { ok: false };
+  if (!(await isModerator())) return { ok: false };
   await approveExternalPost(id);
   revalidatePath("/admin");
   revalidatePath("/comunidad");
@@ -176,7 +183,7 @@ export async function approveExternalPostAction(id: string): Promise<{ ok: boole
 }
 
 export async function rejectExternalPostAction(id: string): Promise<{ ok: boolean }> {
-  if (!(await isAdmin())) return { ok: false };
+  if (!(await isModerator())) return { ok: false };
   await rejectExternalPost(id);
   revalidatePath("/admin");
   return { ok: true };

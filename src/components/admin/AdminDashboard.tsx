@@ -99,6 +99,7 @@ export function AdminDashboard({
   roles,
   pendingExternalPosts,
   demoOpen,
+  isFullAdmin,
 }: {
   reports: ReportWithName[];
   persons: Person[];
@@ -111,6 +112,8 @@ export function AdminDashboard({
   roles: AppRoleGrant[];
   pendingExternalPosts: Post[];
   demoOpen: boolean;
+  /** false = sesión de moderador (subset): sin Colaboradores, gestores, héroes ni denuncias. */
+  isFullAdmin: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -142,10 +145,18 @@ export function AdminDashboard({
             <ShieldCheck className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Panel de moderación</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Panel de moderación</h1>
+              {!isFullAdmin && (
+                <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-bold text-sky-700">
+                  Vista de moderador
+                </span>
+              )}
+            </div>
             <p className="text-sm text-zinc-500">
               Verificar no es obligatorio para que algo aparezca: todo es visible de inmediato. Aquí
-              solo confirmas información, das el visto bueno y asignas gestores.
+              solo confirmas información y das el visto bueno
+              {isFullAdmin ? " o asignas gestores." : "."}
             </p>
           </div>
         </div>
@@ -166,21 +177,25 @@ export function AdminDashboard({
 
       {/* Colaboradores: roles globales por cuenta (admin, moderador de
           hospitales/ayuda). Tu ADMIN_TOKEN sigue funcionando como llave
-          maestra además de esto — no se reemplaza, es un segundo camino. */}
-      <section className="mb-10">
-        <h2 className="mb-1 flex items-center gap-2 font-bold text-zinc-900">
-          <ShieldCheck className="h-4.5 w-4.5 text-zinc-500" />
-          Colaboradores
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-600">
-            {roles.length}
-          </span>
-        </h2>
-        <p className="mb-3 text-sm text-zinc-500">
-          Da acceso al panel o a moderar una categoría completa (todos los hospitales o todos los
-          puntos de ayuda) a una cuenta, sin compartir tu contraseña de admin.
-        </p>
-        <RoleGrants roles={roles} demoOpen={demoOpen} />
-      </section>
+          maestra además de esto — no se reemplaza, es un segundo camino.
+          Solo admin completo: un moderador no puede darse a sí mismo (ni a
+          nadie) más acceso del que ya tiene. */}
+      {isFullAdmin && (
+        <section className="mb-10">
+          <h2 className="mb-1 flex items-center gap-2 font-bold text-zinc-900">
+            <ShieldCheck className="h-4.5 w-4.5 text-zinc-500" />
+            Colaboradores
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-600">
+              {roles.length}
+            </span>
+          </h2>
+          <p className="mb-3 text-sm text-zinc-500">
+            Da acceso al panel completo o de moderador, o a moderar una categoría entera (todos los
+            hospitales o todos los puntos de ayuda), a una cuenta, sin compartir tu contraseña de admin.
+          </p>
+          <RoleGrants roles={roles} demoOpen={demoOpen} />
+        </section>
+      )}
 
       {/* Cola de reportes por verificar */}
       <section className="mb-10">
@@ -400,6 +415,7 @@ export function AdminDashboard({
                 createdAt={point.createdAt}
                 managers={managersByKey[`aid_point:${point.id}`] ?? []}
                 demoOpen={demoOpen}
+                isFullAdmin={isFullAdmin}
                 onToggleVerified={(v) => toggleAidPointVerifiedAction(point.id, v)}
               />
             ))}
@@ -441,6 +457,7 @@ export function AdminDashboard({
                 createdAt={hospital.createdAt}
                 managers={managersByKey[`hospital:${hospital.id}`] ?? []}
                 demoOpen={demoOpen}
+                isFullAdmin={isFullAdmin}
                 onToggleVerified={(v) => toggleHospitalVerifiedAction(hospital.id, v)}
               />
             ))}
@@ -502,7 +519,8 @@ export function AdminDashboard({
         )}
       </section>
 
-      {/* Héroes: dar visto bueno o eliminar propuestas falsas */}
+      {/* Héroes: dar visto bueno o eliminar propuestas falsas — solo admin completo. */}
+      {isFullAdmin && (
       <section className="mt-10">
         <h2 className="mb-1 flex items-center gap-2 font-bold text-zinc-900">
           <Star className="h-4.5 w-4.5 text-amber-500" />
@@ -575,9 +593,12 @@ export function AdminDashboard({
           </ul>
         )}
       </section>
+      )}
 
       {/* Denuncias: solo eliminar las comprobadamente falsas o inapropiadas.
-          No se pueden editar ni las borra el autor (a propósito). */}
+          No se pueden editar ni las borra el autor (a propósito). Solo admin
+          completo — implica responsabilidad legal/liability sobre la decisión. */}
+      {isFullAdmin && (
       <section className="mt-10">
         <h2 className="mb-1 flex items-center gap-2 font-bold text-zinc-900">
           <FileWarning className="h-4.5 w-4.5 text-zinc-500" />
@@ -629,6 +650,7 @@ export function AdminDashboard({
           </ul>
         )}
       </section>
+      )}
     </div>
   );
 }
@@ -647,6 +669,7 @@ function ResourceRow({
   createdAt,
   managers,
   demoOpen,
+  isFullAdmin,
   onToggleVerified,
 }: {
   entityType: ManagedEntity;
@@ -661,6 +684,8 @@ function ResourceRow({
   createdAt: string;
   managers: ResourceManager[];
   demoOpen: boolean;
+  /** false = moderador: puede dar visto bueno, no asignar gestores. */
+  isFullAdmin: boolean;
   onToggleVerified: (value: boolean) => Promise<unknown>;
 }) {
   const router = useRouter();
@@ -719,7 +744,9 @@ function ResourceRow({
         </button>
       </div>
 
-      <ManagerControls entityType={entityType} entityId={id} managers={managers} disabled={demoOpen} />
+      {isFullAdmin && (
+        <ManagerControls entityType={entityType} entityId={id} managers={managers} disabled={demoOpen} />
+      )}
     </li>
   );
 }
@@ -834,7 +861,7 @@ function ManagerControls({
 }
 
 // ── Roles globales (admin por cuenta, moderador de hospitales/ayuda) ────────
-const ROLE_OPTIONS: AppRole[] = ["admin", "hospital_moderator", "aid_point_moderator"];
+const ROLE_OPTIONS: AppRole[] = ["admin", "moderator", "hospital_moderator", "aid_point_moderator"];
 
 function RoleGrants({ roles, demoOpen }: { roles: AppRoleGrant[]; demoOpen: boolean }) {
   const router = useRouter();

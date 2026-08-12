@@ -1,4 +1,4 @@
-import { adminConfigured, isAdmin } from "@/lib/admin";
+import { adminConfigured, getAdminLevel } from "@/lib/admin";
 import { COUNTRY_CODES } from "@/lib/countries";
 import {
   getAidPoints,
@@ -13,6 +13,7 @@ import {
   getPersonsByIds,
   getPosts,
 } from "@/lib/data";
+import type { AppRoleGrant, Complaint, Hero, ResourceManager } from "@/lib/types";
 import { AdminLogin } from "@/components/admin/AdminLogin";
 import { AdminDashboard, type ReportWithName } from "@/components/admin/AdminDashboard";
 
@@ -28,36 +29,40 @@ async function getAllCountries<T>(fn: (country: string) => Promise<T[]>): Promis
 }
 
 export default async function AdminPage() {
-  if (!(await isAdmin())) {
+  const level = await getAdminLevel();
+  if (!level) {
     return <AdminLogin />;
   }
+  const fullAdmin = level === "admin";
 
-  const [
-    pending,
-    persons,
-    aidPoints,
-    hospitals,
-    managers,
-    posts,
-    heroes,
-    complaintsByCountry,
-    roles,
-    pendingExternalPosts,
-  ] = await Promise.all([
+  const [pending, persons, aidPoints, hospitals, posts, pendingExternalPosts] = await Promise.all([
     getPendingReports(),
     getAllCountries((country) => getPersons({ sort: "recent", pageSize: 30, country }).then((r) => r.items)),
     getAllCountries((country) => getAidPoints(country)),
     getAllCountries((country) => getHospitals(country)),
-    getAllResourceManagers(),
     getAllCountries((country) => getPosts({ country })),
-    getHeroesForAdmin(),
-    getAllCountries((country) => getComplaints({ country }, 1, 25).then((r) => r.items)),
-    getAllAppRoles(),
     getPendingExternalPosts(),
   ]);
-  const complaintsPage = { items: complaintsByCountry.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) };
   persons.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   posts.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  // Colaboradores, gestores, héroes y denuncias son solo para admin completo.
+  // Se piden SOLO si `fullAdmin` — no basta con ocultarlos en el UI: como
+  // `AdminDashboard` es "use client", cualquier prop que le pasemos viaja al
+  // navegador, así que un moderador ni siquiera debe recibir estos datos.
+  let managers: ResourceManager[] = [];
+  let heroes: Hero[] = [];
+  let complaintsByCountry: Complaint[] = [];
+  let roles: AppRoleGrant[] = [];
+  if (fullAdmin) {
+    [managers, heroes, complaintsByCountry, roles] = await Promise.all([
+      getAllResourceManagers(),
+      getHeroesForAdmin(),
+      getAllCountries((country) => getComplaints({ country }, 1, 25).then((r) => r.items)),
+      getAllAppRoles(),
+    ]);
+  }
+  const complaintsPage = { items: complaintsByCountry.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)) };
 
   // Enriquecemos cada reporte con el nombre de la persona (una sola consulta, no N+1).
   const personsById = await getPersonsByIds(pending.map((r) => r.personId));
@@ -87,6 +92,7 @@ export default async function AdminPage() {
       roles={roles}
       pendingExternalPosts={pendingExternalPosts}
       demoOpen={!adminConfigured}
+      isFullAdmin={fullAdmin}
     />
   );
 }

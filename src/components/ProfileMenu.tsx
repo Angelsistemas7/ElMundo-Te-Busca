@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { LogOut, Settings, UserCircle2, UserRound } from "lucide-react";
+import { LogOut, Settings, ShieldCheck, UserCircle2, UserRound } from "lucide-react";
 import { getMyProfileAction, signOutAction } from "@/app/actions";
+import { getAdminLevelAction } from "@/app/admin/actions";
 
 type BasicUser = { id: string; username: string };
 
@@ -22,6 +23,7 @@ type BasicUser = { id: string; username: string };
 export function ProfileMenu({ user }: { user: BasicUser }) {
   const router = useRouter();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [adminLevel, setAdminLevel] = useState<"admin" | "moderator" | null>(null);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -29,6 +31,11 @@ export function ProfileMenu({ user }: { user: BasicUser }) {
     getMyProfileAction()
       .then((full) => setAvatarUrl(full?.avatarUrl ?? null))
       .catch(() => setAvatarUrl(null));
+    // Atajo a /admin: solo se muestra si esta cuenta tiene acceso (admin o
+    // moderador), para no ofrecer un enlace muerto a quien no lo tiene.
+    getAdminLevelAction()
+      .then(setAdminLevel)
+      .catch(() => setAdminLevel(null));
   }, []);
 
   useEffect(() => {
@@ -84,6 +91,16 @@ export function ProfileMenu({ user }: { user: BasicUser }) {
             <Settings className="h-4 w-4 text-zinc-400" />
             Configuración
           </Link>
+          {adminLevel && (
+            <Link
+              href="/admin"
+              onClick={() => setOpen(false)}
+              className="press flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            >
+              <ShieldCheck className="h-4 w-4 text-zinc-400" />
+              Panel de moderación
+            </Link>
+          )}
           <div className="my-1 border-t border-zinc-100" />
           <button
             onClick={logout}
