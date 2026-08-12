@@ -9,6 +9,7 @@ import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { ManageLinkBox } from "./ManageLinkBox";
+import { useAuthorName } from "./AuthorNameField";
 
 export function RegisterMarchButton({ country = "ve" }: { country?: string } = {}) {
   const cc = getCountry(country);
@@ -18,6 +19,11 @@ export function RegisterMarchButton({ country = "ve" }: { country?: string } = {
   const [result, setResult] = useState<ActionResult | null>(null);
   const [title, setTitle] = useState("");
   const [aidPointOptions, setAidPointOptions] = useState<{ id: string; label: string }[]>([]);
+  // Solo prellena (nunca bloquea): a diferencia del nombre de quien publica un
+  // post, "Organiza" puede ser legítimamente un colectivo distinto al usuario
+  // de la cuenta (p. ej. "Cruz Roja local") — no se llama commit() para no
+  // sobreescribir el nombre anónimo compartido con un nombre de organización.
+  const organizer = useAuthorName("vtb_anon_publisher_name");
   const formRef = useRef<HTMLFormElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
 
@@ -121,7 +127,13 @@ export function RegisterMarchButton({ country = "ve" }: { country?: string } = {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Organiza" htmlFor="organizerName" required error={fieldErrors?.organizerName}>
-                <Input id="organizerName" name="organizerName" placeholder="Nombre o colectivo" />
+                <Input
+                  id="organizerName"
+                  name="organizerName"
+                  placeholder="Nombre o colectivo"
+                  value={organizer.name}
+                  onChange={(e) => organizer.setName(e.target.value)}
+                />
               </Field>
               <Field
                 label="Teléfono de contacto"

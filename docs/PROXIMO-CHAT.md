@@ -1,8 +1,200 @@
-## 🔴 URGENTE — próxima sesión debe empezar por aquí (2026-08-12, ronda 12)
+## ✅ Cerrado (2026-08-12, ronda 13) — RESUELTO: migración corrida con éxito, "Publicar" funciona de nuevo
+
+**El dueño confirmó que pegó `supabase/schema.sql` completo en el proyecto
+correcto de Supabase y salió "success".** Se reverificó en vivo de inmediato
+(misma consulta OpenAPI de solo lectura) — **las 7 columnas ya existen**:
+`persons.photo_hash/possible_duplicate/duplicate_match_id`,
+`aid_points.category_status`, `marches.aid_point_id`, `posts.aid_point_id`,
+`hospitals.photo_url`. Publicar personas, posts de Comunidad, puntos de
+ayuda, caravanas y hospitales debería funcionar de nuevo. Ver la sección
+"📖 Ronda 13 — diagnóstico técnico" más abajo para el detalle completo de
+la causa raíz (proyecto de Supabase equivocado) y cómo se verificó.
+
+**Además, en la misma sesión, a pedido explícito del dueño ("haz todo,
+bien hecho y diseñado"):**
+
+1. **`RegisterMarchButton.tsx` (campo "Organiza") — prellenado, sin
+   bloquear.** Usa `useAuthorName("vtb_anon_publisher_name")` para sugerir
+   el nombre de sesión/dispositivo como valor inicial, pero el campo queda
+   editable (no se llama `commit()`, para no sobreescribir el nombre
+   anónimo compartido con un nombre de colectivo/organización — a
+   diferencia de los otros 3 formularios, "Organiza" puede legítimamente
+   ser distinto al usuario de la cuenta). `PostManagePanel.tsx` se revisó
+   y se dejó **intacto a propósito**: ya trae `defaultValue={post.authorName}`
+   y es un flujo de EDICIÓN (no de creación), así que el bug de "campo
+   vacío obligatorio" no aplica ahí — tocarlo solo para uniformidad hubiera
+   sido riesgo sin beneficio real.
+2. **Guía rápida (`OnboardingTour.tsx`) — expandida con funciones
+   concretas, tal como pidió el dueño ("no tan largas pero sí lo que se
+   necesita mostrar").** Se reescribió el texto de 5 pasos (mismo cambio
+   en `MOBILE_STEPS` y `DESKTOP_STEPS`, antes solo nombraban la sección):
+   - **Se busca**: ahora menciona la pestaña "¿La reconoces?" (deslizar
+     tarjetas) y los filtros reales (región, cercanía, agrupar por
+     hospital) — antes no se mencionaba ninguna función, y "¿La reconoces?"
+     no aparecía en la guía en absoluto pese a ser una sección principal.
+     No se le agregó un anclaje/spotlight propio porque no es una página
+     aparte: es una pestaña dentro de `/se-busca` (`?view=reconoces`), así
+     que ya queda cubierta por el mismo paso.
+   - **Comunidad**: ahora nombra los 7 tipos de publicación (🆘 necesito,
+     🤲 ofrezco, 🚨 rescate, 🏥 médico...) y las 3 reacciones (🙏 ❤️ ✅).
+   - **Caravanas benéficas**: ahora menciona sumarse o convocar la propia,
+     y que se puede vincular a un punto de ayuda.
+   - **Ayuda y hospitales**: ahora nombra el nivel por recurso (🔴 urgente/
+     🟡 limitado/🟢 cubierto), el voto "Sí hay/Se acabó", y el voto
+     "¿Tiene insumos?" de hospitales — antes solo decía "con sus recursos".
+   - **Mascotas**: ahora nombra los 4 estados (perdida/encontrada/refugio/
+     veterinario) en vez de solo "perdidas o encontradas".
+   - Se dejaron sin tocar (ya eran concretos): Inicio, Voluntariado digital,
+     Denuncias, Mapa, SOS/Emergencias, Tus avisos, Crear cuenta.
+3. **Sync de Colombia re-disparado y CONFIRMADO de punta a punta** (run
+   [31640408518](https://github.com/Angelsistemas7/ElMundo-Te-Busca/actions/runs/31640408518),
+   `gh workflow run sync-legacy-sites.yml` + `gh run watch`). Log real:
+   `Colombia: 2 nuevas, 38 ya existían, 0 errores.` (guardó a Claudia María
+   Ortiz Castaño y Hernando Girando Gomez con UUID real, sin ningún error
+   de columna) y `Venezuela: 0 nuevas, 495 ya existían, 0 errores.` —
+   **el bug de guardado está cerrado de verdad, no solo en teoría.**
+
+**Verificado con**: `npm run build` (verde, typecheck + ESLint incluidos) +
+`npm run start` + `curl` a `/`, `/caravanas`, `/comunidad`, `/se-busca`,
+`/ayuda` (200 en las 5) + confirmado con `curl` que los anclajes `data-tour`
+siguen presentes en el HTML servido. **No verificado visualmente en
+navegador real** (panel de navegador integrado deshabilitado a propósito
+para este proyecto — le crashea la app al dueño, ver
+[[feedback_no_browser_pane]]): el contenido nuevo de la guía (overlay
+`createPortal`, solo existe tras hidratar) y el campo "Organiza" prellenado
+dentro del modal de Caravanas no se pueden confirmar con `curl`. Probar en
+el sitio real: abrir la guía "?" y confirmar que los 5 pasos nuevos se leen
+bien y no se cortan en móvil; abrir "Convocar caravana" con sesión iniciada
+y confirmar que "Organiza" aparece prellenado con el usuario pero se puede
+cambiar libremente.
+
+**Pendiente genuino, sin forma de resolverlo desde este sandbox**:
+- **VPS**: seguir sin poder confirmar el cron de precalentamiento de
+  noticias (puerto 22 bloqueado saliendo de aquí). El dueño debe correr
+  `crontab -l` / `tail -50 logs/warm-news.log` en el VPS él mismo.
+- **Nombre anónimo, matiz sin confirmar**: el dueño pidió que el nombre sin
+  sesión quede fijo "y no se pueda cambiar" — lo implementado permite
+  desbloquear con "¿No eres tú?". Sigue siendo una decisión de diseño no
+  confirmada explícitamente por el dueño (ver sección "Aclaraciones" más
+  abajo).
+
+## 📖 Ronda 13 — diagnóstico técnico completo (histórico — el resumen y el cierre están arriba)
 
 **Sesión cortada a mitad por el dueño** ("voy a continuar en otro chat, deja
 listo") — no se llegó a cerrar todo lo que se abrió. Leer esto completo antes
 de tocar nada.
+
+### 0. CAUSA RAÍZ CONFIRMADA de por qué la migración nunca se aplicaba
+
+**El dueño confirmó qué pasaba**: llevaba (no se sabe con exactitud desde
+cuándo) pegando cada versión nueva de `supabase/schema.sql` en un proyecto de
+Supabase **equivocado** — no en el de "El Mundo Te Busca" — por error. Lo
+confirmó pegando literalmente en el chat el historial de todo lo que había
+pegado ahí: 6 copias crecientes del mismo archivo, cada una un poco más
+completa que la anterior — se ve clarísimo cómo fue creciendo sesión a sesión
+mientras, sin saberlo, apuntaba al proyecto que no era. También mencionó que
+"otro compañero" le pasó horas antes el mismo bloque de `alter table` (las 7
+columnas de abajo) por su cuenta — puede que más de una persona tenga acceso
+de escritura a Supabase; conviene que el dueño confirme que de ahora en
+adelante los cambios de esquema solo se hacen pegando `supabase/schema.sql`
+completo (nunca fragmentos sueltos) y solo en el proyecto correcto.
+
+**Re-verificado en vivo, esta vez de forma EXHAUSTIVA** (no solo las 4
+columnas ya conocidas de la ronda 12): se consultó el esquema completo del
+proyecto CORRECTO (`https://qcmqlqriqqvctwuvoyvc.supabase.co`, el mismo que
+usa `.env.local` y por lo tanto la app real en producción) vía la
+introspección OpenAPI de PostgREST — las 21 tablas y ~150 columnas, en una
+sola consulta de solo lectura con la service role key. Resultado: **exacta-
+mente las mismas 7 columnas que ya se sospechaban siguen faltando, y NINGUNA
+otra** — todo lo demás (país multi-instancia, `cause`, `lat`/`lng`, `user_id`
+en 6 tablas, rol moderador, `pinned`, `avatar_url`, `email_notifications`,
+etc., de rondas anteriores) SÍ está aplicado correctamente en la base real. Es
+decir, el error de "proyecto equivocado" empezó justo en la sesión de
+"duplicados" (la que agregó estas 7 columnas) y no antes:
+
+```
+persons.photo_hash              ❌ no existe
+persons.possible_duplicate      ❌ no existe
+persons.duplicate_match_id      ❌ no existe
+aid_points.category_status      ❌ no existe
+marches.aid_point_id            ❌ no existe
+posts.aid_point_id              ❌ no existe
+hospitals.photo_url             ❌ no existe
+```
+
+**Confirmado además con lectura directa de `src/lib/data.ts` que las 7 están
+en el camino crítico de "Publicar"**, no son columnas secundarias:
+- `findPersonDuplicates` (línea 788) hace `SELECT ... .eq("photo_hash", ...)`
+  — esto FALLA antes de siquiera llegar al INSERT, en cualquier intento de
+  publicar una persona.
+- `createPerson` (líneas ~910-912) inserta `photo_hash`/`possible_duplicate`/
+  `duplicate_match_id` en CADA persona nueva (manual o del scraper).
+- `createAidPoint`/`updateAidPointFields` (líneas 1699/1737) insertan/
+  actualizan `category_status` en CADA punto de ayuda.
+- `createMarch`/`updateMarchFields` (líneas 2028/2069) insertan/actualizan
+  `aid_point_id` en CADA caravana.
+- `createPost`/`updatePostFields` (líneas 2822/3074) insertan/actualizan
+  `aid_point_id` en CADA post de Comunidad.
+- `createHospital` (línea 4125) inserta `photo_url` en CADA hospital nuevo.
+
+**Conclusión: ahora mismo, en producción, "Publicar" está roto para
+personas, posts de Comunidad, puntos de ayuda, caravanas Y hospitales** — 5 de
+los flujos principales de publicación del sitio (mascotas, denuncias y
+voluntarios NO tocan ninguna de estas 7 columnas, esos si funcionan).
+
+**Acción tomada**: se reenvió `supabase/schema.sql` completo como archivo
+adjunto en el chat (sin cambios de contenido — esta verificación exhaustiva
+confirmó que el archivo ya tiene todo lo que el código necesita, no le falta
+nada). Sigue siendo idempotente: pegarlo completo no rompe nada de lo que ya
+existe, solo agrega lo que falta.
+
+**Para no repetir el mismo error, esta vez se le insistió al dueño**:
+verificar ANTES de pegar que la URL del Dashboard de Supabase dice
+`qcmqlqriqqvctwuvoyvc` (`supabase.com/dashboard/project/qcmqlqriqqvctwuvoyvc/...`)
+— es el mismo ID que aparece en `NEXT_PUBLIC_SUPABASE_URL` dentro de
+`.env.local`. Si el proyecto abierto en el navegador dice cualquier otro
+nombre/ID, NO pegar ahí.
+
+**Verificación pendiente para la próxima sesión**: en cuanto el dueño confirme
+que lo corrió, repetir la misma consulta de solo lectura (OpenAPI de
+PostgREST contra `/rest/v1/` con la service role key) para las 7 columnas de
+arriba — es inmediata, no hace falta que el dueño pegue ninguna query de
+verificación él mismo. Recién ahí dar el bug por cerrado y volver a disparar
+`sync-legacy-sites.yml` para confirmar Colombia de punta a punta (ver punto 2
+del checklist más abajo).
+
+### Aclaraciones del dueño que no estaban explícitas todavía (de la sesión con la otra cuenta, para no perderlas)
+
+- **Prioridad explícita, en sus palabras**: "priorizar completamente el
+  funcionamiento de publicar personas y publicar cualquier cosa, cuando se
+  esta logueado y cuando no se esta logueado" — esta es la lente para
+  cualquier decisión de alcance en las próximas sesiones hasta que quede
+  resuelto de punta a punta (la migración de arriba es la mitad del
+  problema; la otra mitad es el punto 2 de abajo, el campo de nombre).
+- **El bloqueo del nombre anónimo pedido es MÁS estricto que lo ya
+  implementado** — pidió textualmente: "cuando no se esta logueado que el
+  nombre que se puso quede fijo y no se pueda cambiar, puede ser algo" (nota:
+  lo dijo como sugerencia, "puede ser algo", no como requisito cerrado). Lo
+  que se construyó en la ronda 12 (`AuthorNameField.tsx`) es más laxo: el
+  campo queda de solo lectura tras la primera publicación exitosa, PERO con
+  un enlace "¿No eres tú?" que lo desbloquea a propósito. Es una decisión de
+  UX tomada por la sesión anterior, no confirmada con el dueño — si en la
+  próxima sesión el dueño la prueba y prefiere que sea imposible de cambiar
+  (sin ningún enlace de escape), es un cambio de una línea (quitar el botón
+  "¿No eres tú?" de `AuthorNameField.tsx`).
+- **La guía rápida le sigue pareciendo corta — tercera vez que lo dice, esta
+  vez más específico**: "le dije lo de la guía rápida que no tenía casi
+  contenido. no tocaba ni una sola sección o funciones de una sección,
+  prácticamente solo hablaba de las secciones en general." Esto es más
+  fuerte que el feedback de rondas 9-10 (ver checklist punto 4 abajo): no
+  solo quiere más pasos en el tour de navegación, quiere que la guía entre
+  en el DETALLE de qué se puede hacer dentro de cada sección (botones,
+  filtros, funciones concretas), no solo nombrar/ubicar las secciones en el
+  menú. Confirma la sospecha ya anotada en ronda 10: la opción rechazada en
+  ronda 9 (guías separadas DENTRO de cada página) es probablemente lo que
+  realmente hace falta, no seguir ampliando el tour de navegación existente.
+  **No es urgente ahora** (la prioridad es la migración + el login), pero no
+  se debe volver a subestimar cuando se retome.
 
 ### 1. La migración de `supabase/schema.sql` SIGUE SIN CORRERSE — reconfirmado en vivo hoy
 
@@ -181,13 +373,11 @@ ya se corrió varias veces antes, no rompe nada existente.
 Pedido explícito del dueño al cerrar la sesión: dejar anotado todo lo que
 falta, sin que se escape nada. En orden de prioridad:
 
-1. **🔴 Migración `supabase/schema.sql` sin correr en producción** (ver
-   bloque de arriba) — bloquea el registro de personas, categorías de
-   ayuda, vincular posts/caravanas a puntos de ayuda, y foto de hospitales.
-   Prioridad #1 absoluta.
-2. **🔴 Scraping de Colombia** — selector arreglado y pusheado (commit
-   `49e123f`), pero el guardado real sigue fallando hasta que se corra la
-   migración del punto 1. Volver a disparar el workflow después.
+1. **✅ RESUELTO (ronda 13) — Migración de `supabase/schema.sql` corrida con
+   éxito** en el proyecto correcto de Supabase. Las 7 columnas confirmadas
+   en vivo. Ver "✅ Cerrado (ronda 13)" al principio del archivo.
+2. **✅ RESUELTO (ronda 13) — Scraping de Colombia**, confirmado de punta a
+   punta: `Colombia: 2 nuevas, 38 ya existían, 0 errores.` Ver detalle arriba.
 3. **Widget de estadísticas de Inicio lento** (`getCrisisStats`,
    `src/lib/news.ts`) — sigue sin confirmarse si el cron de precalentamiento
    (`/api/cron/warm-news`) está instalado y corriendo en el VPS real. No se
@@ -200,15 +390,16 @@ falta, sin que se escape nada. En orden de prioridad:
    tail -50 logs/warm-news.log
    ls -la /tmp/elmundotebusca-news-cache-*.json
    ```
-4. **Guía rápida (OnboardingTour) — el dueño la sintió corta DOS veces
-   seguidas.** Ronda 9 la enriqueció (textos más completos, paso "Inicio"
-   nuevo). Ronda 10 la amplió más en serio: abre "Más" de verdad para
-   resaltar Ayuda/Mascotas, y separó "Comunidad" en 4 pasos (13 pasos + 1 de
-   bienvenida = 14 total, antes 9+1). **Si en la próxima sesión el dueño
-   sigue sintiéndola corta**, la opción que rechazó en ronda 9 (guías
-   separadas DENTRO de cada página, no solo del menú de navegación) es
-   probablemente lo que en realidad quiere — reconsiderarla en vez de seguir
-   agregando texto al mismo tour de navegación.
+4. **✅ RESUELTO (ronda 13) — Guía rápida (OnboardingTour), tercera vuelta,
+   esta vez con funciones concretas.** Rondas 9-10 ampliaron pasos y
+   textos; el dueño seguía sintiéndola sin contenido real ("no tocaba ni
+   una sola función"). Ronda 13 reescribió 5 pasos con detalle concreto de
+   funciones (tipos de post, reacciones, niveles de urgencia, votos de
+   consenso, estados de mascotas — ver "✅ Cerrado (ronda 13)" arriba). **Si
+   en la próxima sesión SIGUE sintiéndola corta pese a este cambio**, ya no
+   es un problema de contenido — es la estructura misma (un tour de
+   navegación con tarjetas de texto): ahí sí reconsiderar la opción que
+   rechazó en ronda 9 (guías separadas DENTRO de cada página).
 5. **Todo lo de interacción pura de las rondas 8-10 sigue sin probarse en un
    navegador/teléfono real** (este sandbox no puede usar el panel de
    navegador — le crashea la app al dueño, y `curl` no sirve para overlays

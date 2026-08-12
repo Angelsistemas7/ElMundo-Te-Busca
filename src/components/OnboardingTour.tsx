@@ -36,12 +36,12 @@ const MOBILE_STEPS: Step[] = [
   {
     selector: '[data-tour="mnav-se-busca"]',
     title: "Se busca",
-    text: "Aquí buscas a una persona (tú tienes sus datos) o publicas a alguien que viste pero no sabes bien quién es.",
+    text: "Busca a alguien que te falta, o cambia a la pestaña \"¿La reconoces?\" para publicar a quien viste pero no sabes quién es (desliza las tarjetas). Filtra por región, cercanía, o agrupa por hospital.",
   },
   {
     selector: '[data-tour="mnav-comunidad"]',
     title: "Comunidad",
-    text: "Todo lo que no es \"busco a alguien\" vive aquí: pide o da ayuda, publica lo que necesites. Los próximos 3 pasos son sus secciones.",
+    text: "Pide o da ayuda con 7 tipos de publicación (🆘 necesito, 🤲 ofrezco, 🚨 rescate, 🏥 médico...) y reacciona con 🙏 ❤️ ✅. Los próximos 3 pasos son sus secciones.",
   },
   {
     selector: '[data-tour="mnav-comunidad"]',
@@ -51,7 +51,7 @@ const MOBILE_STEPS: Step[] = [
   {
     selector: '[data-tour="mnav-comunidad"]',
     title: "Caravanas benéficas",
-    text: "Caravanas de ayuda organizadas, con su ruta y contacto por WhatsApp para coordinar.",
+    text: "Súmate a una caravana o convoca la tuya: ruta, hora de salida y grupo de WhatsApp para coordinarse. Se puede vincular a un punto de ayuda concreto.",
   },
   {
     selector: '[data-tour="mnav-comunidad"]',
@@ -71,13 +71,13 @@ const MOBILE_STEPS: Step[] = [
   {
     selector: '[data-tour="mnav-mas-ayuda"]',
     title: "Ayuda y hospitales",
-    text: "Puntos de ayuda con sus recursos por categoría (agua, comida, medicinas...) y hospitales con su capacidad e insumos — vive detrás de \"Más\".",
+    text: "Puntos de ayuda con nivel por recurso (🔴 urgente/🟡 limitado/🟢 cubierto) y el voto \"Sí hay/Se acabó\" de la comunidad; hospitales con su capacidad y el voto \"¿Tiene insumos?\" — vive detrás de \"Más\".",
     opensMore: true,
   },
   {
     selector: '[data-tour="mnav-mas-mascotas"]',
     title: "Mascotas",
-    text: "Mascotas perdidas o encontradas durante la emergencia, con foto y ubicación — también detrás de \"Más\".",
+    text: "Perdida, encontrada, en refugio o en veterinario: publica la tuya o revisa si alguien encontró a la que buscas, con foto y ubicación — también detrás de \"Más\".",
     opensMore: true,
   },
   {
@@ -102,12 +102,12 @@ const DESKTOP_STEPS: Step[] = [
   {
     selector: '[data-tour="dnav-se-busca"]',
     title: "Se busca",
-    text: "Aquí buscas a una persona (tú tienes sus datos) o publicas a alguien que viste pero no sabes bien quién es.",
+    text: "Busca a alguien que te falta, o cambia a la pestaña \"¿La reconoces?\" para publicar a quien viste pero no sabes quién es (desliza las tarjetas). Filtra por región, cercanía, o agrupa por hospital.",
   },
   {
     selector: '[data-tour="dnav-comunidad"]',
     title: "Comunidad",
-    text: "Todo lo que no es \"busco a alguien\" vive aquí: pide o da ayuda, publica lo que necesites. Los próximos 3 pasos son sus secciones.",
+    text: "Pide o da ayuda con 7 tipos de publicación (🆘 necesito, 🤲 ofrezco, 🚨 rescate, 🏥 médico...) y reacciona con 🙏 ❤️ ✅. Los próximos 3 pasos son sus secciones.",
   },
   {
     selector: '[data-tour="dnav-comunidad"]',
@@ -117,7 +117,7 @@ const DESKTOP_STEPS: Step[] = [
   {
     selector: '[data-tour="dnav-comunidad"]',
     title: "Caravanas benéficas",
-    text: "Caravanas de ayuda organizadas, con su ruta y contacto por WhatsApp para coordinar.",
+    text: "Súmate a una caravana o convoca la tuya: ruta, hora de salida y grupo de WhatsApp para coordinarse. Se puede vincular a un punto de ayuda concreto.",
   },
   {
     selector: '[data-tour="dnav-comunidad"]',
@@ -137,13 +137,13 @@ const DESKTOP_STEPS: Step[] = [
   {
     selector: '[data-tour="dnav-mas-ayuda"]',
     title: "Ayuda y hospitales",
-    text: "Puntos de ayuda con sus recursos por categoría (agua, comida, medicinas...) y hospitales con su capacidad e insumos — vive detrás de \"Más\".",
+    text: "Puntos de ayuda con nivel por recurso (🔴 urgente/🟡 limitado/🟢 cubierto) y el voto \"Sí hay/Se acabó\" de la comunidad; hospitales con su capacidad y el voto \"¿Tiene insumos?\" — vive detrás de \"Más\".",
     opensMore: true,
   },
   {
     selector: '[data-tour="dnav-mas-mascotas"]',
     title: "Mascotas",
-    text: "Mascotas perdidas o encontradas durante la emergencia, con foto y ubicación — también detrás de \"Más\".",
+    text: "Perdida, encontrada, en refugio o en veterinario: publica la tuya o revisa si alguien encontró a la que buscas, con foto y ubicación — también detrás de \"Más\".",
     opensMore: true,
   },
   {
