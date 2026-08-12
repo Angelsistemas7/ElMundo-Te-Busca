@@ -102,6 +102,8 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
     dateFrom: str(sp.dateFrom),
     dateTo: str(sp.dateTo),
     sort: (str(sp.sort) as PersonSort) ?? "recent",
+    nearLat: num(sp.nearLat),
+    nearLng: num(sp.nearLng),
   };
 
   // Las secciones por edad (destacadas) se ven en ambas pestañas, siempre que
