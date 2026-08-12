@@ -2,6 +2,7 @@ import { Megaphone, Users2 } from "lucide-react";
 import { getCommentsForEntities, getPosts, getPostsPage, type PostSort } from "@/lib/data";
 import { POST_TYPE_EMOJI, POST_TYPE_LABEL, type PostType } from "@/lib/types";
 import { getActiveCountry } from "@/lib/country-server";
+import { getAdminLevel } from "@/lib/admin";
 import { getCountry } from "@/lib/countries";
 import { clampPageSize } from "@/lib/utils";
 import { CreatePostButton } from "@/components/CreatePostButton";
@@ -93,14 +94,18 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
   // había que bajar mucho para llegar al muro normal. Un rescate se queda ahí
   // hasta que su autor (o el admin) lo borre — no hay límite de tiempo: un
   // rescate sigue siendo urgente mientras exista, sin importar cuánto lleve.
-  const [featuredPosts, rescuePosts, pageResult] = await Promise.all([
+  const [featuredPosts, rescuePosts, pageResult, adminLevel] = await Promise.all([
     type === "all" ? getPosts({ country, pinnedOnly: true, search: q }) : Promise.resolve([]),
     type === "all" ? getPosts({ country, type: "rescate", search: q }) : Promise.resolve([]),
     // Antes: hasta 100 publicaciones completas en cada visita, sin límite —
     // pasados los 100 posts no había forma de ver algo más antiguo. Ahora
     // pagina de verdad (10/20/50 a elegir), con orden real en la base de datos.
     getPostsPage({ country, type, search: q, estado, dateFrom, dateTo }, page, pageSize, sort),
+    getAdminLevel(),
   ]);
+  // Admin o moderador: puede eliminar cualquier post directo desde el muro,
+  // sin necesitar el enlace privado del autor (ver deletePostModAction).
+  const canModerate = adminLevel !== null;
   const featured = featuredPosts;
   const featuredIds = new Set(featured.map((p) => p.id));
   const pinned = rescuePosts.filter((p) => !featuredIds.has(p.id));
@@ -192,10 +197,10 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
               </h2>
               <SwipeStaticRow className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-1">
                 {withComments(pinned).map((post) => (
-                  <PinnedPostCard key={post.id} post={post} comments={post.comments} tone="red" />
+                  <PinnedPostCard key={post.id} post={post} comments={post.comments} tone="red" canModerate={canModerate} />
                 ))}
                 {withComments(featured).map((post) => (
-                  <PinnedPostCard key={post.id} post={post} comments={post.comments} tone="amber" />
+                  <PinnedPostCard key={post.id} post={post} comments={post.comments} tone="amber" canModerate={canModerate} />
                 ))}
               </SwipeStaticRow>
             </section>
@@ -203,7 +208,7 @@ export default async function ComunidadPage({ searchParams }: { searchParams: Se
 
           <div className="space-y-4">
             {withComments(restPosts).map((post) => (
-              <PostCard key={post.id} post={post} comments={post.comments} />
+              <PostCard key={post.id} post={post} comments={post.comments} canModerate={canModerate} />
             ))}
           </div>
           <div className="mt-6">

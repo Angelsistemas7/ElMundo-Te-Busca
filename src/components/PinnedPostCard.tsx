@@ -11,7 +11,17 @@ import { PostCard } from "./PostCard";
 // lado en vez de apilarse verticalmente (antes había que bajar y bajar antes
 // de llegar al muro normal). Al tocarla se abre la publicación completa —con
 // foto, reacciones y comentarios— en un modal; no hay ficha propia por post.
-export function PinnedPostCard({ post, comments, tone }: { post: Post; comments: Comment[]; tone: "amber" | "red" }) {
+export function PinnedPostCard({
+  post,
+  comments,
+  tone,
+  canModerate = false,
+}: {
+  post: Post;
+  comments: Comment[];
+  tone: "amber" | "red";
+  canModerate?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const toneClass =
     tone === "red"
@@ -34,7 +44,7 @@ export function PinnedPostCard({ post, comments, tone }: { post: Post; comments:
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title={POST_TYPE_LABEL[post.type]}>
-        <PostCard post={post} comments={comments} />
+        <PostCard post={post} comments={comments} canModerate={canModerate} />
       </Modal>
     </>
   );

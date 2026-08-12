@@ -12,6 +12,7 @@ import {
   deleteComplaint,
   deleteHero,
   deleteNewsItem,
+  deletePost,
   dismissReport,
   rejectExternalPost,
   rejectManagerRequest,
@@ -170,6 +171,16 @@ export async function togglePostPinnedAction(
 ): Promise<{ ok: boolean }> {
   if (!(await isModerator())) return { ok: false };
   await setPostPinned(id, value);
+  revalidatePath("/admin");
+  revalidatePath("/comunidad");
+  return { ok: true };
+}
+
+/** Elimina un post directo desde el muro (admin o moderador) — sin el token
+ *  privado del autor. Mismo alcance que fijar/desfijar: moderación de posts. */
+export async function deletePostModAction(id: string): Promise<{ ok: boolean }> {
+  if (!(await isModerator())) return { ok: false };
+  await deletePost(id);
   revalidatePath("/admin");
   revalidatePath("/comunidad");
   return { ok: true };

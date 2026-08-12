@@ -2,12 +2,14 @@
 
 import { memo, useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, MapPin, MessageCircle, Pin } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ExternalLink, Loader2, MapPin, MessageCircle, Pin, Trash2 } from "lucide-react";
 import type { Comment, Post, ReactionKind } from "@/lib/types";
 import { POST_ORIGIN_EMOJI, POST_ORIGIN_LABEL, POST_TYPE_EMOJI, POST_TYPE_LABEL, REACTION_EMOJI } from "@/lib/types";
 import { cn, timeAgo } from "@/lib/utils";
 import { isTweetUrl } from "@/lib/socialEmbed";
 import { reactToPostAction } from "@/app/actions";
+import { deletePostModAction } from "@/app/admin/actions";
 import { Avatar } from "./Avatar";
 import { CommentSection } from "./CommentSection";
 import { ExternalLinkGuard } from "./ExternalLinkGuard";
@@ -27,10 +29,33 @@ const TYPE_STYLE: Record<Post["type"], string> = {
 
 const REACTIONS: ReactionKind[] = ["apoyo", "corazon", "hecho"];
 
-export const PostCard = memo(function PostCard({ post, comments }: { post: Post; comments: Comment[] }) {
+export const PostCard = memo(function PostCard({
+  post,
+  comments,
+  canModerate = false,
+}: {
+  post: Post;
+  comments: Comment[];
+  /** Admin o moderador viendo el muro: puede eliminar cualquier post, sin ser el autor. */
+  canModerate?: boolean;
+}) {
+  const router = useRouter();
   const [counts, setCounts] = useState(post.reactions);
   const [reacted, setReacted] = useState<Record<string, boolean>>({});
   const [showComments, setShowComments] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function moderatorDelete() {
+    if (deleting) return;
+    if (!window.confirm("¿Eliminar esta publicación? No se puede deshacer.")) return;
+    setDeleting(true);
+    const res = await deletePostModAction(post.id);
+    if (res.ok) {
+      router.refresh();
+    } else {
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     const state: Record<string, boolean> = {};
@@ -169,6 +194,17 @@ export const PostCard = memo(function PostCard({ post, comments }: { post: Post;
           <MessageCircle className="h-4 w-4" />
           {comments.length > 0 ? `${comments.length} comentarios` : "Comentar"}
         </button>
+        {canModerate && (
+          <button
+            onClick={moderatorDelete}
+            disabled={deleting}
+            title="Eliminar publicación (admin/moderador)"
+            className="press flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+          >
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            Eliminar
+          </button>
+        )}
       </div>
 
       {showComments && (
