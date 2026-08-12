@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getActivityForEntities, getMyPublicationsAction, getSavedItemsAction } from "@/app/actions";
+import {
+  getActivityForEntities,
+  getMyPublicationsAction,
+  getSavedItemsAction,
+  getSessionUserAction,
+} from "@/app/actions";
 import type { CommentEntity } from "./types";
 import { getMyPubs, getSeen, managePath, markSeen, type Counts, type MyPubType } from "./myPubs";
 
@@ -54,8 +59,15 @@ export function useNotifications() {
   const [entries, setEntries] = useState<NotificationEntry[]>([]);
   const [activity, setActivity] = useState<Activity>({});
   const [seen, setSeenState] = useState<Activity>({});
+  const [loggedIn, setLoggedIn] = useState(false);
 
   const refresh = useCallback(async () => {
+    try {
+      setLoggedIn(!!(await getSessionUserAction()));
+    } catch {
+      setLoggedIn(false);
+    }
+
     // 1) Publicaciones propias: de este dispositivo (token) + de tu cuenta.
     const owned: NotificationEntry[] = getMyPubs().map((p) => ({
       key: keyOf(p.type, p.id),
@@ -151,5 +163,5 @@ export function useNotifications() {
     return e.saved ? PUBLIC_PATH[e.type](e.id) : managePath(e.type as MyPubType, e.id, e.token);
   }
 
-  return { entries, newsOf, totalNew, markRead, linkFor, refresh };
+  return { entries, newsOf, totalNew, markRead, linkFor, refresh, loggedIn };
 }

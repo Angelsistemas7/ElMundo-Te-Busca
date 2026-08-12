@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Globe2 } from "lucide-react";
 import { setActiveCountryAction } from "@/app/actions";
 import {
   AMERICAS_COUNTRIES,
@@ -11,6 +11,7 @@ import {
   isCountryCode,
   type CountryCode,
 } from "@/lib/countries";
+import { cn } from "@/lib/utils";
 import { Modal } from "./Modal";
 import { FlagIcon } from "./FlagIcon";
 
@@ -106,6 +107,15 @@ export function CountryIntroModal({ initialOpen }: { initialOpen: boolean }) {
         </div>
       ) : (
         <>
+          <div className="mb-4 flex items-start gap-2.5 rounded-2xl bg-brand-50 px-3.5 py-3 shadow-sm">
+            <Globe2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+            <p className="text-xs leading-snug text-brand-800">
+              Por ahora <strong>Venezuela</strong> y <strong>Colombia</strong> (resaltados abajo) son los dos
+              únicos países activos. La plataforma nació para ayudar a localizar personas desaparecidas y, a
+              futuro, se piensa sumar más países ante cualquier desastre natural o tragedia que lo amerite —
+              no solo terremotos.
+            </p>
+          </div>
           <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
             {AMERICAS_COUNTRIES.map(({ code, name }) => {
               const active = isCountryCode(code);
@@ -115,7 +125,12 @@ export function CountryIntroModal({ initialOpen }: { initialOpen: boolean }) {
                   type="button"
                   disabled={isPending}
                   onClick={() => tap(code, name)}
-                  className="tap-card flex flex-col items-center gap-1.5 rounded-2xl border-2 border-zinc-200 bg-white p-3 text-center transition hover:border-navy-700 hover:bg-navy-50 disabled:opacity-50"
+                  className={cn(
+                    "tap-card flex flex-col items-center gap-1.5 rounded-2xl border-2 p-3 text-center transition disabled:opacity-50",
+                    active
+                      ? "border-brand-400 bg-brand-50/70 shadow-sm hover:border-brand-500"
+                      : "border-zinc-200 bg-white hover:border-navy-700 hover:bg-navy-50",
+                  )}
                 >
                   {active ? (
                     <FlagIcon code={code} className="h-8 w-11 rounded-md shadow-sm" />
@@ -126,8 +141,8 @@ export function CountryIntroModal({ initialOpen }: { initialOpen: boolean }) {
                   )}
                   <span className="text-xs font-bold leading-tight text-navy-700">{name}</span>
                   {active && (
-                    <span className="text-[10px] font-semibold text-brand-600">
-                      M{COUNTRIES[code].quakeInfo.magnitude}
+                    <span className="rounded-full bg-brand-400 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-zinc-900">
+                      Activo · M{COUNTRIES[code].quakeInfo.magnitude}
                     </span>
                   )}
                 </button>

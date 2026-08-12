@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   ChevronDown,
   HeartHandshake,
+  HelpCircle,
   Home,
   LifeBuoy,
   Map,
@@ -167,6 +168,14 @@ export function SiteHeader() {
             </div>
           </nav>
           <NotificationBell />
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("vtb:tour-open"))}
+            aria-label="Ver guía rápida"
+            className="press flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-600 transition hover:bg-zinc-100"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </button>
           <AuthMenu />
         </div>
       </div>

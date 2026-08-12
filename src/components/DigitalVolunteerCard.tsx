@@ -89,7 +89,7 @@ export function DigitalVolunteerCard({ username, stats }: { username: string; st
               <p className="text-[11px] leading-tight text-zinc-500">{it.label}</p>
             </div>
           ))}
-          <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center">
+          <div className="col-span-2 rounded-xl border border-zinc-200 bg-white p-3 text-center sm:col-span-3">
             <Sparkles className="mx-auto h-4 w-4 text-emerald-600" />
             <p className="mt-1 text-lg font-bold text-zinc-900">{recognized}</p>
             <p className="text-[11px] leading-tight text-zinc-500">

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { HelpCircle, X } from "lucide-react";
+import { X } from "lucide-react";
+import { getSessionUserAction } from "@/app/actions";
 
 const SEEN_KEY = "vtb_tour_seen_v1";
 const PAD = 8; // aire entre el elemento resaltado y el aro del spotlight
@@ -17,11 +18,16 @@ type Step = {
 const INTRO: Step = {
   selector: "",
   title: "Bienvenido a El Mundo Te Busca",
-  text: "Una guía de 30 segundos para que sepas dónde está todo: personas buscadas, ayuda, mapa y emergencias.",
+  text: "Una guía rápida para que sepas dónde está todo: personas buscadas, ayuda, mapa y emergencias. Casi todas las listas tienen un botón \"Filtros\" arriba para buscar por región, tipo o cercanía — es el mismo patrón en todo el sitio.",
 };
 
 // Barra inferior de móvil (MobileNav.tsx).
 const MOBILE_STEPS: Step[] = [
+  {
+    selector: '[data-tour="mnav-inicio"]',
+    title: "Inicio",
+    text: "El resumen de la crisis: cambia entre Venezuela y Colombia (las dos tragedias activas hoy) con el selector de país, revisa las noticias verificadas, y toca \"¿Cómo puedo ayudar?\" si quieres ser voluntario digital.",
+  },
   {
     selector: '[data-tour="mnav-se-busca"]',
     title: "Se busca",
@@ -30,7 +36,7 @@ const MOBILE_STEPS: Step[] = [
   {
     selector: '[data-tour="mnav-comunidad"]',
     title: "Comunidad",
-    text: "Pide o da ayuda, súmate como voluntario digital, mira caravanas benéficas o denuncia una irregularidad — y publica desde aquí.",
+    text: "Todo lo que no es \"busco a alguien\": pide o da ayuda, súmate como voluntario digital, mira caravanas benéficas o denuncia una irregularidad — publica cualquiera desde aquí.",
   },
   {
     selector: '[data-tour="mnav-mapa"]',
@@ -44,8 +50,13 @@ const MOBILE_STEPS: Step[] = [
   },
   {
     selector: '[data-tour="mnav-mas"]',
-    title: "Más",
-    text: "Ayuda y hospitales, y Mascotas perdidas — el resto de secciones vive aquí.",
+    title: "Ayuda y hospitales",
+    text: "Puntos de ayuda con sus recursos por categoría (agua, comida, medicinas...) y hospitales con su capacidad e insumos — vive detrás de \"Más\".",
+  },
+  {
+    selector: '[data-tour="mnav-mas"]',
+    title: "Mascotas",
+    text: "Mascotas perdidas o encontradas durante la emergencia, con foto y ubicación — también detrás de \"Más\".",
   },
   {
     selector: '[data-tour="tour-bell"]',
@@ -62,6 +73,11 @@ const MOBILE_STEPS: Step[] = [
 // Barra superior de escritorio (SiteHeader.tsx).
 const DESKTOP_STEPS: Step[] = [
   {
+    selector: '[data-tour="dnav-inicio"]',
+    title: "Inicio",
+    text: "El resumen de la crisis: cambia entre Venezuela y Colombia (las dos tragedias activas hoy) con el selector de país, revisa las noticias verificadas, y haz clic en \"¿Cómo puedo ayudar?\" si quieres ser voluntario digital.",
+  },
+  {
     selector: '[data-tour="dnav-se-busca"]',
     title: "Se busca",
     text: "Aquí buscas a una persona (tú tienes sus datos) o publicas a alguien que viste pero no sabes bien quién es.",
@@ -69,7 +85,7 @@ const DESKTOP_STEPS: Step[] = [
   {
     selector: '[data-tour="dnav-comunidad"]',
     title: "Comunidad",
-    text: "Pide o da ayuda, súmate como voluntario digital, mira caravanas benéficas o denuncia una irregularidad — y publica desde aquí.",
+    text: "Todo lo que no es \"busco a alguien\": pide o da ayuda, súmate como voluntario digital, mira caravanas benéficas o denuncia una irregularidad — publica cualquiera desde aquí.",
   },
   {
     selector: '[data-tour="dnav-mapa"]',
@@ -83,8 +99,13 @@ const DESKTOP_STEPS: Step[] = [
   },
   {
     selector: '[data-tour="dnav-mas"]',
-    title: "Más",
-    text: "Ayuda y hospitales, y Mascotas perdidas — el resto de secciones vive aquí.",
+    title: "Ayuda y hospitales",
+    text: "Puntos de ayuda con sus recursos por categoría (agua, comida, medicinas...) y hospitales con su capacidad e insumos — vive detrás de \"Más\".",
+  },
+  {
+    selector: '[data-tour="dnav-mas"]',
+    title: "Mascotas",
+    text: "Mascotas perdidas o encontradas durante la emergencia, con foto y ubicación — también detrás de \"Más\".",
   },
   {
     selector: '[data-tour="tour-bell"]',
@@ -108,8 +129,10 @@ function rectOf(el: Element): Rect {
 /**
  * Guía rápida de bienvenida: overlay que difumina la pantalla y resalta (con
  * un "hueco" tipo spotlight) un elemento de navegación a la vez, con una
- * tarjeta explicando qué hace. Solo aparece en la primera visita (marca en
- * localStorage); un botón "?" fijo la vuelve a abrir cuando se quiera.
+ * tarjeta explicando qué hace. Solo aparece sola en la primera visita real
+ * (marca en localStorage; se salta si ya hay sesión iniciada, no es un
+ * visitante nuevo). El botón "?" que la reabre vive en el header
+ * (SiteHeader.tsx, junto a "Entrar") y dispara el evento "vtb:tour-open".
  *
  * Usa DOS secuencias de pasos distintas según el ancho de pantalla al abrir
  * (móvil → ancla a la barra inferior `mnav-*`; escritorio → ancla al header
@@ -136,25 +159,47 @@ export function OnboardingTour() {
     }
     setIsMobile(window.matchMedia("(max-width: 767px)").matches);
     if (seen) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     // En la primerísima visita puede estar abierto el selector de país
     // (CountryIntroModal, mismo criterio de "primera vez" pero solo en el
     // inicio) — esperar a que se cierre antes de arrancar, si no se
     // amontonan dos overlays. Se detecta por cualquier diálogo abierto en
     // vez de acoplarse a esa cookie server-side (leerla aquí forzaría todo
     // el layout a renderizado dinámico).
-    let cancelled = false;
     const tryOpen = () => {
       if (cancelled) return;
       if (document.querySelector('[role="dialog"]')) {
-        setTimeout(tryOpen, 400);
+        timer = setTimeout(tryOpen, 400);
         return;
       }
       setOpen(true);
     };
-    const t = setTimeout(tryOpen, 700);
+    (async () => {
+      // Alguien con sesión ya iniciada no es un visitante nuevo de verdad
+      // (ya conoce el sitio o se registró desde otro dispositivo/sesión
+      // anterior) — no se le interrumpe con la guía sola; puede abrirla
+      // manual con el botón "?" del header si quiere. Se marca como "vista"
+      // para no repetir esta consulta en cada visita siguiente.
+      try {
+        const user = await getSessionUserAction();
+        if (user) {
+          try {
+            localStorage.setItem(SEEN_KEY, "1");
+          } catch {
+            /* almacenamiento no disponible */
+          }
+          return;
+        }
+      } catch {
+        /* sin sesión o sin Supabase: sigue como visitante nuevo normal */
+      }
+      if (cancelled) return;
+      timer = setTimeout(tryOpen, 700);
+    })();
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, []);
 
@@ -215,11 +260,19 @@ export function OnboardingTour() {
   function prev() {
     setStepIndex((i) => Math.max(0, i - 1));
   }
-  function restart() {
+  const restart = useCallback(() => {
     setStepIndex(0);
     setIsMobile(window.matchMedia("(max-width: 767px)").matches);
     setOpen(true);
-  }
+  }, []);
+
+  // El botón "?" que la reabre vive en el header (junto a "Entrar"), no aquí
+  // — se coordinan por evento, mismo patrón que ya usa AuthMenu con
+  // "vtb:auth-open" para abrirse desde otros componentes sin compartir estado.
+  useEffect(() => {
+    window.addEventListener("vtb:tour-open", restart);
+    return () => window.removeEventListener("vtb:tour-open", restart);
+  }, [restart]);
 
   if (!ready) return null;
 
@@ -317,17 +370,6 @@ export function OnboardingTour() {
             </div>
           </div>
         </div>
-      )}
-
-      {!open && (
-        <button
-          type="button"
-          onClick={restart}
-          aria-label="Ver guía rápida"
-          className="press fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-white text-navy-700 shadow-lg ring-1 ring-zinc-200 transition hover:bg-zinc-50 sm:bottom-6"
-        >
-          <HelpCircle className="h-5 w-5" />
-        </button>
       )}
     </>,
     document.body,

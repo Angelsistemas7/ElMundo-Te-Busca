@@ -42,8 +42,13 @@ export default async function PublicVolunteerProfilePage({
       </p>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {items.map((it) => (
-          <div key={it.label} className="rounded-xl border border-zinc-200 bg-white p-3">
+        {items.map((it, i) => (
+          <div
+            key={it.label}
+            className={`rounded-xl border border-zinc-200 bg-white p-3 ${
+              i === items.length - 1 && items.length % 2 === 1 ? "col-span-2 sm:col-span-1" : ""
+            }`}
+          >
             <it.icon className="mx-auto h-4 w-4 text-emerald-600" />
             <p className="mt-1 text-lg font-bold text-zinc-900">{it.value}</p>
             <p className="text-[11px] leading-tight text-zinc-500">{it.label}</p>

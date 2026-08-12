@@ -10,7 +10,7 @@ import { TYPE_LABEL, useNotifications } from "@/lib/useNotifications";
 // servidores de notificaciones: compara el conteo actual con el visto. Vista
 // completa (sin límite de alto) en /notificaciones.
 export function NotificationBell() {
-  const { entries, newsOf, totalNew, markRead, linkFor } = useNotifications();
+  const { entries, newsOf, totalNew, markRead, linkFor, loggedIn } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -28,8 +28,11 @@ export function NotificationBell() {
     };
   }, [open]);
 
-  // Nada que mostrar (sin publicaciones ni guardados en este dispositivo/cuenta).
-  if (entries.length === 0) return null;
+  // Sin sesión Y sin publicaciones/guardados en este dispositivo: no hay nada
+  // que esta persona pueda ver aquí todavía (ni "Ver todas" tendría sentido).
+  // Con sesión iniciada se muestra igual, aunque esté vacía, para que la
+  // campanita sea un punto fijo de la cuenta (junto a "Entrar"/perfil).
+  if (entries.length === 0 && !loggedIn) return null;
 
   const preview = entries.slice(0, 8);
 
@@ -63,6 +66,11 @@ export function NotificationBell() {
             )}
           </div>
 
+          {entries.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-zinc-400">
+              Aún no tienes publicaciones ni guardados. Aparecerán aquí en cuanto publiques o guardes algo.
+            </p>
+          ) : (
           <ul className="max-h-[70vh] divide-y divide-zinc-100 overflow-y-auto">
             {preview.map((e) => {
               const n = newsOf(e);
@@ -117,14 +125,17 @@ export function NotificationBell() {
               );
             })}
           </ul>
+          )}
 
-          <Link
-            href="/notificaciones"
-            onClick={() => setOpen(false)}
-            className="press block border-t border-zinc-100 px-4 py-2.5 text-center text-sm font-semibold text-brand-700 hover:bg-zinc-50"
-          >
-            Ver todas ({entries.length})
-          </Link>
+          {entries.length > 0 && (
+            <Link
+              href="/notificaciones"
+              onClick={() => setOpen(false)}
+              className="press block border-t border-zinc-100 px-4 py-2.5 text-center text-sm font-semibold text-brand-700 hover:bg-zinc-50"
+            >
+              Ver todas ({entries.length})
+            </Link>
+          )}
         </div>
       )}
     </div>
