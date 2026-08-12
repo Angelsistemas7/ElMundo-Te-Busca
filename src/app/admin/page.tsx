@@ -56,7 +56,10 @@ export default async function AdminPage() {
     getAllCountries((country) => getComplaints({ country }, 1, 25).then((r) => r.items)),
     getAllAppRoles(),
     getPendingExternalPosts(),
-    getPendingManagerRequests(),
+    // Tabla nueva (manager_requests): si la migración de supabase/schema.sql
+    // todavía no corrió en producción, que falte esta tabla no debe tumbar
+    // TODO el panel de admin — se degrada a "sin solicitudes" en su lugar.
+    getPendingManagerRequests().catch(() => []),
   ]);
   const complaintsPage = { items: complaintsByCountry.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) };
   persons.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
