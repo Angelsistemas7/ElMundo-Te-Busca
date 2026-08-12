@@ -43,13 +43,17 @@ export default async function PersonOpengraphImage({ params }: { params: Promise
 
   return new ImageResponse(
     (
+      // Fondo claro tipo iOS (blanco con un gris de sistema sutil), en vez del
+      // degradado oscuro anterior: el logo ya tiene su propio contraste
+      // (corazón navy/ámbar sobre transparente), así que no necesita una
+      // tarjeta oscura detrás para leerse.
       <div
         style={{
           position: "relative",
           width: "100%",
           height: "100%",
           display: "flex",
-          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #334155 100%)",
+          background: "linear-gradient(135deg, #ffffff 0%, #f2f2f7 100%)",
           padding: "56px 64px",
         }}
       >
@@ -57,16 +61,10 @@ export default async function PersonOpengraphImage({ params }: { params: Promise
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={logoSrc}
-          width={108}
-          height={108}
+          width={100}
+          height={100}
           alt=""
-          style={{
-            position: "absolute",
-            top: "40px",
-            right: "56px",
-            borderRadius: "22px",
-            boxShadow: "0 14px 32px rgba(0,0,0,0.4)",
-          }}
+          style={{ position: "absolute", top: "44px", right: "56px" }}
         />
 
         {/* Foto de la persona (o iniciales si no tiene) a la izquierda. */}
@@ -78,9 +76,9 @@ export default async function PersonOpengraphImage({ params }: { params: Promise
             borderRadius: "28px",
             overflow: "hidden",
             flexShrink: 0,
-            background: "#334155",
+            background: "#e2e0f0",
             border: `6px solid ${statusColor}`,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+            boxShadow: "0 20px 45px rgba(29,27,64,0.14)",
           }}
         >
           {photoSrc ? (
@@ -96,7 +94,7 @@ export default async function PersonOpengraphImage({ params }: { params: Promise
                 justifyContent: "center",
                 fontSize: "160px",
                 fontWeight: 800,
-                color: "#94a3b8",
+                color: "#6f699e",
               }}
             >
               {displayName === "Persona sin identificar" ? "?" : displayName.slice(0, 1)}
@@ -106,7 +104,7 @@ export default async function PersonOpengraphImage({ params }: { params: Promise
 
         {/* Texto a la derecha. */}
         <div style={{ display: "flex", flexDirection: "column", flex: 1, paddingLeft: "52px" }}>
-          <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: "#fbbf24" }}>
+          <div style={{ display: "flex", fontSize: "28px", fontWeight: 700, color: "#b96a3a" }}>
             El Mundo Te Busca
           </div>
 
@@ -118,7 +116,7 @@ export default async function PersonOpengraphImage({ params }: { params: Promise
               padding: "8px 20px",
               borderRadius: "9999px",
               background: statusColor,
-              color: "#0f172a",
+              color: "#ffffff",
               fontSize: "24px",
               fontWeight: 700,
             }}
@@ -132,14 +130,14 @@ export default async function PersonOpengraphImage({ params }: { params: Promise
               marginTop: "18px",
               fontSize: "58px",
               fontWeight: 800,
-              color: "#ffffff",
+              color: "#16142f",
               lineHeight: 1.08,
             }}
           >
             {displayName}
           </div>
 
-          <div style={{ display: "flex", marginTop: "24px", fontSize: "30px", color: "#cbd5e1", lineHeight: 1.35 }}>
+          <div style={{ display: "flex", marginTop: "24px", fontSize: "30px", color: "#475569", lineHeight: 1.35 }}>
             {cta}
           </div>
 
@@ -147,7 +145,7 @@ export default async function PersonOpengraphImage({ params }: { params: Promise
             {PLATFORM_BLURB}
           </div>
 
-          <div style={{ display: "flex", marginTop: "auto", fontSize: "24px", fontWeight: 600, color: "#94a3b8" }}>
+          <div style={{ display: "flex", marginTop: "auto", fontSize: "24px", fontWeight: 600, color: "#6f699e" }}>
             elmundotebusca.com
           </div>
         </div>

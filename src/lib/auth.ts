@@ -2,7 +2,15 @@ import "server-only";
 import { getSupabaseServer } from "./supabaseServer";
 import { getSupabaseAdmin } from "./supabase";
 import { isSafePhotoUrl } from "./validation";
+import { clientIp, createLockout } from "./ipLockout";
 import type { SignupInput, LoginInput } from "./validation";
+
+// Freno de fuerza bruta contra el login de cuentas de usuario: 8 intentos
+// fallidos por IP bloquean esa IP 15 minutos (un poco más laxo que /admin
+// porque aquí hay muchas más IPs legítimas compartidas — redes de refugios,
+// puntos de wifi comunitarios tras el terremoto — equivocándose de contraseña
+// entre varias personas del mismo lugar).
+const loginLockout = createLockout(8, 15 * 60 * 1000);
 
 // Cuentas con Supabase Auth. Diseño: usuario único + contraseña fuerte; correo
 // OPCIONAL (solo para recuperar la clave). La contraseña la hashea Supabase
@@ -153,6 +161,11 @@ export async function signIn(input: LoginInput): Promise<AuthResult> {
     return { ok: false, error: "Las cuentas se activan al conectar la base de datos (Supabase)." };
   }
 
+  const ip = await clientIp();
+  if (loginLockout.isLocked(ip)) {
+    return { ok: false, error: "Demasiados intentos. Espera unos minutos y vuelve a intentar." };
+  }
+
   const { data: prof } = await admin
     .from("profiles")
     .select("login_email, username")
@@ -168,6 +181,7 @@ export async function signIn(input: LoginInput): Promise<AuthResult> {
   // ser válida) para gastar un tiempo parecido antes de responder.
   if (!prof) {
     await sb.auth.signInWithPassword({ email: synthEmail("__no_such_user__"), password: input.password });
+    loginLockout.registerFailure(ip);
     return { ok: false, error: "Usuario o contraseña incorrectos." };
   }
 
@@ -175,8 +189,12 @@ export async function signIn(input: LoginInput): Promise<AuthResult> {
     email: prof.login_email as string,
     password: input.password,
   });
-  if (error) return { ok: false, error: "Usuario o contraseña incorrectos." };
+  if (error) {
+    loginLockout.registerFailure(ip);
+    return { ok: false, error: "Usuario o contraseña incorrectos." };
+  }
 
+  loginLockout.registerSuccess(ip);
   return { ok: true, username: prof.username as string };
 }
 

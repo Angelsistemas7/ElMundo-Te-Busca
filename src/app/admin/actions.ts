@@ -13,6 +13,7 @@ import {
   deleteHero,
   deleteNewsItem,
   deletePost,
+  dismissPersonDuplicate,
   dismissReport,
   rejectExternalPost,
   rejectManagerRequest,
@@ -259,6 +260,15 @@ export async function approveManagerRequestAction(requestId: string): Promise<{ 
 export async function rejectManagerRequestAction(requestId: string): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
   await rejectManagerRequest(requestId);
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/** El moderador ya revisó el aviso de posible duplicado: lo saca de la cola
+ *  sin borrar ni fusionar nada (son personas distintas, o se resolvió a mano). */
+export async function dismissPersonDuplicateAction(personId: string): Promise<{ ok: boolean }> {
+  if (!(await isAdmin()) && !(await isModerator())) return { ok: false };
+  await dismissPersonDuplicate(personId);
   revalidatePath("/admin");
   return { ok: true };
 }

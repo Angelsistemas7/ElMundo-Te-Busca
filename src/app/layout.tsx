@@ -38,21 +38,21 @@ export const metadata: Metadata = {
   },
   applicationName: "El Mundo Te Busca",
   description:
-    "Iniciativa ciudadana, voluntaria y sin fines de lucro para localizar personas desaparecidas y coordinar ayuda ante emergencias en cualquier parte del mundo. Activa ahora tras los terremotos de Venezuela (jun. 2026) y Colombia (ago. 2026).",
+    "Iniciativa ciudadana, voluntaria y sin fines de lucro para localizar personas desaparecidas y coordinar ayuda ante cualquier tragedia o emergencia, en cualquier parte del mundo. Hoy activa en Venezuela y Colombia.",
   robots: { index: true, follow: true },
   openGraph: {
-    title: "El Mundo Te Busca — Ayuda y búsqueda ante emergencias",
+    title: "El Mundo Te Busca — Respuesta ciudadana a tragedias en el mundo",
     description:
-      "Plataforma ciudadana global para localizar personas desaparecidas y coordinar ayuda ante emergencias. Activa ahora en Venezuela y Colombia (terremotos de 2026).",
+      "Plataforma ciudadana global para localizar personas desaparecidas y coordinar ayuda ante cualquier emergencia. Hoy activa en Venezuela y Colombia.",
     type: "website",
     locale: "es_419",
     siteName: "El Mundo Te Busca",
   },
   twitter: {
     card: "summary_large_image",
-    title: "El Mundo Te Busca — Ayuda y búsqueda ante emergencias",
+    title: "El Mundo Te Busca — Respuesta ciudadana a tragedias en el mundo",
     description:
-      "Plataforma ciudadana global para localizar personas desaparecidas y coordinar ayuda ante emergencias. Activa ahora en Venezuela y Colombia (terremotos de 2026).",
+      "Plataforma ciudadana global para localizar personas desaparecidas y coordinar ayuda ante cualquier emergencia. Hoy activa en Venezuela y Colombia.",
   },
 };
 

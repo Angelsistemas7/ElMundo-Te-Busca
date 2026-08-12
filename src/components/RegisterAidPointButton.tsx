@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ImagePlus, Loader2, Plus } from "lucide-react";
-import { AID_POINT_TYPE_LABEL, type AidPointType } from "@/lib/types";
+import { AID_POINT_TYPE_LABEL, AID_STOCK_LEVEL_LABEL, type AidPointType, type AidStockLevel } from "@/lib/types";
 import { getCountry } from "@/lib/countries";
 import { registerAidPointAction, type ActionResult } from "@/app/actions";
 import { uploadPhoto } from "@/lib/upload";
@@ -22,6 +22,7 @@ export function RegisterAidPointButton({ country = "ve" }: { country?: string } 
   const [result, setResult] = useState<ActionResult | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [title, setTitle] = useState("");
+  const [checkedTypes, setCheckedTypes] = useState<Set<AidPointType>>(new Set(["comida"]));
   const fileRef = useRef<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
@@ -31,6 +32,7 @@ export function RegisterAidPointButton({ country = "ve" }: { country?: string } 
     setTimeout(() => {
       setResult(null);
       setPreview(null);
+      setCheckedTypes(new Set(["comida"]));
       fileRef.current = null;
       formRef.current?.reset();
     }, 200);
@@ -131,16 +133,45 @@ export function RegisterAidPointButton({ country = "ve" }: { country?: string } 
               <Input id="name" name="name" placeholder="Donatón de comida — Plaza Macuto" />
             </Field>
 
-            <Field label="¿Qué recursos hay aquí?" required error={fieldErrors?.types} hint="Marca todos los que apliquen.">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <Field label="¿Qué recursos hay aquí?" required error={fieldErrors?.types} hint="Marca todos los que apliquen y di qué tan surtido está cada uno.">
+              <div className="space-y-2">
                 {(Object.keys(AID_POINT_TYPE_LABEL) as AidPointType[]).map((t) => (
-                  <label
+                  <div
                     key={t}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50"
+                    className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50"
                   >
-                    <input type="checkbox" name="types" value={t} defaultChecked={t === "comida"} className="h-4 w-4 rounded" />
-                    {AID_POINT_TYPE_LABEL[t]}
-                  </label>
+                    <label className="flex flex-1 cursor-pointer items-center gap-2 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        name="types"
+                        value={t}
+                        defaultChecked={checkedTypes.has(t)}
+                        className="h-4 w-4 rounded"
+                        onChange={(e) =>
+                          setCheckedTypes((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(t);
+                            else next.delete(t);
+                            return next;
+                          })
+                        }
+                      />
+                      {AID_POINT_TYPE_LABEL[t]}
+                    </label>
+                    {checkedTypes.has(t) && (
+                      <select
+                        name={`status_${t}`}
+                        defaultValue={"cubierto" satisfies AidStockLevel}
+                        className="rounded-lg border border-zinc-300 px-2 py-1 text-xs text-zinc-700"
+                      >
+                        {(Object.keys(AID_STOCK_LEVEL_LABEL) as AidStockLevel[]).map((lvl) => (
+                          <option key={lvl} value={lvl}>
+                            {AID_STOCK_LEVEL_LABEL[lvl]}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 ))}
               </div>
             </Field>

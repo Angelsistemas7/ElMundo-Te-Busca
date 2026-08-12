@@ -2,7 +2,7 @@ import Image from "next/image";
 import { memo } from "react";
 import { BadgeCheck, Clock3, MapPin, MessageCircle, Phone, ShieldQuestion } from "lucide-react";
 import type { AidPoint, AidPointType } from "@/lib/types";
-import { AID_POINT_TYPE_LABEL } from "@/lib/types";
+import { AID_POINT_TYPE_LABEL, AID_STOCK_LEVEL_EMOJI } from "@/lib/types";
 import { cn, timeAgo } from "@/lib/utils";
 import { AidConsensusVote } from "./AidConsensusVote";
 import { LikeButton } from "./LikeButton";
@@ -20,6 +20,9 @@ const TYPE_EMOJI: Record<AidPointType, string> = {
 };
 
 export const AidPointCard = memo(function AidPointCard({ point }: { point: AidPoint }) {
+  // Categorías marcadas "urgente": lo que de verdad hace falta ahí, para que
+  // quien lleva ayuda no la concentre donde ya sobra (ver AID_STOCK_LEVEL_LABEL).
+  const urgentTypes = point.types.filter((t) => point.categoryStatus?.[t] === "urgente");
   return (
     <article
       className={cn(
@@ -79,6 +82,13 @@ export const AidPointCard = memo(function AidPointCard({ point }: { point: AidPo
             </span>
           )}
         </div>
+
+        {urgentTypes.length > 0 && (
+          <p className="flex flex-wrap items-center gap-1 text-xs font-semibold text-rose-700">
+            {AID_STOCK_LEVEL_EMOJI.urgente} Urgente:{" "}
+            {urgentTypes.map((t) => AID_POINT_TYPE_LABEL[t]).join(", ")}
+          </p>
+        )}
 
         <AidConsensusVote
           id={point.id}

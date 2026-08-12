@@ -120,6 +120,20 @@ create unique index if not exists persons_external_uniq
   on persons (external_source, external_id)
   where external_id is not null;
 
+-- ── Aviso de posible duplicado (nombre parecido, cédula o foto idéntica) ────
+-- `photo_hash` es un SHA-256 determinístico de los bytes de la foto (no un
+-- modelo de IA ni hash perceptual): detecta cuando el MISMO archivo se subió
+-- ya sea desde el formulario de publicar o desde el sync de sitios viejos.
+-- `possible_duplicate`/`duplicate_match_id` se calculan al crear el registro
+-- (manual o automático) y NO bloquean la publicación, solo la marcan para que
+-- un moderador la revise en /admin — puede ser gente real que comparte una
+-- sola foto familiar, no necesariamente el mismo caso repetido.
+alter table persons add column if not exists photo_hash text;
+alter table persons add column if not exists possible_duplicate boolean not null default false;
+alter table persons add column if not exists duplicate_match_id uuid references persons(id) on delete set null;
+create index if not exists persons_photo_hash_idx on persons (photo_hash) where photo_hash is not null;
+create index if not exists persons_possible_duplicate_idx on persons (possible_duplicate) where possible_duplicate;
+
 -- ── Propietario de la publicación (token privado de gestión) ────────────────
 -- Tabla aparte y SIN lectura pública: el token es secreto. Solo el servidor
 -- (service role) lo lee para verificar al autor. Permite que quien publicó
@@ -252,6 +266,11 @@ create index if not exists aid_points_type_idx   on aid_points using gin (types)
 alter table aid_points add column if not exists country text not null default 've';
 create index if not exists aid_points_country_idx on aid_points (country);
 
+-- Existencias POR CATEGORÍA (ej. {"agua":"urgente","comida":"cubierto"}), en
+-- vez de un solo disponible/agotado para todo el punto. La fija el autor o el
+-- admin (igual que `available`), no es un voto. Categoría ausente = cubierta.
+alter table aid_points add column if not exists category_status jsonb not null default '{}'::jsonb;
+
 -- ── Marchas / caravanas ─────────────────────────────────────────────────────
 create table if not exists marches (
   id uuid primary key default uuid_generate_v4(),
@@ -272,6 +291,11 @@ create index if not exists marches_depart_idx on marches (depart_at);
 -- Migración multi-país (ago. 2026): ver nota en `persons` más arriba.
 alter table marches add column if not exists country text not null default 've';
 create index if not exists marches_country_idx on marches (country);
+
+-- Vínculo opcional a un punto de ayuda concreto: qué necesidad atiende esta
+-- caravana, para que se vea cruzada en la ficha del punto (ago. 2026).
+alter table marches add column if not exists aid_point_id uuid references aid_points(id) on delete set null;
+create index if not exists marches_aid_point_idx on marches (aid_point_id) where aid_point_id is not null;
 
 -- ── Hospitales ──────────────────────────────────────────────────────────────
 create table if not exists hospitals (
@@ -344,6 +368,11 @@ create index if not exists posts_type_idx      on posts (type);
 create index if not exists posts_estado_idx    on posts (estado);
 create index if not exists posts_created_idx   on posts (created_at desc);
 create index if not exists posts_pinned_idx    on posts (pinned);
+
+-- Vínculo opcional a un punto de ayuda concreto (mismo patrón que marches
+-- arriba): qué necesidad u oferta atiende este post, cruzado en su ficha.
+alter table posts add column if not exists aid_point_id uuid references aid_points(id) on delete set null;
+create index if not exists posts_aid_point_idx on posts (aid_point_id) where aid_point_id is not null;
 create index if not exists posts_reactions_idx on posts (reactions_total desc);
 
 -- Migración: ingesta automática de publicaciones de otras redes (Bluesky,

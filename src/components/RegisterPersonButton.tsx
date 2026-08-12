@@ -21,7 +21,8 @@ import {
 } from "@/app/actions";
 import type { PersonDuplicateMatch } from "@/lib/data";
 import { PERSON_STATUS_LABEL } from "@/lib/types";
-import { uploadPhoto } from "@/lib/upload";
+import { uploadPhoto, hashFile } from "@/lib/upload";
+import { suspiciousPhoneReason } from "@/lib/phone";
 import { compressImage } from "@/lib/image";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
@@ -46,8 +47,10 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
   const [title, setTitle] = useState("");
   const [duplicates, setDuplicates] = useState<PersonDuplicateMatch[] | null>(null);
   const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [phoneWarning, setPhoneWarning] = useState<string | null>(null);
   const skipDuplicateCheck = useRef(false);
   const fileRef = useRef<File | null>(null);
+  const photoHashRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
 
@@ -57,8 +60,10 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
     setDone(false);
     setIntent(null);
     setDuplicates(null);
+    setPhoneWarning(null);
     skipDuplicateCheck.current = false;
     fileRef.current = null;
+    photoHashRef.current = null;
     formRef.current?.reset();
   }
 
@@ -83,16 +88,34 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
     if (submitting || checkingDuplicates) return;
     const form = new FormData(e.currentTarget);
 
-    // Antes de crear un registro "busco a esta persona" con nombre/cédula,
-    // avisamos si ya existe algo que coincida exacto, para no duplicar.
-    if (!isSighting && !skipDuplicateCheck.current) {
+    // El hash se calcula una sola vez por archivo (se reusa en el reintento de
+    // "publicar de todas formas") y viaja en el propio formulario para que el
+    // servidor lo guarde junto al registro, sin depender de que se muestre o
+    // no el aviso de duplicado.
+    if (fileRef.current && !photoHashRef.current) {
+      try {
+        photoHashRef.current = await hashFile(fileRef.current);
+      } catch {
+        // Sin hash no hay chequeo por foto, pero no se pierde el registro.
+      }
+    }
+    if (photoHashRef.current) form.set("photoHash", photoHashRef.current);
+
+    // Antes de crear el registro, avisamos si ya existe algo que probablemente
+    // sea la misma persona: cédula, nombre parecido o la MISMA foto.
+    if (!skipDuplicateCheck.current) {
       const firstName = String(form.get("firstName") ?? "");
       const lastName = String(form.get("lastName") ?? "");
       const cedula = String(form.get("cedula") ?? "");
-      if (firstName.trim() || cedula.trim()) {
+      if (firstName.trim() || cedula.trim() || photoHashRef.current) {
         setCheckingDuplicates(true);
         try {
-          const matches = await checkPersonDuplicatesAction(firstName, lastName, cedula);
+          const matches = await checkPersonDuplicatesAction(
+            firstName,
+            lastName,
+            cedula,
+            photoHashRef.current ?? undefined,
+          );
           if (matches.length > 0) {
             setDuplicates(matches);
             return;
@@ -206,12 +229,12 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
               <div>
                 <p className="text-sm font-semibold text-amber-900">
-                  Ya encontramos {duplicates.length === 1 ? "un registro" : "registros"} con el
-                  mismo nombre o cédula
+                  Ya encontramos {duplicates.length === 1 ? "un registro parecido" : "registros parecidos"}
                 </p>
                 <p className="mt-1 text-sm text-amber-800">
-                  Si es la misma persona, mejor aporta información en esa ficha en vez de crear una
-                  nueva. Si es alguien distinto, puedes continuar publicando igual.
+                  Por cédula, nombre parecido o la misma foto. Si es la misma persona, mejor aporta
+                  información en esa ficha en vez de crear una nueva. Si es alguien distinto (p. ej.
+                  varios familiares comparten una sola foto), puedes continuar publicando igual.
                 </p>
               </div>
             </div>
@@ -231,6 +254,14 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
                           "Sin más datos"}
                         {" · "}
                         {PERSON_STATUS_LABEL[m.status]}
+                        {" · "}
+                        <span className="font-medium text-amber-700">
+                          {m.matchReason === "cedula"
+                            ? "misma cédula"
+                            : m.matchReason === "photo"
+                              ? "misma foto"
+                              : "nombre parecido"}
+                        </span>
                       </p>
                     </div>
                     <Link
@@ -340,6 +371,7 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
                   const file = e.target.files?.[0];
                   if (!file) return;
                   fileRef.current = file;
+                  photoHashRef.current = null;
                   setPreview(URL.createObjectURL(file));
                 }}
               />
@@ -468,7 +500,15 @@ export function RegisterPersonButton({ country = "ve" }: { country?: string } = 
                 error={fieldErrors?.contactPhone}
                 hint="Con el código de tu país si no es +58."
               >
-                <Input id="contactPhone" name="contactPhone" placeholder="+58 424 0000000" />
+                <Input
+                  id="contactPhone"
+                  name="contactPhone"
+                  placeholder="+58 424 0000000"
+                  onBlur={(e) => setPhoneWarning(suspiciousPhoneReason(e.target.value))}
+                  onChange={() => phoneWarning && setPhoneWarning(null)}
+                />
+                {/* Aviso, no bloqueo: se puede publicar igual aunque el número parezca falso. */}
+                {phoneWarning && <p className="mt-1 text-xs font-medium text-amber-700">{phoneWarning}</p>}
               </Field>
               <Field label="Correo (opcional)" htmlFor="contactEmail" error={fieldErrors?.contactEmail}>
                 <Input id="contactEmail" name="contactEmail" type="email" placeholder="tu@correo.com" />

@@ -37,3 +37,14 @@ export async function uploadPhoto(file: File): Promise<string | null> {
   const { data } = sb.storage.from("photos").getPublicUrl(name);
   return data.publicUrl;
 }
+
+// SHA-256 de los bytes del archivo (Web Crypto, sin librerías). Determinístico
+// y barato: sirve para detectar el MISMO archivo repetido entre publicaciones
+// (aviso de posible duplicado), no es reconocimiento facial ni un modelo de IA.
+export async function hashFile(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}

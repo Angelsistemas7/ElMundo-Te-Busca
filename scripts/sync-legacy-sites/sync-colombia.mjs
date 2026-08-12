@@ -96,6 +96,7 @@ async function main() {
       const parsed = parseDetail(detailHtml);
       if (!parsed) continue; // borrada/inexistente
 
+      const photo = parsed.photoUrl ? await uploadPhotoFromUrl(sb, parsed.photoUrl) : { url: null, hash: null };
       const row = {
         first_name: (parsed.name || "Sin identificar").slice(0, 80),
         last_name: "",
@@ -106,7 +107,8 @@ async function main() {
         estado: guessRegion(parsed.fields["Último lugar visto"], CO_REGIONS),
         location_text: parsed.fields["Último lugar visto"] || "",
         description: parsed.fields["Descripción adicional"] || "",
-        photo_url: parsed.photoUrl ? await uploadPhotoFromUrl(sb, parsed.photoUrl) : null,
+        photo_url: photo.url,
+        photo_hash: photo.hash,
         status: mapStatus(parsed.fields["Estado"]),
         is_unidentified: false,
         created_at: parseFecha(parsed.fields["Registrado"]) || new Date().toISOString(),
@@ -118,7 +120,7 @@ async function main() {
       if (result.status === "inserted") {
         inserted++;
         allKnownOnThisPage = false;
-        console.log(`  + ${row.first_name} (${id})`);
+        console.log(`  + ${row.first_name} (${id})${result.possibleDuplicate ? "  ⚠ posible duplicado" : ""}`);
       } else if (result.status === "error") {
         errors++;
         console.error(`  ❌ ${id}: ${result.error}`);

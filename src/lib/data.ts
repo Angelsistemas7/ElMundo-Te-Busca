@@ -212,6 +212,9 @@ function rowToPerson(r: any): Person {
     contactPhone: r.contact_phone,
     contactEmail: r.contact_email,
     verified: r.verified ?? false,
+    photoHash: r.photo_hash ?? null,
+    possibleDuplicate: r.possible_duplicate ?? false,
+    duplicateMatchId: r.duplicate_match_id ?? null,
     reactions: { fuerza: 0, corazon: 0, difundir: 0, ...(r.reactions ?? {}) },
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -681,6 +684,24 @@ function normalizeName(value: string): string {
     .replace(/\s+/g, " ");
 }
 
+// Nombres "parecidos" en vez de idénticos: alguien puede escribir "Ana Maria"
+// donde otro puso "Ana María Saavedra" o invertir nombre/apellido. Con 2+
+// palabras de 3+ letras en común (nombre de pila + al menos un apellido) hay
+// buena probabilidad de que sea la misma persona, sin ser tan laxo como para
+// que "María González" choque con cualquier otra María.
+function nameTokens(value: string): string[] {
+  return normalizeName(value)
+    .split(" ")
+    .filter((t) => t.length >= 3);
+}
+
+function sharedNameTokens(a: string, b: string): number {
+  const tokensB = new Set(nameTokens(b));
+  return nameTokens(a).filter((t) => tokensB.has(t)).length;
+}
+
+export type DuplicateMatchReason = "cedula" | "photo" | "name";
+
 export interface PersonDuplicateMatch {
   id: string;
   firstName: string;
@@ -691,9 +712,10 @@ export interface PersonDuplicateMatch {
   status: PersonStatus;
   photoUrl: string | null;
   isUnidentified: boolean;
+  matchReason: DuplicateMatchReason;
 }
 
-function toDuplicateMatch(p: Person): PersonDuplicateMatch {
+function toDuplicateMatch(p: Person, matchReason: DuplicateMatchReason): PersonDuplicateMatch {
   return {
     id: p.id,
     firstName: p.firstName,
@@ -704,35 +726,48 @@ function toDuplicateMatch(p: Person): PersonDuplicateMatch {
     status: p.status,
     photoUrl: p.photoUrl,
     isUnidentified: p.isUnidentified,
+    matchReason,
   };
 }
 
 /**
- * Busca registros ya existentes que probablemente sean la misma persona (por
- * cédula exacta o nombre completo exacto), para avisar antes de crear un
- * duplicado. No es detección difusa: solo coincidencia exacta normalizada.
+ * Busca registros ya existentes que probablemente sean la misma persona: por
+ * cédula exacta, por la MISMA foto (mismo SHA-256, ver `photoHash` — no es
+ * IA ni hash perceptual, solo detecta el archivo idéntico repetido) o por
+ * nombre PARECIDO (2+ palabras en común entre nombre y apellido, no exige
+ * coincidencia exacta). Avisa antes de crear un duplicado; no bloquea nada.
  */
 export async function findPersonDuplicates(params: {
   firstName: string;
   lastName: string;
   cedula: string | null;
+  photoHash?: string | null;
   country: CountryCode;
 }): Promise<PersonDuplicateMatch[]> {
   const cedulaDigits = normalizeCedula(params.cedula);
-  const fullName = normalizeName(`${params.firstName} ${params.lastName}`);
-  if (!cedulaDigits && !fullName) return [];
+  const photoHash = params.photoHash?.trim() || null;
+  const inputFullName = `${params.firstName} ${params.lastName}`;
+  const inputTokens = nameTokens(inputFullName);
+  if (!cedulaDigits && !photoHash && inputTokens.length < 2) return [];
+
+  function matchReasonFor(p: Person): DuplicateMatchReason | null {
+    if (cedulaDigits && normalizeCedula(p.cedula) === cedulaDigits) return "cedula";
+    if (photoHash && p.photoHash === photoHash) return "photo";
+    if (inputTokens.length >= 2 && sharedNameTokens(inputFullName, `${p.firstName} ${p.lastName}`) >= 2)
+      return "name";
+    return null;
+  }
 
   const sb = getSupabase();
   if (!sb) {
-    return mem.persons
-      .filter((p) => (p.country ?? "ve") === params.country)
-      .filter((p) => {
-        if (cedulaDigits && normalizeCedula(p.cedula) === cedulaDigits) return true;
-        if (fullName && normalizeName(`${p.firstName} ${p.lastName}`) === fullName) return true;
-        return false;
-      })
-      .slice(0, 5)
-      .map(toDuplicateMatch);
+    const out: PersonDuplicateMatch[] = [];
+    for (const p of mem.persons) {
+      if ((p.country ?? "ve") !== params.country) continue;
+      const reason = matchReasonFor(p);
+      if (reason) out.push(toDuplicateMatch(p, reason));
+      if (out.length >= 5) break;
+    }
+    return out;
   }
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -748,15 +783,22 @@ export async function findPersonDuplicates(params: {
         .limit(5),
     );
   }
-  if (fullName && params.firstName.trim()) {
+  if (photoHash) {
+    queries.push(
+      sb.from("persons").select("*").eq("country", params.country).eq("photo_hash", photoHash).limit(5),
+    );
+  }
+  // Coincidencia difusa: trae candidatos por cualquier palabra del nombre
+  // (3+ letras) y filtra en JS por 2+ palabras en común (ver matchReasonFor),
+  // en vez de exigir nombre y apellido exactos como antes.
+  if (inputTokens.length >= 2) {
     queries.push(
       sb
         .from("persons")
         .select("*")
         .eq("country", params.country)
-        .ilike("first_name", params.firstName.trim())
-        .ilike("last_name", params.lastName.trim() || "")
-        .limit(5),
+        .or(inputTokens.map((t) => `first_name.ilike.%${t}%,last_name.ilike.%${t}%`).join(","))
+        .limit(30),
     );
   }
   if (queries.length === 0) return [];
@@ -765,8 +807,9 @@ export async function findPersonDuplicates(params: {
   const byId = new Map<string, PersonDuplicateMatch>();
   for (const { data } of results) {
     for (const row of data ?? []) {
-      const match = toDuplicateMatch(rowToPerson(row));
-      byId.set(match.id, match);
+      const p = rowToPerson(row);
+      const reason = matchReasonFor(p);
+      if (reason && !byId.has(p.id)) byId.set(p.id, toDuplicateMatch(p, reason));
     }
   }
   return Array.from(byId.values()).slice(0, 5);
@@ -794,6 +837,19 @@ export async function createPerson(
     : "por_localizar";
 
   const country = input.country ?? "ve";
+  const photoHash = input.photoHash?.trim() || null;
+  // Chequeo del lado del servidor, además del aviso que ya vio quien publica
+  // en el formulario: cubre tanto a quien salta el aviso a propósito como
+  // cualquier llamado directo a esta Server Action. No bloquea, solo marca
+  // el registro para revisión del moderador en /admin.
+  const dupMatches = await findPersonDuplicates({
+    firstName,
+    lastName: input.lastName || "",
+    cedula: input.cedula || null,
+    photoHash,
+    country,
+  });
+  const duplicateMatchId = dupMatches[0]?.id ?? null;
 
   if (!sb) {
     const person: Person = {
@@ -818,6 +874,9 @@ export async function createPerson(
       contactPhone: input.contactPhone || null,
       contactEmail: input.contactEmail || null,
       verified: false,
+      photoHash,
+      possibleDuplicate: duplicateMatchId !== null,
+      duplicateMatchId,
       reactions: { fuerza: 0, corazon: 0, difundir: 0 },
       createdAt: now,
       updatedAt: now,
@@ -848,6 +907,9 @@ export async function createPerson(
       contact_name: input.contactName || null,
       contact_phone: input.contactPhone || null,
       contact_email: input.contactEmail || null,
+      photo_hash: photoHash,
+      possible_duplicate: duplicateMatchId !== null,
+      duplicate_match_id: duplicateMatchId,
       user_id: userId,
     })
     .select("*")
@@ -862,6 +924,47 @@ export async function createPerson(
     .insert({ person_id: person.id, token: ownerToken });
   if (ownerError) throw ownerError;
   return { person, ownerToken };
+}
+
+/** Cola de revisión para el moderador: registros marcados como posible
+ *  duplicado (por cédula, nombre parecido o foto idéntica) al crearse, ya sea
+ *  desde el formulario o el sync automático. No están ocultos al público;
+ *  esto solo los agrupa para que un moderador decida si son la misma persona. */
+export async function getPossibleDuplicatePersons(country: string): Promise<Person[]> {
+  if (!getSupabase()) {
+    return mem.persons.filter((p) => p.possibleDuplicate && (p.country ?? "ve") === country);
+  }
+  const sb = getSupabaseAdmin() ?? getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("persons")
+    .select("*")
+    .eq("country", country)
+    .eq("possible_duplicate", true)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  return (data ?? []).map(rowToPerson);
+}
+
+/** El moderador revisó el aviso de duplicado y decide no marcarlo más
+ *  (son personas distintas, o ya se fusionó/borró el otro registro a mano). */
+export async function dismissPersonDuplicate(personId: string): Promise<void> {
+  if (!getSupabase()) {
+    const p = mem.persons.find((x) => x.id === personId);
+    if (p) {
+      p.possibleDuplicate = false;
+      p.duplicateMatchId = null;
+    }
+    return;
+  }
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  const { error } = await sb
+    .from("persons")
+    .update({ possible_duplicate: false, duplicate_match_id: null })
+    .eq("id", personId);
+  if (error) throw error;
 }
 
 // ── Gestión por el autor de la publicación ──────────────────────────────────
@@ -1458,6 +1561,7 @@ function rowToAidPoint(r: any): AidPoint {
     available: r.available ?? true,
     votesAvailable: r.votes_available ?? 0,
     votesDepleted: r.votes_depleted ?? 0,
+    categoryStatus: r.category_status ?? {},
     likes: r.likes ?? 0,
     updatedAt: r.updated_at ?? r.created_at,
     createdAt: r.created_at,
@@ -1568,6 +1672,7 @@ export async function createAidPoint(
       available: true,
       votesAvailable: 0,
       votesDepleted: 0,
+      categoryStatus: input.categoryStatus ?? {},
       likes: 0,
       updatedAt: now,
       createdAt: now,
@@ -1591,6 +1696,7 @@ export async function createAidPoint(
       photo_url: photoUrl,
       contact_name: input.contactName || null,
       contact_phone: input.contactPhone || null,
+      category_status: input.categoryStatus ?? {},
       user_id: userId,
     })
     .select("*")
@@ -1610,6 +1716,7 @@ export async function updateAidPointFields(id: string, input: AidPointInput): Pr
     if (point) {
       point.name = input.name;
       point.types = input.types;
+      point.categoryStatus = input.categoryStatus ?? {};
       point.estado = input.estado ?? null;
       point.locationText = input.locationText;
       if (input.lat !== undefined) point.lat = input.lat;
@@ -1627,6 +1734,7 @@ export async function updateAidPointFields(id: string, input: AidPointInput): Pr
     .update({
       name: input.name,
       types: input.types,
+      category_status: input.categoryStatus ?? {},
       estado: input.estado ?? null,
       location_text: input.locationText,
       ...(input.lat !== undefined ? { lat: input.lat } : {}),
@@ -1851,6 +1959,7 @@ function rowToMarch(r: any): March {
     description: r.description ?? "",
     attendeesCount: r.attendees_count ?? 0,
     likes: r.likes ?? 0,
+    aidPointId: r.aid_point_id ?? null,
     createdAt: r.created_at,
   };
 }
@@ -1897,6 +2006,7 @@ export async function createMarch(
       description: input.description || "",
       attendeesCount: 0,
       likes: 0,
+      aidPointId: input.aidPointId || null,
       createdAt: now,
     };
     mem.marches.unshift(march);
@@ -1915,6 +2025,7 @@ export async function createMarch(
       organizer_phone: input.organizerPhone,
       whatsapp_url: input.whatsappUrl || null,
       description: input.description || "",
+      aid_point_id: input.aidPointId || null,
       user_id: userId,
     })
     .select("*")
@@ -2433,6 +2544,7 @@ function rowToPost(r: any): Post {
     authorName: r.author_name,
     contactPhone: r.contact_phone,
     pinned: r.pinned ?? false,
+    aidPointId: r.aid_point_id ?? null,
     reactions: { apoyo: 0, corazon: 0, hecho: 0, ...(r.reactions ?? {}) },
     createdAt: r.created_at,
     origin: r.origin ?? "community",
@@ -2448,6 +2560,7 @@ export async function getPosts(
     estado?: string | "all";
     search?: string;
     pinnedOnly?: boolean;
+    aidPointId?: string;
   } = {},
 ): Promise<Post[]> {
   const country = filter.country ?? "ve";
@@ -2460,6 +2573,7 @@ export async function getPosts(
     if (filter.estado && filter.estado !== "all")
       items = items.filter((p) => p.estado === filter.estado);
     if (filter.pinnedOnly) items = items.filter((p) => p.pinned);
+    if (filter.aidPointId) items = items.filter((p) => p.aidPointId === filter.aidPointId);
     if (filter.search) {
       const s = filter.search.toLowerCase().trim();
       items = items.filter((p) =>
@@ -2482,6 +2596,7 @@ export async function getPosts(
   if (filter.type && filter.type !== "all") query = query.eq("type", filter.type);
   if (filter.estado && filter.estado !== "all") query = query.eq("estado", filter.estado);
   if (filter.pinnedOnly) query = query.eq("pinned", true);
+  if (filter.aidPointId) query = query.eq("aid_point_id", filter.aidPointId);
   if (filter.search) {
     // Quita caracteres que rompen el filtro `or` de PostgREST.
     const s = filter.search.replace(/[,()*]/g, " ").trim();
@@ -2682,6 +2797,7 @@ export async function createPost(
       authorName: input.authorName,
       contactPhone: input.contactPhone || null,
       pinned: false,
+      aidPointId: input.aidPointId || null,
       reactions: { apoyo: 0, corazon: 0, hecho: 0 },
       createdAt: now,
     };
@@ -2701,6 +2817,7 @@ export async function createPost(
       link_url: input.linkUrl || null,
       author_name: input.authorName,
       contact_phone: input.contactPhone || null,
+      aid_point_id: input.aidPointId || null,
       reactions: { apoyo: 0, corazon: 0, hecho: 0 },
       user_id: userId,
     })

@@ -63,6 +63,7 @@ import {
   assignManagerAction,
   assignRoleAction,
   deleteComplaintAction,
+  dismissPersonDuplicateAction,
   dismissReportAction,
   logoutAdminAction,
   rejectExternalPostAction,
@@ -102,6 +103,7 @@ export function AdminDashboard({
   roles,
   pendingExternalPosts,
   pendingManagerRequests,
+  possibleDuplicates,
   demoOpen,
   isFullAdmin,
 }: {
@@ -116,6 +118,7 @@ export function AdminDashboard({
   roles: AppRoleGrant[];
   pendingExternalPosts: Post[];
   pendingManagerRequests: ManagerRequest[];
+  possibleDuplicates: Person[];
   demoOpen: boolean;
   /** false = sesión de moderador (subset): sin Colaboradores, gestores, héroes ni denuncias. */
   isFullAdmin: boolean;
@@ -338,6 +341,74 @@ export function AdminDashboard({
         )}
       </section>
       )}
+
+      {/* Avisos de posible duplicado: por cédula, nombre parecido o la MISMA
+          foto (mismo SHA-256, calculado al publicar o al importar del sync de
+          sitios viejos). No están ocultos al público — publicarlos nunca se
+          bloqueó — esto solo junta los casos para que un moderador decida si
+          son la misma persona (y le pida a quien corresponda que fusione o
+          borre uno) o son gente distinta que comparte una foto de familia. */}
+      <section className="mb-10">
+        <h2 className="mb-3 flex items-center gap-2 font-bold text-zinc-900">
+          <FileWarning className="h-4.5 w-4.5 text-zinc-500" />
+          Posibles duplicados
+          <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">
+            {possibleDuplicates.length}
+          </span>
+        </h2>
+
+        {possibleDuplicates.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-zinc-300 bg-white py-10 text-center text-sm text-zinc-500">
+            Sin avisos pendientes. 🤍
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {possibleDuplicates.map((p) => {
+              const name = `${p.firstName} ${p.lastName}`.trim() || "Sin identificar";
+              return (
+                <li key={p.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CountryBadge country={p.country} />
+                        <span className="font-semibold text-zinc-900">{name}</span>
+                        <span className="text-xs text-zinc-400">{timeAgo(p.createdAt)}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <Link
+                          href={`/persona/${p.id}`}
+                          target="_blank"
+                          className="rounded-lg border border-zinc-300 px-2.5 py-1 font-medium text-zinc-700 hover:bg-zinc-50"
+                        >
+                          Ver este registro
+                        </Link>
+                        {p.duplicateMatchId && (
+                          <Link
+                            href={`/persona/${p.duplicateMatchId}`}
+                            target="_blank"
+                            className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 font-medium text-amber-800 hover:bg-amber-100"
+                          >
+                            Ver el posible duplicado
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => run(p.id, () => dismissPersonDuplicateAction(p.id))}
+                      disabled={pending && busy === p.id}
+                      className="press flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+                    >
+                      <Check className="h-4 w-4" />
+                      Descartar aviso
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       {/* Cola de moderación: publicaciones importadas de otras redes por
           hashtag (Bluesky/Mastodon, vía scripts/fetch-social-posts.mjs).

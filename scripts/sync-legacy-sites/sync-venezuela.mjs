@@ -93,11 +93,13 @@ async function main() {
       seen.add(p.id);
       try {
         const { __photoUrl, row } = personToRow(p);
-        row.photo_url = __photoUrl ? await uploadPhotoFromUrl(sb, __photoUrl) : null;
+        const photo = __photoUrl ? await uploadPhotoFromUrl(sb, __photoUrl) : { url: null, hash: null };
+        row.photo_url = photo.url;
+        row.photo_hash = photo.hash;
         const result = await upsertPerson(sb, row);
         if (result.status === "inserted") {
           inserted++;
-          console.log(`  + ${row.first_name} (${p.id})`);
+          console.log(`  + ${row.first_name} (${p.id})${result.possibleDuplicate ? "  ⚠ posible duplicado" : ""}`);
         } else if (result.status === "error") {
           errors++;
           console.error(`  ❌ ${p.id}: ${result.error}`);

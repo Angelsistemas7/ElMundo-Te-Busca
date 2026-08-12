@@ -2,8 +2,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { BadgeCheck, Clock3, MapPin, Phone, ShieldQuestion, Settings } from "lucide-react";
-import { canManageAidPoint, getAidPointById, getComments } from "@/lib/data";
-import { AID_POINT_TYPE_LABEL } from "@/lib/types";
+import { canManageAidPoint, getAidPointById, getComments, getMarches, getPosts } from "@/lib/data";
+import {
+  AID_POINT_TYPE_LABEL,
+  AID_STOCK_LEVEL_EMOJI,
+  AID_STOCK_LEVEL_LABEL,
+  POST_TYPE_EMOJI,
+  POST_TYPE_LABEL,
+} from "@/lib/types";
 import { timeAgo } from "@/lib/utils";
 import { AidConsensusVote } from "@/components/AidConsensusVote";
 import { LikeButton } from "@/components/LikeButton";
@@ -16,10 +22,13 @@ export default async function AidPointPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const point = await getAidPointById(id);
   if (!point) notFound();
-  const [comments, canManage] = await Promise.all([
+  const [comments, canManage, linkedPosts, allMarches] = await Promise.all([
     getComments("aid_point", id),
     canManageAidPoint(id),
+    getPosts({ country: point.country ?? "ve", aidPointId: id }),
+    getMarches(),
   ]);
+  const linkedMarches = allMarches.filter((m) => m.aidPointId === id);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
@@ -84,6 +93,25 @@ export default async function AidPointPage({ params }: { params: Promise<{ id: s
           {point.description && <p className="text-sm text-zinc-600">{point.description}</p>}
 
           <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              Existencias por recurso
+            </p>
+            <ul className="space-y-1.5">
+              {point.types.map((t) => {
+                const level = point.categoryStatus?.[t] ?? "cubierto";
+                return (
+                  <li key={t} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="text-zinc-700">{AID_POINT_TYPE_LABEL[t]}</span>
+                    <span className="font-medium text-zinc-600">
+                      {AID_STOCK_LEVEL_EMOJI[level]} {AID_STOCK_LEVEL_LABEL[level]}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
             <AidConsensusVote id={point.id} votesAvailable={point.votesAvailable} votesDepleted={point.votesDepleted} />
           </div>
 
@@ -109,6 +137,47 @@ export default async function AidPointPage({ params }: { params: Promise<{ id: s
           )}
         </div>
       </article>
+
+      {(linkedPosts.length > 0 || linkedMarches.length > 0) && (
+        <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5">
+          <h2 className="font-bold text-zinc-900">Necesidades y caravanas vinculadas a este punto</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Publicaciones de la comunidad que la gente vinculó a este punto de ayuda al publicar.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {linkedPosts.map((p) => (
+              <li key={`post-${p.id}`}>
+                <Link
+                  href="/comunidad"
+                  className="flex items-start gap-2 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm transition hover:bg-zinc-50"
+                >
+                  <span className="shrink-0">{POST_TYPE_EMOJI[p.type]}</span>
+                  <span className="min-w-0">
+                    <span className="block font-medium text-zinc-800">{POST_TYPE_LABEL[p.type]}</span>
+                    <span className="line-clamp-2 text-zinc-600">{p.body}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+            {linkedMarches.map((m) => (
+              <li key={`march-${m.id}`}>
+                <Link
+                  href={`/caravanas/${m.id}`}
+                  className="flex items-start gap-2 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm transition hover:bg-zinc-50"
+                >
+                  <span className="shrink-0">🚐</span>
+                  <span className="min-w-0">
+                    <span className="block font-medium text-zinc-800">{m.title}</span>
+                    <span className="text-zinc-600">
+                      {m.originText} → {m.destinationText}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-6">
         <CommentSection

@@ -120,6 +120,14 @@ export interface Person {
    * registro: todo aparece de inmediato. Solo añade una insignia de confianza.
    */
   verified: boolean;
+  /** SHA-256 de los bytes de la foto (no un modelo de IA). Sirve para detectar
+   *  el mismo archivo repetido entre publicaciones manuales y el sync. */
+  photoHash: string | null;
+  /** Aviso de posible duplicado (nombre parecido, cédula o foto idéntica a
+   *  otro registro). No oculta ni bloquea nada, solo lo pone en la cola de
+   *  revisión del moderador (`/admin`). */
+  possibleDuplicate: boolean;
+  duplicateMatchId: string | null;
   reactions: Record<PersonReaction, number>;
   createdAt: string; // ISO
   updatedAt: string; // ISO
@@ -163,6 +171,26 @@ export const AID_POINT_TYPE_LABEL: Record<AidPointType, string> = {
   otro: "Otro",
 };
 
+/** Qué tan surtida está UNA categoría concreta del punto (no todo el punto en
+ *  bloque, como el viejo "disponible/agotado"). La fija el autor o el admin,
+ *  igual que la disponibilidad general — no es un voto de la comunidad (ese
+ *  sigue existiendo aparte, como señal). Sin número exacto a propósito: nadie
+ *  puede mantener un inventario preciso en medio de una emergencia, pero sí
+ *  puede decir "esto se está acabando". */
+export type AidStockLevel = "urgente" | "limitado" | "cubierto";
+
+export const AID_STOCK_LEVEL_LABEL: Record<AidStockLevel, string> = {
+  urgente: "Urgente: casi no queda",
+  limitado: "Limitado: queda poco",
+  cubierto: "Cubierto: hay suficiente",
+};
+
+export const AID_STOCK_LEVEL_EMOJI: Record<AidStockLevel, string> = {
+  urgente: "🔴",
+  limitado: "🟡",
+  cubierto: "🟢",
+};
+
 /** Punto físico de ayuda: donatón de comida, refugio, agua, etc. */
 export interface AidPoint {
   id: string;
@@ -187,6 +215,11 @@ export interface AidPoint {
   /** Votos de la comunidad: "sí hay" vs "se acabó". */
   votesAvailable: number;
   votesDepleted: number;
+  /** Nivel de existencias por CADA recurso que ofrece (ver `AidStockLevel`).
+   *  Solo tiene sentido para las categorías presentes en `types`; una
+   *  categoría sin entrada aquí se asume cubierta. Opcional para no romper
+   *  puntos ya creados antes de este campo. */
+  categoryStatus?: Partial<Record<AidPointType, AidStockLevel>>;
   likes: number;
   updatedAt: string;
   createdAt: string;
@@ -207,6 +240,9 @@ export interface March {
   description: string;
   attendeesCount: number;
   likes: number;
+  /** Punto de ayuda al que responde esta caravana (opcional): qué necesidad
+   *  concreta va a atender, para que se vea cruzada en la ficha del punto. */
+  aidPointId?: string | null;
   createdAt: string;
 }
 
@@ -289,6 +325,9 @@ export interface Post {
   linkUrl: string | null; // enlace externo (video, red social)
   authorName: string;
   contactPhone: string | null;
+  /** Punto de ayuda al que responde este post (opcional): qué necesidad u
+   *  oferta concreta va ligada a ese punto, para que se vea cruzada en su ficha. */
+  aidPointId?: string | null;
   /** Fijado arriba del muro (destacado por el equipo: avisos importantes). */
   pinned: boolean;
   reactions: Record<ReactionKind, number>;

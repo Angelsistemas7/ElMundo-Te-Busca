@@ -43,12 +43,16 @@ export function guessRegion(text, regions) {
   return null;
 }
 
+// Devuelve la URL pública subida y el SHA-256 de los bytes (determinístico,
+// no un hash perceptual ni IA): sirve para detectar más adelante si la MISMA
+// foto ya fue importada en otro registro (aviso de posible duplicado).
 export async function uploadPhotoFromUrl(sb, photoUrl) {
-  if (!photoUrl) return null;
+  if (!photoUrl) return { url: null, hash: null };
   try {
     const res = await fetch(photoUrl);
-    if (!res.ok) return null;
+    if (!res.ok) return { url: null, hash: null };
     const buf = Buffer.from(await res.arrayBuffer());
+    const hash = crypto.createHash("sha256").update(buf).digest("hex");
     const contentType = res.headers.get("content-type") || "image/jpeg";
     const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
     const name = `${crypto.randomUUID()}.${ext}`;
@@ -58,15 +62,81 @@ export async function uploadPhotoFromUrl(sb, photoUrl) {
       contentType,
     });
     if (error) throw error;
-    return sb.storage.from("photos").getPublicUrl(name).data.publicUrl;
+    return { url: sb.storage.from("photos").getPublicUrl(name).data.publicUrl, hash };
   } catch (e) {
     console.error("  [foto] no se pudo subir:", e.message);
-    return null;
+    return { url: null, hash: null };
   }
 }
 
+function normalizeName(s) {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function nameTokens(s) {
+  return normalizeName(s)
+    .split(/\s+/)
+    .filter((t) => t.length >= 3);
+}
+
+function sharedTokenCount(a, b) {
+  const setB = new Set(nameTokens(b));
+  return nameTokens(a).filter((t) => setB.has(t)).length;
+}
+
+// Busca en la base un registro que probablemente sea la misma persona: por
+// cédula exacta, por la MISMA foto (mismo hash) o por 2+ palabras del nombre
+// en común. Igual criterio que `findPersonDuplicates` en src/lib/data.ts,
+// reescrito acá porque este script corre suelto en Node, sin importar TS.
+// No bloquea el import: solo devuelve el id para dejarlo marcado y que un
+// moderador lo revise en /admin — puede ser gente real con una sola foto.
+async function findDuplicateMatch(sb, { firstName, lastName, cedula, photoHash, country }) {
+  const cedulaDigits = (cedula || "").replace(/\D/g, "");
+  const tokens = nameTokens(`${firstName} ${lastName}`);
+
+  if (cedulaDigits) {
+    const { data } = await sb
+      .from("persons")
+      .select("id")
+      .eq("country", country)
+      .ilike("cedula", `%${cedulaDigits}%`)
+      .limit(1);
+    if (data?.[0]) return data[0].id;
+  }
+  if (photoHash) {
+    const { data } = await sb
+      .from("persons")
+      .select("id")
+      .eq("country", country)
+      .eq("photo_hash", photoHash)
+      .limit(1);
+    if (data?.[0]) return data[0].id;
+  }
+  if (tokens.length >= 2) {
+    const { data } = await sb
+      .from("persons")
+      .select("id, first_name, last_name")
+      .eq("country", country)
+      .or(tokens.map((t) => `first_name.ilike.%${t}%,last_name.ilike.%${t}%`).join(","))
+      .limit(30);
+    for (const row of data ?? []) {
+      if (sharedTokenCount(`${firstName} ${lastName}`, `${row.first_name} ${row.last_name}`) >= 2) {
+        return row.id;
+      }
+    }
+  }
+  return null;
+}
+
 // Inserta o actualiza por (external_source, external_id). Si ya existe, no
-// vuelve a subir la foto (deja la que ya está). Devuelve "inserted" | "skipped" | "error".
+// vuelve a subir la foto (deja la que ya está). Antes de insertar revisa
+// duplicados (cédula, foto idéntica o nombre parecido) y marca el registro
+// nuevo con `possible_duplicate`/`duplicate_match_id` si encuentra algo — sin
+// dejar de importarlo. Devuelve "inserted" | "skipped" | "error".
 export async function upsertPerson(sb, row) {
   const { data: existing, error: selErr } = await sb
     .from("persons")
@@ -77,7 +147,19 @@ export async function upsertPerson(sb, row) {
   if (selErr) return { status: "error", error: selErr.message };
   if (existing) return { status: "skipped" };
 
-  const { error } = await sb.from("persons").insert(row);
+  const duplicateMatchId = await findDuplicateMatch(sb, {
+    firstName: row.first_name,
+    lastName: row.last_name,
+    cedula: row.cedula,
+    photoHash: row.photo_hash,
+    country: row.country,
+  }).catch(() => null); // el import sigue aunque falle el chequeo de duplicados
+
+  const { error } = await sb.from("persons").insert({
+    ...row,
+    possible_duplicate: duplicateMatchId !== null,
+    duplicate_match_id: duplicateMatchId,
+  });
   if (error) return { status: "error", error: error.message };
-  return { status: "inserted" };
+  return { status: "inserted", possibleDuplicate: duplicateMatchId !== null };
 }

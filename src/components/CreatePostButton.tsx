@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, ImagePlus, Loader2, PenLine } from "lucide-react";
 import { POST_TYPE_EMOJI, POST_TYPE_LABEL, type PostType } from "@/lib/types";
 import { getCountry } from "@/lib/countries";
-import { createPostAction, getMyProfileAction, type ActionResult } from "@/app/actions";
+import { createPostAction, getAidPointOptionsAction, getMyProfileAction, type ActionResult } from "@/app/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { compressImage } from "@/lib/image";
 import { Avatar } from "./Avatar";
@@ -33,6 +33,7 @@ export function CreatePostButton({
   const [preview, setPreview] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [aidPointOptions, setAidPointOptions] = useState<{ id: string; label: string }[]>([]);
   const fileRef = useRef<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
@@ -45,6 +46,15 @@ export function CreatePostButton({
       .then((p) => setAvatarUrl(p?.avatarUrl ?? null))
       .catch(() => {});
   }, [variant]);
+
+  // Para "Vincular a un punto de ayuda": se pide recién al abrir el modal
+  // (no en cada render) porque implica una consulta a la base.
+  useEffect(() => {
+    if (!open) return;
+    getAidPointOptionsAction()
+      .then(setAidPointOptions)
+      .catch(() => setAidPointOptions([]));
+  }, [open]);
 
   function close() {
     setOpen(false);
@@ -198,6 +208,23 @@ export function CreatePostButton({
                 <Input id="locationText" name="locationText" placeholder="El Junquito, km 11..." />
               </Field>
             </div>
+
+            {aidPointOptions.length > 0 && (
+              <Field
+                label="Vincular a un punto de ayuda (opcional)"
+                htmlFor="aidPointId"
+                hint="Si esto responde a un punto concreto (llevas lo que piden, o ahí es donde hace falta), se verá reflejado en su ficha."
+              >
+                <Select id="aidPointId" name="aidPointId" defaultValue="">
+                  <option value="">Ninguno</option>
+                  {aidPointOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Tu nombre" htmlFor="authorName" required error={fieldErrors?.authorName}>

@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Trash2, TriangleAlert, X } from "lucide-react";
-import type { AidPoint, AidPointType } from "@/lib/types";
-import { AID_POINT_TYPE_LABEL } from "@/lib/types";
+import type { AidPoint, AidPointType, AidStockLevel } from "@/lib/types";
+import { AID_POINT_TYPE_LABEL, AID_STOCK_LEVEL_LABEL } from "@/lib/types";
 import { getCountry } from "@/lib/countries";
 import {
   ownerDeleteAidPointAction,
@@ -27,6 +27,7 @@ export function AidPointManagePanel({ point, token }: { point: AidPoint; token: 
   const [error, setError] = useState<string | null>(null);
   const [available, setAvailable] = useState(point.available);
   const [availPending, startAvailTransition] = useTransition();
+  const [checkedTypes, setCheckedTypes] = useState<Set<AidPointType>>(new Set(point.types));
 
   function setAvail(next: boolean) {
     if (next === available || availPending) return;
@@ -78,16 +79,45 @@ export function AidPointManagePanel({ point, token }: { point: AidPoint; token: 
             <Input id="name" name="name" defaultValue={point.name} />
           </Field>
 
-          <Field label="¿Qué recursos hay aquí?" required error={fieldErrors?.types} hint="Marca todos los que apliquen.">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Field label="¿Qué recursos hay aquí?" required error={fieldErrors?.types} hint="Marca todos los que apliquen y di qué tan surtido está cada uno.">
+            <div className="space-y-2">
               {TYPES.map((t) => (
-                <label
+                <div
                   key={t}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50"
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50"
                 >
-                  <input type="checkbox" name="types" value={t} defaultChecked={point.types.includes(t)} className="h-4 w-4 rounded" />
-                  {AID_POINT_TYPE_LABEL[t]}
-                </label>
+                  <label className="flex flex-1 cursor-pointer items-center gap-2 text-sm text-zinc-700">
+                    <input
+                      type="checkbox"
+                      name="types"
+                      value={t}
+                      defaultChecked={point.types.includes(t)}
+                      className="h-4 w-4 rounded"
+                      onChange={(e) =>
+                        setCheckedTypes((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(t);
+                          else next.delete(t);
+                          return next;
+                        })
+                      }
+                    />
+                    {AID_POINT_TYPE_LABEL[t]}
+                  </label>
+                  {checkedTypes.has(t) && (
+                    <select
+                      name={`status_${t}`}
+                      defaultValue={point.categoryStatus?.[t] ?? ("cubierto" satisfies AidStockLevel)}
+                      className="rounded-lg border border-zinc-300 px-2 py-1 text-xs text-zinc-700"
+                    >
+                      {(Object.keys(AID_STOCK_LEVEL_LABEL) as AidStockLevel[]).map((lvl) => (
+                        <option key={lvl} value={lvl}>
+                          {AID_STOCK_LEVEL_LABEL[lvl]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               ))}
             </div>
           </Field>

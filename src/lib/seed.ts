@@ -96,6 +96,9 @@ function buildPersons(): Person[] {
       contactPhone: unidentified ? null : "+58 412 0000000",
       contactEmail: null,
       verified: rand() > 0.7, // ~30% con visto bueno (sello de confianza)
+      photoHash: null,
+      possibleDuplicate: false,
+      duplicateMatchId: null,
       reactions: {
         fuerza: Math.floor(rand() * 40),
         corazon: Math.floor(rand() * 25),

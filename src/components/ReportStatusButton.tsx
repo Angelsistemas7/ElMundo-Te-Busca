@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, LogIn, Loader2, ShieldCheck } from "lucide-react";
 import { PERSON_STATUS_LABEL, type PersonStatus } from "@/lib/types";
 import { getSessionUserAction, reportStatusAction, type ActionResult } from "@/app/actions";
+import { suspiciousPhoneReason } from "@/lib/phone";
 import { Modal } from "./Modal";
 import { Field, Input, Select, Textarea } from "./FormControls";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
@@ -33,6 +34,7 @@ export function ReportStatusButton({
   const [confirmed, setConfirmed] = useState(false);
   const [reportedStatus, setReportedStatus] = useState<PersonStatus>("localizado");
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const [phoneWarning, setPhoneWarning] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
 
@@ -50,6 +52,7 @@ export function ReportStatusButton({
     setTimeout(() => {
       setResult(null);
       setConfirmed(false);
+      setPhoneWarning(null);
       setReportedStatus("localizado");
       formRef.current?.reset();
     }, 200);
@@ -151,7 +154,17 @@ export function ReportStatusButton({
                     error={fieldErrors?.reporterPhone}
                     hint="Con el código de tu país si no es +58."
                   >
-                    <Input id="reporterPhone" name="reporterPhone" placeholder="+58 424 0000000" />
+                    <Input
+                      id="reporterPhone"
+                      name="reporterPhone"
+                      placeholder="+58 424 0000000"
+                      onBlur={(e) => setPhoneWarning(suspiciousPhoneReason(e.target.value))}
+                      onChange={() => phoneWarning && setPhoneWarning(null)}
+                    />
+                    {/* Aviso, no bloqueo: quien reporta decide si lo corrige. */}
+                    {phoneWarning && (
+                      <p className="mt-1 text-xs font-medium text-amber-700">{phoneWarning}</p>
+                    )}
                   </Field>
                 </div>
 

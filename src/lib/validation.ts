@@ -90,6 +90,9 @@ export const personSchema = z
     contactName: z.string().trim().max(80).optional().or(z.literal("")),
     contactPhone: phone,
     contactEmail: z.string().trim().email("Correo no válido").optional().or(z.literal("")),
+    // SHA-256 de la foto, calculado en el cliente antes de subir (ver
+    // src/lib/upload.ts). Solo para detectar duplicados, no se valida su forma.
+    photoHash: z.string().trim().max(64).optional().or(z.literal("")),
   })
   .superRefine((data, ctx) => {
     // Caso "busco a esta persona": se conoce la identidad → el nombre es obligatorio.
@@ -122,12 +125,18 @@ export const statusReportSchema = z.object({
 
 export type StatusReportInput = z.infer<typeof statusReportSchema>;
 
+const aidStockLevel = z.enum(["urgente", "limitado", "cubierto"]);
+
 export const aidPointSchema = z.object({
   country: countryEnum.optional(),
   name: z.string().trim().min(2, "Nombre del punto obligatorio").max(120),
   types: z
     .array(z.enum(["comida", "agua", "medicina", "refugio", "alojamiento", "ropa", "otro"]))
     .min(1, "Selecciona al menos un recurso"),
+  // Nivel de existencias por categoría (ver AidStockLevel en types.ts). Se
+  // arma en el servidor a partir de los campos status_<categoria> del
+  // formulario, solo para las categorías marcadas en `types`.
+  categoryStatus: z.record(aidStockLevel).optional(),
   estado: estadoEnum.optional(),
   locationText: z.string().trim().min(2, "Indica la ubicación").max(160),
   lat: z.coerce.number().min(-90).max(90).optional(),
@@ -156,6 +165,9 @@ export const marchSchema = z.object({
     .regex(/^[+\d\s()-]{7,20}$/u, "Teléfono de contacto no válido"),
   whatsappUrl: httpUrl("Enlace de WhatsApp no válido"),
   description: z.string().trim().max(800).optional().or(z.literal("")),
+  // Punto de ayuda al que responde esta caravana (opcional, sin validar
+  // que exista de verdad: si el id es viejo o inválido, se guarda null).
+  aidPointId: z.string().trim().optional().or(z.literal("")),
 });
 
 export type MarchInput = z.infer<typeof marchSchema>;
@@ -169,6 +181,8 @@ export const postSchema = z.object({
   linkUrl: httpUrl("Enlace no válido"),
   authorName: z.string().trim().min(2, "Indica tu nombre").max(80),
   contactPhone: phone,
+  // Punto de ayuda al que responde este post (opcional).
+  aidPointId: z.string().trim().optional().or(z.literal("")),
 });
 
 export type PostInput = z.infer<typeof postSchema>;

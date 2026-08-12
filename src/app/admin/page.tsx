@@ -12,6 +12,7 @@ import {
   getPendingReports,
   getPersons,
   getPersonsByIds,
+  getPossibleDuplicatePersons,
   getPosts,
 } from "@/lib/data";
 import type { AppRoleGrant, Complaint, Hero, ResourceManager } from "@/lib/types";
@@ -36,14 +37,16 @@ export default async function AdminPage() {
   }
   const fullAdmin = level === "admin";
 
-  const [pending, persons, aidPoints, hospitals, posts, pendingExternalPosts] = await Promise.all([
-    getPendingReports(),
-    getAllCountries((country) => getPersons({ sort: "recent", pageSize: 30, country }).then((r) => r.items)),
-    getAllCountries((country) => getAidPoints(country)),
-    getAllCountries((country) => getHospitals(country)),
-    getAllCountries((country) => getPosts({ country })),
-    getPendingExternalPosts(),
-  ]);
+  const [pending, persons, aidPoints, hospitals, posts, pendingExternalPosts, possibleDuplicates] =
+    await Promise.all([
+      getPendingReports(),
+      getAllCountries((country) => getPersons({ sort: "recent", pageSize: 30, country }).then((r) => r.items)),
+      getAllCountries((country) => getAidPoints(country)),
+      getAllCountries((country) => getHospitals(country)),
+      getAllCountries((country) => getPosts({ country })),
+      getPendingExternalPosts(),
+      getAllCountries((country) => getPossibleDuplicatePersons(country)),
+    ]);
   persons.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   posts.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
@@ -98,6 +101,7 @@ export default async function AdminPage() {
       roles={roles}
       pendingExternalPosts={pendingExternalPosts}
       pendingManagerRequests={pendingManagerRequests}
+      possibleDuplicates={possibleDuplicates}
       demoOpen={!adminConfigured}
       isFullAdmin={fullAdmin}
     />

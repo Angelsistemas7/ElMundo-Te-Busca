@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Plus } from "lucide-react";
-import { registerMarchAction, type ActionResult } from "@/app/actions";
+import { getAidPointOptionsAction, registerMarchAction, type ActionResult } from "@/app/actions";
 import { Modal } from "./Modal";
-import { Field, Input, Textarea } from "./FormControls";
+import { Field, Input, Select, Textarea } from "./FormControls";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { ManageLinkBox } from "./ManageLinkBox";
 
@@ -15,8 +15,16 @@ export function RegisterMarchButton() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [title, setTitle] = useState("");
+  const [aidPointOptions, setAidPointOptions] = useState<{ id: string; label: string }[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    getAidPointOptionsAction()
+      .then(setAidPointOptions)
+      .catch(() => setAidPointOptions([]));
+  }, [open]);
 
   function close() {
     setOpen(false);
@@ -128,6 +136,23 @@ export function RegisterMarchButton() {
             <Field label="Detalles" htmlFor="description" hint="Qué llevar, punto de encuentro, recomendaciones.">
               <Textarea id="description" name="description" placeholder="Llevar agua y alimentos no perecederos. Encuentro 6:30 a. m..." />
             </Field>
+
+            {aidPointOptions.length > 0 && (
+              <Field
+                label="Vincular a un punto de ayuda (opcional)"
+                htmlFor="aidPointId"
+                hint="Si esta caravana lleva ayuda hacia un punto concreto, se verá reflejado en su ficha."
+              >
+                <Select id="aidPointId" name="aidPointId" defaultValue="">
+                  <option value="">Ninguno</option>
+                  {aidPointOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
 
             <Turnstile ref={turnstileRef} />
 

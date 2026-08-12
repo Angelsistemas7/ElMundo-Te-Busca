@@ -13,6 +13,7 @@ import {
   createComplaint,
   createHospital,
   createMarch,
+  getAidPoints,
   createPerson,
   createPet,
   createPost,
@@ -78,6 +79,8 @@ import {
 } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { clientIp } from "@/lib/ipLockout";
+import { interactionLimiter } from "@/lib/rateLimit";
 import type {
   Comment,
   CommentEntity,
@@ -138,6 +141,14 @@ function zodToFieldErrors(error: { issues: { path: (string | number)[]; message:
 function getField(form: FormData, name: string): string {
   const v = form.get(name);
   return typeof v === "string" ? v : "";
+}
+
+/** true si esta IP ya se pasó del límite de interacciones anónimas de un clic
+ *  (me gusta, reacciones) en la ventana actual. Estas acciones no llevan
+ *  Turnstile ni requieren sesión — sin este freno, un script podría llamarlas
+ *  sin límite y machacar la base de datos con lecturas+escrituras. */
+async function tooManyInteractions(): Promise<boolean> {
+  return !interactionLimiter.allow(await clientIp());
 }
 
 /** Foto ya subida al bucket de Storage. Descarta cualquier URL que no venga
@@ -391,21 +402,24 @@ export async function setSavedAction(
 // ── Registrar persona desaparecida ──────────────────────────────────────────
 /**
  * Consulta liviana (sin Turnstile: es de solo lectura, no escribe nada) que
- * busca posibles coincidencias exactas por cédula o nombre completo antes de
- * publicar, para avisar y evitar duplicados. La ficha coincidente ya es
- * pública (aparece en /se-busca), así que esto no expone nada nuevo.
+ * busca posibles coincidencias por cédula, foto idéntica (mismo SHA-256) o
+ * nombre parecido antes de publicar, para avisar y evitar duplicados. La
+ * ficha coincidente ya es pública (aparece en /se-busca), así que esto no
+ * expone nada nuevo.
  */
 export async function checkPersonDuplicatesAction(
   firstName: string,
   lastName: string,
   cedula: string,
+  photoHash?: string,
 ): Promise<PersonDuplicateMatch[]> {
-  if (!firstName.trim() && !cedula.trim()) return [];
+  if (!firstName.trim() && !cedula.trim() && !photoHash) return [];
   try {
     return await findPersonDuplicates({
       firstName,
       lastName,
       cedula: cedula || null,
+      photoHash: photoHash || null,
       country: await getActiveCountry(),
     });
   } catch {
@@ -436,6 +450,7 @@ export async function registerPersonAction(form: FormData): Promise<ActionResult
     contactName: getField(form, "contactName"),
     contactPhone: getField(form, "contactPhone"),
     contactEmail: getField(form, "contactEmail"),
+    photoHash: getField(form, "photoHash"),
   });
 
   if (!parsed.success) {
@@ -536,15 +551,29 @@ export async function reportStatusAction(form: FormData): Promise<ActionResult> 
 }
 
 // ── Registrar punto de ayuda ─────────────────────────────────────────────────
+// Arma { comida: "urgente", ... } a partir de los campos status_<categoria>
+// del formulario, solo para las categorías que la persona marcó en `types`
+// (un status_ropa suelto sin que "ropa" esté marcado no significa nada).
+function buildCategoryStatus(form: FormData, types: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const t of types) {
+    const v = getField(form, `status_${t}`);
+    if (v) out[t] = v;
+  }
+  return out;
+}
+
 export async function registerAidPointAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
     return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
   }
 
+  const types = form.getAll("types").filter((v): v is string => typeof v === "string");
   const parsed = aidPointSchema.safeParse({
     name: getField(form, "name"),
-    types: form.getAll("types").filter((v): v is string => typeof v === "string"),
+    types,
+    categoryStatus: buildCategoryStatus(form, types),
     estado: getField(form, "estado") || undefined,
     locationText: getField(form, "locationText"),
     lat: getField(form, "lat") || undefined,
@@ -580,6 +609,14 @@ export async function registerAidPointAction(form: FormData): Promise<ActionResu
   }
 }
 
+/** Lista liviana de puntos de ayuda del país activo, para el selector "Vincular
+ *  a un punto de ayuda" al publicar un post o una caravana. Sin Turnstile:
+ *  solo lee, no escribe, y los puntos ya son públicos en /ayuda. */
+export async function getAidPointOptionsAction(): Promise<{ id: string; label: string }[]> {
+  const points = await getAidPoints(await getActiveCountry());
+  return points.map((p) => ({ id: p.id, label: `${p.name} — ${p.locationText}` }));
+}
+
 // ── Registrar marcha / caravana ──────────────────────────────────────────────
 export async function registerMarchAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
@@ -596,6 +633,7 @@ export async function registerMarchAction(form: FormData): Promise<ActionResult>
     organizerPhone: getField(form, "organizerPhone"),
     whatsappUrl: getField(form, "whatsappUrl"),
     description: getField(form, "description"),
+    aidPointId: getField(form, "aidPointId"),
   });
 
   if (!parsed.success) {
@@ -639,6 +677,12 @@ const COMMENT_ENTITY_TYPES: readonly CommentEntity[] = [
 ];
 
 export async function postCommentAction(form: FormData): Promise<ActionResult> {
+  // Con sesión, Turnstile no aplica abajo (ver comentario más adelante) — este
+  // freno cubre ese caso: una cuenta ya creada no podría, aun así, inundar de
+  // comentarios en bucle.
+  if (await tooManyInteractions()) {
+    return { ok: false, error: "Vas muy rápido. Espera un momento e intenta de nuevo." };
+  }
   const entityTypeRaw = getField(form, "entityType");
   if (!COMMENT_ENTITY_TYPES.includes(entityTypeRaw as CommentEntity)) {
     return { ok: false, error: "Tipo de publicación no válido." };
@@ -685,6 +729,7 @@ export async function postCommentAction(form: FormData): Promise<ActionResult> {
 }
 
 export async function likeCommentAction(id: string): Promise<{ ok: boolean }> {
+  if (await tooManyInteractions()) return { ok: false };
   try {
     await likeComment(id);
     return { ok: true };
@@ -695,6 +740,7 @@ export async function likeCommentAction(id: string): Promise<{ ok: boolean }> {
 
 // ── "Me gusta" en publicaciones de recursos ──────────────────────────────────
 export async function likeAidPointAction(id: string): Promise<{ ok: boolean }> {
+  if (await tooManyInteractions()) return { ok: false };
   try {
     await likeAidPoint(id);
     revalidatePath("/ayuda");
@@ -706,6 +752,7 @@ export async function likeAidPointAction(id: string): Promise<{ ok: boolean }> {
 }
 
 export async function likeMarchAction(id: string): Promise<{ ok: boolean }> {
+  if (await tooManyInteractions()) return { ok: false };
   try {
     await likeMarch(id);
     revalidatePath("/caravanas");
@@ -717,6 +764,7 @@ export async function likeMarchAction(id: string): Promise<{ ok: boolean }> {
 }
 
 export async function likeHospitalAction(id: string): Promise<{ ok: boolean }> {
+  if (await tooManyInteractions()) return { ok: false };
   try {
     await likeHospital(id);
     revalidatePath("/hospitales");
@@ -758,6 +806,7 @@ export async function createPostAction(form: FormData): Promise<ActionResult> {
     linkUrl: getField(form, "linkUrl"),
     authorName: getField(form, "authorName"),
     contactPhone: getField(form, "contactPhone"),
+    aidPointId: getField(form, "aidPointId"),
   });
 
   if (!parsed.success) {
@@ -1019,6 +1068,7 @@ export async function registerHeroAction(form: FormData): Promise<ActionResult> 
 }
 
 export async function likeHeroAction(id: string): Promise<{ ok: boolean }> {
+  if (await tooManyInteractions()) return { ok: false };
   try {
     await likeHero(id);
     revalidatePath("/ayuda");
@@ -1029,6 +1079,7 @@ export async function likeHeroAction(id: string): Promise<{ ok: boolean }> {
 }
 
 export async function likeNewsItemAction(id: string): Promise<{ ok: boolean }> {
+  if (await tooManyInteractions()) return { ok: false };
   try {
     await likeNewsItem(id);
     // No sabemos aquí si es kind=ayuda o kind=noticia (solo el id); se
@@ -1140,6 +1191,7 @@ export async function ownerDeletePostAction(
 }
 
 export async function reactToPostAction(id: string, kind: ReactionKind): Promise<{ ok: boolean }> {
+  if (await tooManyInteractions()) return { ok: false };
   try {
     await reactToPost(id, kind);
     revalidatePath("/comunidad");
@@ -1159,6 +1211,7 @@ export async function reactToPersonAction(
   id: string,
   kind: PersonReaction,
 ): Promise<{ ok: boolean }> {
+  if (await tooManyInteractions()) return { ok: false };
   try {
     await reactToPerson(id, kind);
     revalidatePath(`/persona/${id}`);
@@ -1247,9 +1300,11 @@ export async function ownerUpdateAidPointAction(form: FormData): Promise<ActionR
     return { ok: false, error: "Enlace de gestión no válido." };
   }
 
+  const opTypes = form.getAll("types").filter((v): v is string => typeof v === "string");
   const parsed = aidPointSchema.safeParse({
     name: getField(form, "name"),
-    types: form.getAll("types").filter((v): v is string => typeof v === "string"),
+    types: opTypes,
+    categoryStatus: buildCategoryStatus(form, opTypes),
     estado: getField(form, "estado") || undefined,
     locationText: getField(form, "locationText"),
     lat: getField(form, "lat") || undefined,

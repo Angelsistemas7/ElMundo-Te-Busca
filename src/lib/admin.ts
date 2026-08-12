@@ -1,7 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { getCurrentUser } from "./auth";
 import { hasAppRole } from "./data";
+import { clientIp, createLockout } from "./ipLockout";
 
 // Compara el token/contraseña maestra sin filtrar por temporización cuánto
 // coincide el prefijo (`===` corta en el primer byte distinto). Si difieren en
@@ -38,60 +39,11 @@ export const adminConfigured = Boolean(ADMIN_TOKEN);
 // límite. Con suficiente tráfico de internet, esto crece sin parar (fuga de
 // memoria lógica). Por eso se poda cuando crece demasiado: quita entradas
 // viejas que ya no aportan nada (su bloqueo, si lo hubo, ya venció hace rato).
-const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
-const MAX_TRACKED_IPS = 5000;
-const attempts = new Map<string, { count: number; lockedUntil: number; lastAttemptAt: number }>();
-
-function pruneAttempts(): void {
-  if (attempts.size < MAX_TRACKED_IPS) return;
-  const now = Date.now();
-  for (const [ip, entry] of attempts) {
-    if (now - entry.lastAttemptAt > LOCKOUT_MS) attempts.delete(ip);
-  }
-}
-
-// Frontera de confianza: ¿de dónde sale la IP en la que confiamos para el
-// freno de fuerza bruta? `X-Forwarded-For` lo pone nginx con
-// `$proxy_add_x_forwarded_for`, que AÑADE la IP real al final de lo que el
-// cliente ya mandó — no lo reemplaza. Cualquiera puede mandar su propio
-// "X-Forwarded-For: 1.2.3.4" y quedaría primero en la lista; tomar
-// `split(",")[0]` (como hacía antes) toma ese valor FALSEADO, no el real —
-// bastaba con rotar ese encabezado para saltarse el bloqueo de 5 intentos.
-// Con Cloudflare por delante, `CF-Connecting-IP` es la fuente correcta: la
-// pone Cloudflare mismo y SOBRESCRIBE cualquier valor que el cliente haya
-// mandado, así que no se puede falsear (mientras nadie le pegue directo a
-// la IP del VPS saltándose Cloudflare — para eso está el `default_server`
-// documentado en docs/DESPLIEGUE-VPS.md). Sin Cloudflare (desarrollo local),
-// se usa el resto como respaldo.
-async function clientIp(): Promise<string> {
-  const h = await headers();
-  const cf = h.get("cf-connecting-ip");
-  if (cf) return cf.trim();
-  const fwd = h.get("x-forwarded-for");
-  return (fwd ? fwd.split(",")[0].trim() : null) || h.get("x-real-ip") || "unknown";
-}
-
-function isLocked(ip: string): boolean {
-  const entry = attempts.get(ip);
-  return Boolean(entry && entry.lockedUntil > Date.now());
-}
-
-function registerFailure(ip: string): void {
-  pruneAttempts();
-  const entry = attempts.get(ip) ?? { count: 0, lockedUntil: 0, lastAttemptAt: 0 };
-  entry.count += 1;
-  entry.lastAttemptAt = Date.now();
-  if (entry.count >= MAX_ATTEMPTS) {
-    entry.lockedUntil = Date.now() + LOCKOUT_MS;
-    entry.count = 0;
-  }
-  attempts.set(ip, entry);
-}
-
-function registerSuccess(ip: string): void {
-  attempts.delete(ip);
-}
+const lockout = createLockout(5, LOCKOUT_MS);
+const isLocked = lockout.isLocked;
+const registerFailure = lockout.registerFailure;
+const registerSuccess = lockout.registerSuccess;
 
 export async function isAdmin(): Promise<boolean> {
   // Sin ADMIN_TOKEN: abierto en desarrollo (demo), CERRADO en producción para no
