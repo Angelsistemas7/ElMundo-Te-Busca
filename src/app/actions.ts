@@ -78,6 +78,7 @@ import {
   updateRecoveryEmail,
 } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
+import { clampPageSize } from "@/lib/utils";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { clientIp } from "@/lib/ipLockout";
 import { interactionLimiter } from "@/lib/rateLimit";
@@ -785,6 +786,11 @@ export async function getMorePostsAction(
   pageSize: number,
   sort: PostSort,
 ): Promise<{ items: (Post & { comments: Comment[] })[]; hasMore: boolean }> {
+  // Server Action llamable directo por cualquier cliente (no solo desde la UI):
+  // sin este clamp, alguien podría pedir pageSize=100000 en una sola llamada y
+  // volcar el feed completo saltándose la paginación normal de 10/20/50.
+  pageSize = clampPageSize(pageSize);
+  page = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
   const pageResult = await getPostsPage({ ...filter, country: await getActiveCountry() }, page, pageSize, sort);
   const commentsByPost = await getCommentsForEntities("post", pageResult.items.map((p) => p.id));
   const items = pageResult.items.map((post) => ({ ...post, comments: commentsByPost[post.id] ?? [] }));
@@ -1161,6 +1167,7 @@ export async function ownerUpdatePostAction(form: FormData): Promise<ActionResul
     linkUrl: getField(form, "linkUrl"),
     authorName: getField(form, "authorName"),
     contactPhone: getField(form, "contactPhone"),
+    aidPointId: getField(form, "aidPointId"),
   });
   if (!parsed.success) {
     return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
@@ -1361,6 +1368,7 @@ export async function ownerUpdateMarchAction(form: FormData): Promise<ActionResu
     organizerPhone: getField(form, "organizerPhone"),
     whatsappUrl: getField(form, "whatsappUrl"),
     description: getField(form, "description"),
+    aidPointId: getField(form, "aidPointId"),
   });
   if (!parsed.success) {
     return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Trash2, TriangleAlert } from "lucide-react";
 import type { Post, PostType } from "@/lib/types";
 import { POST_TYPE_EMOJI, POST_TYPE_LABEL } from "@/lib/types";
 import { getCountry } from "@/lib/countries";
 import {
+  getAidPointOptionsAction,
   ownerDeletePostAction,
   ownerUpdatePostAction,
   type ActionResult,
@@ -24,6 +25,13 @@ export function PostManagePanel({ post, token }: { post: Post; token: string }) 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [aidPointOptions, setAidPointOptions] = useState<{ id: string; label: string }[]>([]);
+
+  useEffect(() => {
+    getAidPointOptionsAction()
+      .then(setAidPointOptions)
+      .catch(() => setAidPointOptions([]));
+  }, []);
 
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -75,6 +83,21 @@ export function PostManagePanel({ post, token }: { post: Post; token: string }) 
 
           <Field label="Enlace a video o red social (opcional)" htmlFor="linkUrl" error={fieldErrors?.linkUrl}>
             <Input id="linkUrl" name="linkUrl" defaultValue={post.linkUrl ?? ""} placeholder="https://..." />
+          </Field>
+
+          <Field
+            label="Vincular a un punto de ayuda (opcional)"
+            htmlFor="aidPointId"
+            hint="Si esto responde a un punto concreto, se verá reflejado en su ficha."
+          >
+            <Select id="aidPointId" name="aidPointId" defaultValue={post.aidPointId ?? ""}>
+              <option value="">Ninguno</option>
+              {aidPointOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
           </Field>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

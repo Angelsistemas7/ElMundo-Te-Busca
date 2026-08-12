@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Trash2, TriangleAlert } from "lucide-react";
 import type { March } from "@/lib/types";
 import {
+  getAidPointOptionsAction,
   ownerDeleteMarchAction,
   ownerUpdateMarchAction,
   type ActionResult,
 } from "@/app/actions";
 import { getCountry } from "@/lib/countries";
-import { Field, Input, Textarea } from "./FormControls";
+import { Field, Input, Select, Textarea } from "./FormControls";
 
 /** ISO → valor para <input type="datetime-local"> en hora local. */
 function toLocalInput(iso: string): string {
@@ -28,6 +29,13 @@ export function MarchManagePanel({ march, token }: { march: March; token: string
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [aidPointOptions, setAidPointOptions] = useState<{ id: string; label: string }[]>([]);
+
+  useEffect(() => {
+    getAidPointOptionsAction()
+      .then(setAidPointOptions)
+      .catch(() => setAidPointOptions([]));
+  }, []);
 
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -105,6 +113,21 @@ export function MarchManagePanel({ march, token }: { march: March; token: string
 
           <Field label="Detalles" htmlFor="description">
             <Textarea id="description" name="description" defaultValue={march.description} />
+          </Field>
+
+          <Field
+            label="Vincular a un punto de ayuda (opcional)"
+            htmlFor="aidPointId"
+            hint="Si esta caravana responde a un punto concreto, se verá reflejado en su ficha."
+          >
+            <Select id="aidPointId" name="aidPointId" defaultValue={march.aidPointId ?? ""}>
+              <option value="">Ninguno</option>
+              {aidPointOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
           </Field>
 
           {result && !result.ok && (

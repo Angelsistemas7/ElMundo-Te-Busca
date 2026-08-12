@@ -2051,6 +2051,7 @@ export async function updateMarchFields(id: string, input: MarchInput): Promise<
       march.organizerPhone = input.organizerPhone;
       march.whatsappUrl = input.whatsappUrl || null;
       march.description = input.description || "";
+      march.aidPointId = input.aidPointId || null;
     }
     return;
   }
@@ -2065,6 +2066,7 @@ export async function updateMarchFields(id: string, input: MarchInput): Promise<
       organizer_phone: input.organizerPhone,
       whatsapp_url: input.whatsappUrl || null,
       description: input.description || "",
+      aid_point_id: input.aidPointId || null,
     })
     .eq("id", id);
   if (error) throw error;
@@ -3055,6 +3057,7 @@ export async function updatePostFields(id: string, input: PostInput): Promise<vo
       post.linkUrl = input.linkUrl || null;
       post.authorName = input.authorName;
       post.contactPhone = input.contactPhone || null;
+      post.aidPointId = input.aidPointId || null;
     }
     return;
   }
@@ -3068,6 +3071,7 @@ export async function updatePostFields(id: string, input: PostInput): Promise<vo
       link_url: input.linkUrl || null,
       author_name: input.authorName,
       contact_phone: input.contactPhone || null,
+      aid_point_id: input.aidPointId || null,
     })
     .eq("id", id);
   if (error) throw error;

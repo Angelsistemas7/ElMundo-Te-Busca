@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { IconButton } from "./IconButton";
 import { useDragDismiss } from "@/lib/useDragDismiss";
+
+// Pila global de modales abiertos (p. ej. LocationPicker o el mapPoint de
+// FilterModal abren su propio Modal encima de otro Modal ya abierto, ambos
+// escuchando "Escape" en document). Sin esto, Escape cerraba los dos a la
+// vez; con la pila, solo el que está más arriba (el último abierto) responde.
+let modalStack: symbol[] = [];
 
 export function Modal({
   open,
@@ -47,14 +53,22 @@ export function Modal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const idRef = useRef<symbol | null>(null);
+  if (!idRef.current) idRef.current = Symbol("modal");
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const id = idRef.current!;
+    modalStack.push(id);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && modalStack[modalStack.length - 1] === id) onClose();
+    };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
+      modalStack = modalStack.filter((x) => x !== id);
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.body.style.overflow = modalStack.length ? "hidden" : "";
     };
   }, [open, onClose]);
 

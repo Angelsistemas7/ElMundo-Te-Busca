@@ -1,3 +1,72 @@
+## ✅ Cerrado (2026-08-12, ronda 5) — build verde, pusheado
+
+Pedido del dueño: "botón + flotante en móvil (como en Se busca) para publicar
+en todos lados", y luego "continuar con todo lo pendiente de la lista, lo
+que quedó a medias". Hecho:
+
+1. **FAB de publicar en móvil** en `RegisterAidPointButton`,
+   `RegisterMarchButton`, `DenunciaButton`, `RegisterHospitalButton`,
+   `RegisterVolunteerButton`, `RegisterPetButton` — mismo patrón que ya
+   tenía `RegisterPersonButton` en Se busca (botón `+` fijo arriba de la
+   barra inferior, solo en móvil; en escritorio queda el botón normal). No
+   se tocó la lógica interna de ningún modal (denuncia sigue mostrando el
+   aviso legal primero).
+2. **Bug real corregido**: `Modal.tsx` escuchaba "Escape" en `document` sin
+   ninguna noción de cuál modal está "encima" — con dos modales anidados
+   abiertos a la vez (p. ej. `LocationPicker` o el `mapPoint` de
+   `FilterModal` dentro de un formulario ya abierto en su propio Modal),
+   Escape cerraba los dos de golpe. Se agregó una pila global de módulo
+   (`modalStack`, un `Symbol` por instancia) — ahora Escape solo cierra el
+   modal que está más arriba.
+3. **Revisado, no era un bug**: `getPersonGroups` (agrupación por
+   hospital/región en Se busca) SÍ respeta `nearLat/nearLng/radiusKm` — el
+   filtro de cercanía se aplica antes de paginar en ambas ramas (memoria y
+   Supabase), independientemente del `pageSize` que pase `getPersonGroups`
+   internamente. No hacía falta tocar código.
+4. **Vincular a un punto de ayuda ahora también al editar** posts y
+   caravanas ya publicados (antes solo se podía al crear). Se agregó el
+   mismo selector "Vincular a un punto de ayuda (opcional)" a
+   `PostManagePanel.tsx` y `MarchManagePanel.tsx`, se agregó `aidPointId` a
+   los `FormData` que leen `ownerUpdatePostAction`/`ownerUpdateMarchAction`
+   en `actions.ts`, y `updatePostFields`/`updateMarchFields` en `data.ts`
+   ahora persisten `aid_point_id` (ambas ramas, memoria + Supabase). Sin
+   migración nueva — la columna ya existía de la ronda anterior.
+5. **Hueco de seguridad real, corregido**: `getMorePostsAction` (Server
+   Action del scroll infinito de Comunidad) aceptaba `pageSize` directo del
+   cliente SIN el `clampPageSize` que sí aplican todas las páginas normales
+   — cualquiera que llamara la acción directamente (no solo desde la UI,
+   Server Actions de Next.js son endpoints POST invocables con su id
+   codificado, visible en el bundle) podía pedir `pageSize=100000` y volcar
+   el feed completo en una sola llamada, saltándose la paginación de
+   10/20/50. Se agregó el mismo `clampPageSize` ahí (y se sanea `page` a un
+   entero ≥1). Se revisó el resto de `actions.ts`: es la única acción
+   client-callable que aceptaba `page`/`pageSize` sin control — el resto de
+   listados (Se busca, Ayuda, Hospitales, etc.) pagina vía Server Component
+   con `searchParams`, que ya pasaba por `clampPageSize` desde antes.
+
+**Revisado, deliberadamente NO tocado (riesgo sin poder probar en
+navegador, o requiere datos/decisiones del dueño):**
+- `useNotifications()` (llamadas de red de más para visitantes anónimos):
+  la sesión vive en una cookie `httpOnly`, no hay forma barata de saber
+  "hay sesión" desde el cliente sin otra llamada de red — y el intento
+  anterior de pasar el estado de sesión desde un Server Component ya se
+  revirtió una vez por romper la página estática de Emergencias. No se
+  reintentó a ciegas.
+- `docs/kit-prensa/`, botón "Comunicados de prensa" → Drive: no hay código
+  construido todavía, necesita un enlace de Drive/decisión de branding que
+  solo tiene el dueño.
+- Secretos del VPS de ejemplo, teléfonos de emergencia sin verificar: son
+  del dueño (reemplazar secretos) o requieren datos reales verificados (no
+  inventar teléfonos), no es trabajo de código.
+
+**Verificado con**: `npm run build` (verde, typecheck incluido) +
+`npm run start` + `curl` a `/`, `/comunidad`, `/caravanas`, `/ayuda`,
+`/comunidad/x/gestion` (200 en todas). **Falta probar en navegador real**
+(sigue sin poder usarse el panel, le crashea la app al dueño): el FAB en
+cada página en móvil, el selector de "Vincular a un punto de ayuda" al
+editar un post/caravana ya publicado, y confirmar que Escape con dos
+modales abiertos a la vez ahora solo cierra el de encima.
+
 # Estado y pendientes — "El Mundo Te Busca"
 
 Plataforma ciudadana, sin fines de lucro, para localizar personas desaparecidas y
