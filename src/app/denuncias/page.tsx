@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Megaphone, Search, ShieldAlert } from "lucide-react";
 import { getCommentsForEntities, getComplaints } from "@/lib/data";
 import {
@@ -17,6 +18,7 @@ import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { PostFeedSkeleton } from "@/components/ListSkeletons";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +54,59 @@ const buildFilterFields = (regions: readonly string[]): FilterField[] => [
   { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Publicado entre" },
 ];
 
+// Lista + comentarios: separado del cascarón (encabezado, buscador, filtros)
+// para que ese cascarón aparezca de inmediato al navegar — mismo patrón que
+// Comunidad/Ayuda/Se busca/Hospitales/Mascotas.
+async function DenunciasList({
+  country,
+  category,
+  q,
+  estado,
+  dateFrom,
+  dateTo,
+  page,
+  pageSize,
+}: {
+  country: string;
+  category: ComplaintCategory | "all";
+  q: string | undefined;
+  estado: string;
+  dateFrom: string | undefined;
+  dateTo: string | undefined;
+  page: number;
+  pageSize: number;
+}) {
+  const { items: complaints, total } = await getComplaints(
+    { country, category, search: q, estado, dateFrom, dateTo },
+    page,
+    pageSize,
+  );
+  const commentsByComplaint = await getCommentsForEntities("complaint", complaints.map((c) => c.id));
+
+  return complaints.length === 0 ? (
+    <EmptyState
+      icon={ShieldAlert}
+      title={total === 0 ? "No hay denuncias de este tipo" : "Ninguna denuncia coincide"}
+      description={
+        total === 0
+          ? "Si detectas una irregularidad real (desvío de ayuda, riesgo a la niñez…), repórtala con responsabilidad."
+          : "Prueba con otra categoría o cambia el término de búsqueda."
+      }
+    />
+  ) : (
+    <>
+      <div className="animate-rise space-y-4">
+        {complaints.map((c) => (
+          <ComplaintCard key={c.id} complaint={c} comments={commentsByComplaint[c.id] ?? []} />
+        ))}
+      </div>
+      <div className="mt-6">
+        <Pagination page={page} pageSize={pageSize} total={total} />
+      </div>
+    </>
+  );
+}
+
 export default async function DenunciasPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const category = (str(sp.cat) as ComplaintCategory | "all") ?? "all";
@@ -64,13 +119,6 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
   const country = await getActiveCountry();
   const regions = getCountry(country).regions;
 
-  const { items: complaints, total } = await getComplaints(
-    { country, category, search: q, estado, dateFrom, dateTo },
-    page,
-    pageSize,
-  );
-  const commentsByComplaint = await getCommentsForEntities("complaint", complaints.map((c) => c.id));
-
   const currentParams: Record<string, string> = {};
   if (category !== "all") currentParams.cat = category;
   if (q) currentParams.q = q;
@@ -78,6 +126,8 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
   if (dateFrom) currentParams.dateFrom = dateFrom;
   if (dateTo) currentParams.dateTo = dateTo;
   if (pageSize !== 10) currentParams.pageSize = String(pageSize);
+
+  const listKey = JSON.stringify({ category, q, estado, dateFrom, dateTo, page, pageSize });
 
   return (
     <PullToRefresh>
@@ -117,28 +167,18 @@ export default async function DenunciasPage({ searchParams }: { searchParams: Se
         <PageSizeSelect value={pageSize} />
       </div>
 
-      {complaints.length === 0 ? (
-        <EmptyState
-          icon={ShieldAlert}
-          title={total === 0 ? "No hay denuncias de este tipo" : "Ninguna denuncia coincide"}
-          description={
-            total === 0
-              ? "Si detectas una irregularidad real (desvío de ayuda, riesgo a la niñez…), repórtala con responsabilidad."
-              : "Prueba con otra categoría o cambia el término de búsqueda."
-          }
+      <Suspense key={listKey} fallback={<PostFeedSkeleton />}>
+        <DenunciasList
+          country={country}
+          category={category}
+          q={q}
+          estado={estado}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          page={page}
+          pageSize={pageSize}
         />
-      ) : (
-        <>
-          <div className="animate-rise space-y-4">
-            {complaints.map((c) => (
-              <ComplaintCard key={c.id} complaint={c} comments={commentsByComplaint[c.id] ?? []} />
-            ))}
-          </div>
-          <div className="mt-6">
-            <Pagination page={page} pageSize={pageSize} total={total} />
-          </div>
-        </>
-      )}
+      </Suspense>
     </div>
     </PullToRefresh>
   );

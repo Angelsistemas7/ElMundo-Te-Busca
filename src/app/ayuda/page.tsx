@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import nextDynamic from "next/dynamic";
 import { HeartHandshake } from "lucide-react";
 import { getAidPointsPage, getCommentsForEntities, getHeroes, getNewsItems } from "@/lib/data";
@@ -18,6 +19,7 @@ import { AyudaExtras } from "@/components/AyudaExtras";
 import { AyudaTabs } from "@/components/AyudaTabs";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { CardGridSkeleton } from "@/components/ListSkeletons";
 
 export const dynamic = "force-dynamic";
 
@@ -77,22 +79,60 @@ function buildFilterFields(regions: readonly string[]): FilterField[] {
   ];
 }
 
-export default async function AyudaPage({ searchParams }: { searchParams: SearchParams }) {
-  const sp = await searchParams;
-  const country = await getActiveCountry();
-  const FILTER_FIELDS = buildFilterFields(getCountry(country).regions);
-  const type = (str(sp.type) as AidPointType | "all") ?? "all";
-  const availOnly = str(sp.avail) === "1";
-  const estado = str(sp.estado) ?? "all";
-  const dateFrom = str(sp.dateFrom);
-  const dateTo = str(sp.dateTo);
-  const page = num(sp.page) ?? 1;
-  const pageSize = clampPageSize(num(sp.pageSize));
-
+// Grilla principal, separada del resto (ver comentario en ComunidadPage: mismo
+// patrón) para que no espere a los héroes/sismos/noticias curadas, que viven
+// en su propio Suspense más abajo.
+async function AidPointsGrid({
+  country,
+  type,
+  availOnly,
+  estado,
+  dateFrom,
+  dateTo,
+  page,
+  pageSize,
+}: {
+  country: string;
+  type: AidPointType | "all";
+  availOnly: boolean;
+  estado: string;
+  dateFrom: string | undefined;
+  dateTo: string | undefined;
+  page: number;
+  pageSize: number;
+}) {
   // Antes: `getAidPoints()` traía la tabla ENTERA sin límite ni paginación en
   // cada visita. Ahora pagina de verdad (10/20/50 a elegir), en vivo.
-  const [{ items: points, total }, heroes, quakes, curatedAyuda, admin] = await Promise.all([
-    getAidPointsPage({ country, type, availOnly, estado, dateFrom, dateTo }, page, pageSize),
+  const { items: points, total } = await getAidPointsPage(
+    { country, type, availOnly, estado, dateFrom, dateTo },
+    page,
+    pageSize,
+  );
+
+  return points.length === 0 ? (
+    <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-16 text-center text-zinc-500">
+      {total === 0
+        ? "Aún no hay puntos registrados. Sé el primero en publicar uno."
+        : "Ningún punto coincide con el filtro. Prueba con otro recurso o quita “solo disponibles”."}
+    </div>
+  ) : (
+    <>
+      <div className="animate-rise grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {points.map((point) => (
+          <AidPointCard key={point.id} point={point} />
+        ))}
+      </div>
+      <div className="mt-6">
+        <Pagination page={page} pageSize={pageSize} total={total} />
+      </div>
+    </>
+  );
+}
+
+// Héroes, sismos recientes (API externa USGS) y noticias curadas: contenido
+// secundario que puede tardar más (llamada externa) sin tapar la grilla.
+async function AyudaExtrasSection({ country }: { country: string }) {
+  const [heroes, quakes, curatedAyuda, admin] = await Promise.all([
     getHeroes(country),
     getRecentQuakes(country),
     // Si la tabla aún no existe (esquema sin migrar), no rompemos la página.
@@ -105,6 +145,31 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
     getCommentsForEntities("news_item", curatedAyuda.map((n) => n.id)),
   ]);
 
+  return (
+    <AyudaExtras
+      curatedAyuda={curatedAyuda}
+      newsComments={newsComments}
+      heroes={heroes}
+      heroComments={heroComments}
+      quakes={quakes}
+      isAdmin={admin}
+      country={country}
+    />
+  );
+}
+
+export default async function AyudaPage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = await searchParams;
+  const country = await getActiveCountry();
+  const FILTER_FIELDS = buildFilterFields(getCountry(country).regions);
+  const type = (str(sp.type) as AidPointType | "all") ?? "all";
+  const availOnly = str(sp.avail) === "1";
+  const estado = str(sp.estado) ?? "all";
+  const dateFrom = str(sp.dateFrom);
+  const dateTo = str(sp.dateTo);
+  const page = num(sp.page) ?? 1;
+  const pageSize = clampPageSize(num(sp.pageSize));
+
   const currentParams: Record<string, string> = {};
   if (type !== "all") currentParams.type = type;
   if (availOnly) currentParams.avail = "1";
@@ -112,6 +177,8 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
   if (dateFrom) currentParams.dateFrom = dateFrom;
   if (dateTo) currentParams.dateTo = dateTo;
   if (pageSize !== 10) currentParams.pageSize = String(pageSize);
+
+  const gridKey = JSON.stringify({ type, availOnly, estado, dateFrom, dateTo, page, pageSize });
 
   return (
     <PullToRefresh>
@@ -135,34 +202,22 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
         <PageSizeSelect value={pageSize} />
       </div>
 
-      {points.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-16 text-center text-zinc-500">
-          {total === 0
-            ? "Aún no hay puntos registrados. Sé el primero en publicar uno."
-            : "Ningún punto coincide con el filtro. Prueba con otro recurso o quita “solo disponibles”."}
-        </div>
-      ) : (
-        <>
-          <div className="animate-rise grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {points.map((point) => (
-              <AidPointCard key={point.id} point={point} />
-            ))}
-          </div>
-          <div className="mt-6">
-            <Pagination page={page} pageSize={pageSize} total={total} />
-          </div>
-        </>
-      )}
+      <Suspense key={gridKey} fallback={<CardGridSkeleton variant="photo" />}>
+        <AidPointsGrid
+          country={country}
+          type={type}
+          availOnly={availOnly}
+          estado={estado}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          page={page}
+          pageSize={pageSize}
+        />
+      </Suspense>
 
-      <AyudaExtras
-        curatedAyuda={curatedAyuda}
-        newsComments={newsComments}
-        heroes={heroes}
-        heroComments={heroComments}
-        quakes={quakes}
-        isAdmin={admin}
-        country={country}
-      />
+      <Suspense fallback={<div className="mt-8 h-64 animate-pulse rounded-3xl bg-zinc-100" />}>
+        <AyudaExtrasSection country={country} />
+      </Suspense>
     </div>
     </PullToRefresh>
   );

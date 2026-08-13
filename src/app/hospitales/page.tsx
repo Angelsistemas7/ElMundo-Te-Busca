@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import nextDynamic from "next/dynamic";
 import { Building2 } from "lucide-react";
@@ -16,6 +17,7 @@ import { FilterModal, type FilterField } from "@/components/FilterModal";
 import { AyudaTabs } from "@/components/AyudaTabs";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { CardGridSkeleton } from "@/components/ListSkeletons";
 
 export const dynamic = "force-dynamic";
 
@@ -51,18 +53,30 @@ function buildFilterFields(regions: readonly string[]): FilterField[] {
   ];
 }
 
-export default async function HospitalesPage({ searchParams }: { searchParams: SearchParams }) {
-  const sp = await searchParams;
-  const country = await getActiveCountry();
-  const FILTER_FIELDS = buildFilterFields(getCountry(country).regions);
-  const status = str(sp.status) as HospitalStatus | undefined;
-  const estado = str(sp.estado) ?? "all";
-  const sort = (str(sp.sort) as HospitalSort) ?? "name";
-  const dateFrom = str(sp.dateFrom);
-  const dateTo = str(sp.dateTo);
-  const page = num(sp.page) ?? 1;
-  const pageSize = clampPageSize(num(sp.pageSize));
-
+// Resumen de capacidad + grilla: todo lo que depende de datos, separado del
+// cascarón (encabezado, filtros) para que ese cascarón aparezca de inmediato
+// al navegar — mismo patrón que Comunidad/Ayuda/Se busca.
+async function HospitalesContent({
+  country,
+  status,
+  estado,
+  sort,
+  dateFrom,
+  dateTo,
+  page,
+  pageSize,
+  currentParams,
+}: {
+  country: string;
+  status: HospitalStatus | undefined;
+  estado: string;
+  sort: HospitalSort;
+  dateFrom: string | undefined;
+  dateTo: string | undefined;
+  page: number;
+  pageSize: number;
+  currentParams: Record<string, string>;
+}) {
   const [{ items: shown, total }, counts, allHospitals] = await Promise.all([
     getHospitalsPage({ country, status, estado, dateFrom, dateTo }, page, pageSize, sort),
     getPatientCounts(),
@@ -80,26 +94,8 @@ export default async function HospitalesPage({ searchParams }: { searchParams: S
     return `/hospitales?${params.toString()}`;
   };
 
-  const currentParams: Record<string, string> = {};
-  if (estado !== "all") currentParams.estado = estado;
-  if (sort !== "name") currentParams.sort = sort;
-  if (dateFrom) currentParams.dateFrom = dateFrom;
-  if (dateTo) currentParams.dateTo = dateTo;
-  if (pageSize !== 10) currentParams.pageSize = String(pageSize);
-
   return (
-    <PullToRefresh>
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <AyudaTabs />
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          icon={Building2}
-          title="Hospitales"
-          description="Capacidad en tiempo real, especialidades e insumos que necesitan, para saber a dónde trasladar a cada persona. Abre un hospital para ver la lista de personas atendidas."
-        />
-        <RegisterHospitalButton country={country} />
-      </div>
-
+    <>
       {/* Resumen de capacidad: fila horizontal (antes iba en rejilla 2x2, se veía
           apilada y grande en móvil). Cada uno filtra la lista de abajo; tocar el
           que ya está activo lo quita. Sin movimiento (a diferencia de otras filas). */}
@@ -124,11 +120,6 @@ export default async function HospitalesPage({ searchParams }: { searchParams: S
         ))}
       </div>
 
-      <div className="mb-4 flex items-center justify-end gap-2">
-        <FilterModal basePath="/hospitales" currentParams={currentParams} fields={FILTER_FIELDS} />
-        <PageSizeSelect value={pageSize} />
-      </div>
-
       {shown.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-16 text-center text-zinc-500">
           {total === 0
@@ -147,6 +138,62 @@ export default async function HospitalesPage({ searchParams }: { searchParams: S
           </div>
         </>
       )}
+    </>
+  );
+}
+
+export default async function HospitalesPage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = await searchParams;
+  const country = await getActiveCountry();
+  const FILTER_FIELDS = buildFilterFields(getCountry(country).regions);
+  const status = str(sp.status) as HospitalStatus | undefined;
+  const estado = str(sp.estado) ?? "all";
+  const sort = (str(sp.sort) as HospitalSort) ?? "name";
+  const dateFrom = str(sp.dateFrom);
+  const dateTo = str(sp.dateTo);
+  const page = num(sp.page) ?? 1;
+  const pageSize = clampPageSize(num(sp.pageSize));
+
+  const currentParams: Record<string, string> = {};
+  if (estado !== "all") currentParams.estado = estado;
+  if (sort !== "name") currentParams.sort = sort;
+  if (dateFrom) currentParams.dateFrom = dateFrom;
+  if (dateTo) currentParams.dateTo = dateTo;
+  if (pageSize !== 10) currentParams.pageSize = String(pageSize);
+
+  const contentKey = JSON.stringify({ status, estado, sort, dateFrom, dateTo, page, pageSize });
+
+  return (
+    <PullToRefresh>
+    <div className="mx-auto max-w-6xl px-4 py-6">
+      <AyudaTabs />
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeader
+          icon={Building2}
+          title="Hospitales"
+          description="Capacidad en tiempo real, especialidades e insumos que necesitan, para saber a dónde trasladar a cada persona. Abre un hospital para ver la lista de personas atendidas."
+        />
+        <RegisterHospitalButton country={country} />
+      </div>
+
+      <div className="mb-4 flex items-center justify-end gap-2">
+        <FilterModal basePath="/hospitales" currentParams={currentParams} fields={FILTER_FIELDS} />
+        <PageSizeSelect value={pageSize} />
+      </div>
+
+      <Suspense key={contentKey} fallback={<CardGridSkeleton variant="text" />}>
+        <HospitalesContent
+          country={country}
+          status={status}
+          estado={estado}
+          sort={sort}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          page={page}
+          pageSize={pageSize}
+          currentParams={currentParams}
+        />
+      </Suspense>
     </div>
     </PullToRefresh>
   );

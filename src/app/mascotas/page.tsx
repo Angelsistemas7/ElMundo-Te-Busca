@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import nextDynamic from "next/dynamic";
 import { PawPrint, Search } from "lucide-react";
 import { getCommentsForEntities, getPets, type PetSort } from "@/lib/data";
@@ -15,6 +16,7 @@ import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { CardGridSkeleton } from "@/components/ListSkeletons";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +66,62 @@ function buildFilterFields(regions: readonly string[]): FilterField[] {
   ];
 }
 
+// Grilla + comentarios: separado del cascarón (encabezado, buscador, filtros)
+// para que ese cascarón aparezca de inmediato al navegar — mismo patrón que
+// Comunidad/Ayuda/Se busca/Hospitales.
+async function MascotasGrid({
+  country,
+  status,
+  q,
+  estado,
+  sort,
+  dateFrom,
+  dateTo,
+  page,
+  pageSize,
+}: {
+  country: string;
+  status: PetStatus | "all";
+  q: string | undefined;
+  estado: string;
+  sort: PetSort;
+  dateFrom: string | undefined;
+  dateTo: string | undefined;
+  page: number;
+  pageSize: number;
+}) {
+  const { items: pets, total } = await getPets(
+    { country, status, search: q, estado, dateFrom, dateTo },
+    page,
+    pageSize,
+    sort,
+  );
+  const commentsByPet = await getCommentsForEntities("pet", pets.map((p) => p.id));
+
+  return pets.length === 0 ? (
+    <EmptyState
+      icon={PawPrint}
+      title={total === 0 ? "No hay mascotas reportadas aquí" : "Ninguna mascota coincide"}
+      description={
+        total === 0
+          ? "¿Perdiste o encontraste una mascota tras el sismo? Repórtala para reunirla con su familia."
+          : "Prueba con otro estado o cambia el término de búsqueda."
+      }
+    />
+  ) : (
+    <>
+      <div className="animate-rise grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {pets.map((p) => (
+          <PetCard key={p.id} pet={p} commentCount={(commentsByPet[p.id] ?? []).length} />
+        ))}
+      </div>
+      <div className="mt-6">
+        <Pagination page={page} pageSize={pageSize} total={total} />
+      </div>
+    </>
+  );
+}
+
 export default async function MascotasPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const country = await getActiveCountry();
@@ -77,14 +135,6 @@ export default async function MascotasPage({ searchParams }: { searchParams: Sea
   const page = num(sp.page) ?? 1;
   const pageSize = clampPageSize(num(sp.pageSize));
 
-  const { items: pets, total } = await getPets(
-    { country, status, search: q, estado, dateFrom, dateTo },
-    page,
-    pageSize,
-    sort,
-  );
-  const commentsByPet = await getCommentsForEntities("pet", pets.map((p) => p.id));
-
   const currentParams: Record<string, string> = {};
   if (status !== "all") currentParams.status = status;
   if (sort !== "recent") currentParams.sort = sort;
@@ -93,6 +143,8 @@ export default async function MascotasPage({ searchParams }: { searchParams: Sea
   if (dateTo) currentParams.dateTo = dateTo;
   if (q) currentParams.q = q;
   if (pageSize !== 10) currentParams.pageSize = String(pageSize);
+
+  const gridKey = JSON.stringify({ status, q, estado, sort, dateFrom, dateTo, page, pageSize });
 
   return (
     <PullToRefresh>
@@ -134,28 +186,19 @@ export default async function MascotasPage({ searchParams }: { searchParams: Sea
         <PageSizeSelect value={pageSize} />
       </div>
 
-      {pets.length === 0 ? (
-        <EmptyState
-          icon={PawPrint}
-          title={total === 0 ? "No hay mascotas reportadas aquí" : "Ninguna mascota coincide"}
-          description={
-            total === 0
-              ? "¿Perdiste o encontraste una mascota tras el sismo? Repórtala para reunirla con su familia."
-              : "Prueba con otro estado o cambia el término de búsqueda."
-          }
+      <Suspense key={gridKey} fallback={<CardGridSkeleton variant="photo" />}>
+        <MascotasGrid
+          country={country}
+          status={status}
+          q={q}
+          estado={estado}
+          sort={sort}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          page={page}
+          pageSize={pageSize}
         />
-      ) : (
-        <>
-          <div className="animate-rise grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {pets.map((p) => (
-              <PetCard key={p.id} pet={p} commentCount={(commentsByPet[p.id] ?? []).length} />
-            ))}
-          </div>
-          <div className="mt-6">
-            <Pagination page={page} pageSize={pageSize} total={total} />
-          </div>
-        </>
-      )}
+      </Suspense>
     </div>
     </PullToRefresh>
   );

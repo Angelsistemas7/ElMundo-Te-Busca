@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import nextDynamic from "next/dynamic";
 import { Search } from "lucide-react";
 import {
@@ -27,6 +28,7 @@ import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { clampPageSize } from "@/lib/utils";
+import { PersonGridSkeleton } from "@/components/ListSkeletons";
 // El aviso de "modo demostración" (DevModeNotice) ya se muestra en el home
 // (/) — no se repite en cada página.
 
@@ -42,6 +44,137 @@ function num(v: string | string[] | undefined): number | undefined {
   if (!s) return undefined;
   const n = Number(s);
   return Number.isFinite(n) ? n : undefined;
+}
+
+interface BaseQuery {
+  country: string;
+  unresolvedOnly: boolean | undefined;
+  search: string | undefined;
+  status: PersonStatus | "all";
+  estado: string;
+  gender: string;
+  cause: "desastre" | "otra" | "all";
+  minAge: number | undefined;
+  maxAge: number | undefined;
+  dateFrom: string | undefined;
+  dateTo: string | undefined;
+  sort: PersonSort;
+  nearLat: number | undefined;
+  nearLng: number | undefined;
+  radiusKm: number | undefined;
+}
+
+// Todo lo que depende de datos (barra de "¿ya ayudaste en terreno?", baraja o
+// grilla de personas, secciones destacadas, "localizados recientemente") vive
+// en su propio Suspense, separado del cascarón (encabezado, interruptor de
+// vista, buscador) — mismo patrón que Comunidad/Ayuda, así el cascarón
+// aparece de inmediato al navegar en vez de esperar la consulta más lenta.
+async function SeBuscaResults({
+  baseQuery,
+  page,
+  pageSize,
+  groupBy,
+  isReconoces,
+  hasActiveQuery,
+  showAgeSections,
+  showBuscaExtras,
+  country,
+}: {
+  baseQuery: BaseQuery;
+  page: number;
+  pageSize: number;
+  groupBy: GroupBy | null;
+  isReconoces: boolean;
+  hasActiveQuery: boolean;
+  showAgeSections: boolean;
+  showBuscaExtras: boolean;
+  country: string;
+}) {
+  const user = await getCurrentUser();
+  const [result, groups, recentlyLocated, alreadyVolunteered] = await Promise.all([
+    groupBy
+      ? Promise.resolve(null)
+      : getPersons({ ...baseQuery, page, pageSize: isReconoces ? 60 : pageSize }),
+    groupBy ? getPersonGroups(baseQuery, groupBy) : Promise.resolve(null),
+    showBuscaExtras ? getRecentlyLocated(12, country) : Promise.resolve([]),
+    user ? hasVolunteered(user.id) : Promise.resolve(false),
+  ]);
+
+  const total = groupBy
+    ? (groups ?? []).reduce((n, g) => n + g.items.length, 0)
+    : (result?.total ?? 0);
+
+  return (
+    <>
+      <FieldVolunteerBar alreadyVolunteered={alreadyVolunteered} />
+
+      {/* "¿La reconoces?": baraja de tarjetas (desliza para reconocer). */}
+      {isReconoces && (
+        <div className="border-t border-zinc-100 pt-6">
+          <RecognizeDeck persons={result?.items ?? []} />
+        </div>
+      )}
+
+      {!isReconoces && showAgeSections && (
+        <div className="space-y-8 border-t border-zinc-100 pt-3">
+          {/* Da esperanza primero: lo que más motiva a seguir usando la
+              plataforma va arriba, antes de explorar por edad. */}
+          {showBuscaExtras && <RecentlyLocated persons={recentlyLocated} />}
+          <FeaturedSections unidentified={false} country={country} />
+        </div>
+      )}
+
+      {/* Vista plana: solo con búsqueda/filtro activo. Con la vista limpia,
+          las secciones por edad (arriba) hacen de listado. */}
+      {!isReconoces && !showAgeSections && (
+      <div className="border-t border-zinc-100 pt-6">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="font-bold text-zinc-900">
+              {hasActiveQuery
+                ? "Resultados"
+                : isReconoces
+                  ? "Personas sin identificar"
+                  : "Todos los registros"}
+            </h2>
+            <p className="text-sm text-zinc-500">
+              {total.toLocaleString("es-VE")}{" "}
+              {isReconoces
+                ? total === 1
+                  ? "caso sin identificar"
+                  : "casos sin identificar"
+                : total === 1
+                  ? "persona encontrada"
+                  : "personas encontradas"}
+              {groupBy && (
+                <span className="text-zinc-400">
+                  {" · "}agrupadas por {groupBy === "hospital" ? "hospital" : "región"}
+                </span>
+              )}
+            </p>
+          </div>
+          {/* El tamaño de página no aplica a la vista agrupada (por hospital/región). */}
+          {!groupBy && <PageSizeSelect value={pageSize} />}
+        </div>
+
+        {groupBy ? (
+          <PersonGroups groups={groups ?? []} groupKind={groupBy} />
+        ) : (
+          <>
+            <PersonGrid persons={result?.items ?? []} />
+            <div className="mt-6">
+              <Pagination
+                page={result?.page ?? 1}
+                pageSize={result?.pageSize ?? pageSize}
+                total={result?.total ?? 0}
+              />
+            </div>
+          </>
+        )}
+      </div>
+      )}
+    </>
+  );
 }
 
 export default async function SeBuscaPage({ searchParams }: { searchParams: SearchParams }) {
@@ -83,7 +216,7 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
 
   const country = await getActiveCountry();
 
-  const baseQuery = {
+  const baseQuery: BaseQuery = {
     country,
     // "Se busca" muestra a TODOS (con y sin información, cada tarjeta
     // etiquetada — ver PersonCard). "¿La reconoces?" muestra el mismo
@@ -114,26 +247,13 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
   const showAgeSections = !hasActiveQuery;
   const showBuscaExtras = !isReconoces && !hasActiveQuery;
   const pageSize = clampPageSize(num(sp.pageSize));
+  const page = num(sp.page) ?? 1;
 
-  const user = await getCurrentUser();
-  const [result, groups, recentlyLocated, alreadyVolunteered] = await Promise.all([
-    groupBy
-      ? Promise.resolve(null)
-      : getPersons({ ...baseQuery, page: num(sp.page) ?? 1, pageSize: isReconoces ? 60 : pageSize }),
-    groupBy ? getPersonGroups(baseQuery, groupBy) : Promise.resolve(null),
-    showBuscaExtras ? getRecentlyLocated(12, country) : Promise.resolve([]),
-    user ? hasVolunteered(user.id) : Promise.resolve(false),
-  ]);
-
-  const total = groupBy
-    ? (groups ?? []).reduce((n, g) => n + g.items.length, 0)
-    : (result?.total ?? 0);
+  const resultsKey = JSON.stringify({ view, status, page, pageSize, sp });
 
   return (
     <PullToRefresh>
     <div className="mx-auto max-w-6xl px-4 py-6">
-      <FieldVolunteerBar alreadyVolunteered={alreadyVolunteered} />
-
       <div className="mb-5">
         <PageHeader
           icon={Search}
@@ -174,71 +294,19 @@ export default async function SeBuscaPage({ searchParams }: { searchParams: Sear
           {!isReconoces && <RegisterPersonButton country={country} />}
         </SearchAndFilters>
 
-        {/* "¿La reconoces?": baraja de tarjetas (desliza para reconocer). */}
-        {isReconoces && (
-          <div className="border-t border-zinc-100 pt-6">
-            <RecognizeDeck persons={result?.items ?? []} />
-          </div>
-        )}
-
-        {!isReconoces && showAgeSections && (
-          <div className="space-y-8 border-t border-zinc-100 pt-3">
-            {/* Da esperanza primero: lo que más motiva a seguir usando la
-                plataforma va arriba, antes de explorar por edad. */}
-            {showBuscaExtras && <RecentlyLocated persons={recentlyLocated} />}
-            <FeaturedSections unidentified={false} country={country} />
-          </div>
-        )}
-
-        {/* Vista plana: solo con búsqueda/filtro activo. Con la vista limpia,
-            las secciones por edad (arriba) hacen de listado. */}
-        {!isReconoces && !showAgeSections && (
-        <div className="border-t border-zinc-100 pt-6">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <h2 className="font-bold text-zinc-900">
-                {hasActiveQuery
-                  ? "Resultados"
-                  : isReconoces
-                    ? "Personas sin identificar"
-                    : "Todos los registros"}
-              </h2>
-              <p className="text-sm text-zinc-500">
-                {total.toLocaleString("es-VE")}{" "}
-                {isReconoces
-                  ? total === 1
-                    ? "caso sin identificar"
-                    : "casos sin identificar"
-                  : total === 1
-                    ? "persona encontrada"
-                    : "personas encontradas"}
-                {groupBy && (
-                  <span className="text-zinc-400">
-                    {" · "}agrupadas por {groupBy === "hospital" ? "hospital" : "región"}
-                  </span>
-                )}
-              </p>
-            </div>
-            {/* El tamaño de página no aplica a la vista agrupada (por hospital/región). */}
-            {!groupBy && <PageSizeSelect value={pageSize} />}
-          </div>
-
-          {groupBy ? (
-            <PersonGroups groups={groups ?? []} groupKind={groupBy} />
-          ) : (
-            <>
-              <PersonGrid persons={result?.items ?? []} />
-              <div className="mt-6">
-                <Pagination
-                  page={result?.page ?? 1}
-                  pageSize={result?.pageSize ?? pageSize}
-                  total={result?.total ?? 0}
-                />
-              </div>
-            </>
-          )}
-        </div>
-        )}
+        <Suspense key={resultsKey} fallback={<PersonGridSkeleton />}>
+          <SeBuscaResults
+            baseQuery={baseQuery}
+            page={page}
+            pageSize={pageSize}
+            groupBy={groupBy}
+            isReconoces={isReconoces}
+            hasActiveQuery={hasActiveQuery}
+            showAgeSections={showAgeSections}
+            showBuscaExtras={showBuscaExtras}
+            country={country}
+          />
+        </Suspense>
       </div>
     </div>
     </PullToRefresh>

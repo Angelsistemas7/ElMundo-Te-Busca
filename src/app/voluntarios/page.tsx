@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Image from "next/image";
 import nextDynamic from "next/dynamic";
 import { HandHeart, Mail, MapPin, Phone, Search } from "lucide-react";
@@ -16,6 +17,7 @@ import { PageSizeSelect } from "@/components/PageSizeSelect";
 import { FilterModal, type FilterField } from "@/components/FilterModal";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { ListRowSkeleton } from "@/components/ListSkeletons";
 
 export const dynamic = "force-dynamic";
 
@@ -62,19 +64,30 @@ const buildFilterFields = (regions: readonly string[]): FilterField[] => [
   { kind: "dateRange", fromKey: "dateFrom", toKey: "dateTo", label: "Registrado entre" },
 ];
 
-export default async function VoluntariosPage({ searchParams }: { searchParams: SearchParams }) {
-  const sp = await searchParams;
-  const type = (str(sp.type) as VolunteerType | "all") ?? "all";
-  const q = str(sp.q);
-  const estado = str(sp.estado) ?? "all";
-  const sort = (str(sp.sort) as VolunteerSort) ?? "recent";
-  const dateFrom = str(sp.dateFrom);
-  const dateTo = str(sp.dateTo);
-  const page = num(sp.page) ?? 1;
-  const pageSize = clampPageSize(num(sp.pageSize));
-  const country = await getActiveCountry();
-  const regions = getCountry(country).regions;
-
+// Lista de voluntarios: separada del cascarón (encabezado, buscador, filtros)
+// para que ese cascarón aparezca de inmediato al navegar — mismo patrón que
+// Comunidad/Ayuda/Se busca/Hospitales/Mascotas/Denuncias/Caravanas.
+async function VolunteersList({
+  country,
+  type,
+  q,
+  estado,
+  sort,
+  dateFrom,
+  dateTo,
+  page,
+  pageSize,
+}: {
+  country: string;
+  type: VolunteerType | "all";
+  q: string | undefined;
+  estado: string;
+  sort: VolunteerSort;
+  dateFrom: string | undefined;
+  dateTo: string | undefined;
+  page: number;
+  pageSize: number;
+}) {
   // Antes: hasta 300 voluntarios sin límite de página, cacheados 60s (te
   // acababas de ofrecer y podías no verte en la lista por un minuto). Ahora
   // pagina de verdad (10/20/50 a elegir) y consulta en vivo.
@@ -85,56 +98,8 @@ export default async function VoluntariosPage({ searchParams }: { searchParams: 
     sort,
   );
 
-  const currentParams: Record<string, string> = {};
-  if (type !== "all") currentParams.type = type;
-  if (sort !== "recent") currentParams.sort = sort;
-  if (estado !== "all") currentParams.estado = estado;
-  if (dateFrom) currentParams.dateFrom = dateFrom;
-  if (dateTo) currentParams.dateTo = dateTo;
-  if (q) currentParams.q = q;
-  if (pageSize !== 10) currentParams.pageSize = String(pageSize);
-
   return (
-    <PullToRefresh>
-    <div className="mx-auto max-w-3xl px-4 py-6">
-      <CommunityTabs />
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          icon={HandHeart}
-          tone="emerald"
-          title="Voluntarios"
-          description="Personas que ofrecen su tiempo y conocimiento: médicos, rescatistas, conductores, traductores y más. Ofrécete o encuentra a quien pueda ayudar."
-        />
-        <div className="shrink-0">
-          <RegisterVolunteerButton country={country} />
-        </div>
-      </div>
-
-      <form action="/voluntarios" className="mb-3 flex gap-2">
-        {type !== "all" && <input type="hidden" name="type" value={type} />}
-        {sort !== "recent" && <input type="hidden" name="sort" value={sort} />}
-        {estado !== "all" && <input type="hidden" name="estado" value={estado} />}
-        {dateFrom && <input type="hidden" name="dateFrom" value={dateFrom} />}
-        {dateTo && <input type="hidden" name="dateTo" value={dateTo} />}
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-          <input
-            name="q"
-            defaultValue={q ?? ""}
-            placeholder="Buscar por nombre, ciudad o habilidad..."
-            className="w-full rounded-xl border border-zinc-300 bg-white py-2.5 pl-10 pr-3 text-base outline-none sm:text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-          />
-        </div>
-        <button type="submit" className="press rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800">
-          Buscar
-        </button>
-      </form>
-
-      <div className="mb-5 flex items-center justify-end gap-2">
-        <FilterModal basePath="/voluntarios" currentParams={currentParams} fields={buildFilterFields(regions)} />
-        <PageSizeSelect value={pageSize} />
-      </div>
-
+    <>
       {volunteers.length === 0 ? (
         <EmptyState
           icon={HandHeart}
@@ -199,6 +164,88 @@ export default async function VoluntariosPage({ searchParams }: { searchParams: 
       <div className="mt-6">
         <Pagination page={page} pageSize={pageSize} total={total} />
       </div>
+    </>
+  );
+}
+
+export default async function VoluntariosPage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = await searchParams;
+  const type = (str(sp.type) as VolunteerType | "all") ?? "all";
+  const q = str(sp.q);
+  const estado = str(sp.estado) ?? "all";
+  const sort = (str(sp.sort) as VolunteerSort) ?? "recent";
+  const dateFrom = str(sp.dateFrom);
+  const dateTo = str(sp.dateTo);
+  const page = num(sp.page) ?? 1;
+  const pageSize = clampPageSize(num(sp.pageSize));
+  const country = await getActiveCountry();
+  const regions = getCountry(country).regions;
+
+  const currentParams: Record<string, string> = {};
+  if (type !== "all") currentParams.type = type;
+  if (sort !== "recent") currentParams.sort = sort;
+  if (estado !== "all") currentParams.estado = estado;
+  if (dateFrom) currentParams.dateFrom = dateFrom;
+  if (dateTo) currentParams.dateTo = dateTo;
+  if (q) currentParams.q = q;
+  if (pageSize !== 10) currentParams.pageSize = String(pageSize);
+
+  const listKey = JSON.stringify({ type, q, estado, sort, dateFrom, dateTo, page, pageSize });
+
+  return (
+    <PullToRefresh>
+    <div className="mx-auto max-w-3xl px-4 py-6">
+      <CommunityTabs />
+      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeader
+          icon={HandHeart}
+          tone="emerald"
+          title="Voluntarios"
+          description="Personas que ofrecen su tiempo y conocimiento: médicos, rescatistas, conductores, traductores y más. Ofrécete o encuentra a quien pueda ayudar."
+        />
+        <div className="shrink-0">
+          <RegisterVolunteerButton country={country} />
+        </div>
+      </div>
+
+      <form action="/voluntarios" className="mb-3 flex gap-2">
+        {type !== "all" && <input type="hidden" name="type" value={type} />}
+        {sort !== "recent" && <input type="hidden" name="sort" value={sort} />}
+        {estado !== "all" && <input type="hidden" name="estado" value={estado} />}
+        {dateFrom && <input type="hidden" name="dateFrom" value={dateFrom} />}
+        {dateTo && <input type="hidden" name="dateTo" value={dateTo} />}
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <input
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Buscar por nombre, ciudad o habilidad..."
+            className="w-full rounded-xl border border-zinc-300 bg-white py-2.5 pl-10 pr-3 text-base outline-none sm:text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+          />
+        </div>
+        <button type="submit" className="press rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800">
+          Buscar
+        </button>
+      </form>
+
+      <div className="mb-5 flex items-center justify-end gap-2">
+        <FilterModal basePath="/voluntarios" currentParams={currentParams} fields={buildFilterFields(regions)} />
+        <PageSizeSelect value={pageSize} />
+      </div>
+
+      <Suspense key={listKey} fallback={<ListRowSkeleton />}>
+        <VolunteersList
+          country={country}
+          type={type}
+          q={q}
+          estado={estado}
+          sort={sort}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          page={page}
+          pageSize={pageSize}
+        />
+      </Suspense>
     </div>
     </PullToRefresh>
   );
