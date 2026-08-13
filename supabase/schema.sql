@@ -776,3 +776,54 @@ alter table consensus_votes enable row level security;
 -- Sin lectura pública: es el voto individual de cada cuenta (el contador
 -- agregado sí es público, en aid_points/hospitals). Solo el servidor
 -- (service role) la lee/escribe para recalcular esos contadores.
+
+-- ── Red de auxilio: check-in "¿estás bien?" tras un sismo (app móvil) ───────
+-- Diseño completo en plan-app-movil/investigacion-tecnica/10-alerta-sismo-checkin.md
+-- del repo MundoTebuscaAPP. Nada de esto se lee/escribe con la anon key desde
+-- el cliente directamente: todo pasa por la Edge Function `safety-optin`
+-- (service role), mismo principio que ya aplica el resto de este archivo
+-- (ver "Escrituras... SOLO por service role" más arriba).
+create table if not exists safety_optins (
+  id uuid primary key default gen_random_uuid(),
+  device_id text not null,                 -- UUID de instalación (DeviceId en Flutter);
+                                            -- no requiere cuenta, igual que otros dedup
+  user_id uuid references auth.users(id),  -- null si no inició sesión
+  push_token text,
+  last_lat double precision,
+  last_lng double precision,
+  last_location_at timestamptz,
+  country text not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (device_id)
+);
+create index if not exists safety_optins_active_country_idx
+  on safety_optins (country) where active;
+
+-- Un check-in disparado por un sismo concreto (o una prueba manual mientras
+-- no hay cron de USGS conectado — quake_id = 'manual-test').
+create table if not exists safety_checkins (
+  id uuid primary key default gen_random_uuid(),
+  optin_id uuid not null references safety_optins(id) on delete cascade,
+  quake_id text not null,
+  status text not null default 'pending'
+    check (status in ('pending', 'ok', 'needs_help', 'no_response')),
+  lat double precision,   -- snapshot de dónde estaba EN ESE MOMENTO, no la
+  lng double precision,   -- ubicación actual (esa sigue cambiando en safety_optins)
+  notified_at timestamptz not null default now(),
+  responded_at timestamptz,
+  resolved_at timestamptz,
+  unique (optin_id, quake_id)
+);
+create index if not exists safety_checkins_visible_idx
+  on safety_checkins (status) where resolved_at is null;
+
+alter table safety_optins   enable row level security;
+alter table safety_checkins enable row level security;
+-- Sin políticas a propósito: la ubicación de una persona en vivo no es
+-- pública ni siquiera de lectura general. Se resuelve todo en la Edge
+-- Function con service role. Cuando exista el rol volunteer/rescuer en
+-- app_roles (hoy solo admin/moderator/hospital_moderator/aid_point_moderator,
+-- ver arriba), se añade aquí una política de SELECT sobre safety_checkins
+-- acotada a status IN ('needs_help','no_response') y resolved_at is null.
