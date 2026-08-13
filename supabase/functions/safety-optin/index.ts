@@ -63,15 +63,116 @@ Deno.serve(async (req) => {
     return json({ error: "invalid_json" }, 400);
   }
 
-  const { action, device_id: deviceId } = body;
-
-  if (!esDeviceIdValido(deviceId)) {
-    return json({ error: "invalid_device_id" }, 400);
-  }
+  const { action } = body;
 
   const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
+
+  // Única acción que no está atada a un device_id: la usa un voluntario
+  // autenticado, no un dispositivo con la Red de auxilio activa.
+  if (action === "list-needs-help") {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const jwt = authHeader.replace(/^Bearer\s+/i, "");
+    if (!jwt) return json({ error: "unauthorized" }, 401);
+
+    const { data: userRes, error: userError } = await db.auth.getUser(jwt);
+    if (userError || !userRes.user) return json({ error: "unauthorized" }, 401);
+
+    const { data: rol, error: rolError } = await db
+      .from("app_roles")
+      .select("role")
+      .eq("user_id", userRes.user.id)
+      .eq("role", "volunteer")
+      .maybeSingle();
+    if (rolError) {
+      console.error("safety-optin list-needs-help role", rolError.code);
+      return json({ error: "db_error" }, 500);
+    }
+    if (!rol) return json({ error: "forbidden" }, 403);
+
+    // Ventana de espera del push antes de considerar 'no_response': ver §5 de
+    // 10-alerta-sismo-checkin.md. Se resuelve aquí mismo (sin cron aparte)
+    // porque un voluntario solo necesita la lista al momento de mirarla.
+    const limiteEspera = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    await db
+      .from("safety_checkins")
+      .update({ status: "no_response" })
+      .eq("status", "pending")
+      .is("resolved_at", null)
+      .lt("notified_at", limiteEspera);
+
+    const { data: checkins, error: listError } = await db
+      .from("safety_checkins")
+      .select(
+        "id, quake_id, status, lat, lng, notified_at, responded_at, " +
+          "safety_optins(user_id, country, last_lat, last_lng, last_location_at)",
+      )
+      .in("status", ["needs_help", "no_response"])
+      .is("resolved_at", null)
+      .order("notified_at", { ascending: false })
+      .limit(50);
+    if (listError) {
+      console.error("safety-optin list-needs-help list", listError.code);
+      return json({ error: "db_error" }, 500);
+    }
+
+    const userIds = Array.from(
+      new Set(
+        (checkins ?? [])
+          .map((c) => (c.safety_optins as { user_id: string | null } | null)?.user_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    const perfiles = new Map<string, { username: string; blood_type: string | null }>();
+    if (userIds.length > 0) {
+      const { data: filas, error: perfilError } = await db
+        .from("profiles")
+        .select("user_id, username, blood_type")
+        .in("user_id", userIds);
+      if (perfilError) {
+        console.error("safety-optin list-needs-help profiles", perfilError.code);
+      } else {
+        for (const p of filas ?? []) {
+          perfiles.set(p.user_id as string, {
+            username: p.username as string,
+            blood_type: p.blood_type as string | null,
+          });
+        }
+      }
+    }
+
+    const resultado = (checkins ?? []).map((c) => {
+      const optin = c.safety_optins as {
+        user_id: string | null;
+        country: string;
+        last_lat: number | null;
+        last_lng: number | null;
+        last_location_at: string | null;
+      } | null;
+      const perfil = optin?.user_id ? perfiles.get(optin.user_id) : undefined;
+      return {
+        id: c.id,
+        quake_id: c.quake_id,
+        status: c.status,
+        notified_at: c.notified_at,
+        responded_at: c.responded_at,
+        // Ubicación actual si el dispositivo la sigue reportando; si no, la
+        // que tenía en el momento exacto del sismo.
+        lat: optin?.last_lat ?? c.lat,
+        lng: optin?.last_lng ?? c.lng,
+        username: perfil?.username ?? null,
+        blood_type: perfil?.blood_type ?? null,
+      };
+    });
+
+    return json({ ok: true, checkins: resultado });
+  }
+
+  const { device_id: deviceId } = body;
+  if (!esDeviceIdValido(deviceId)) {
+    return json({ error: "invalid_device_id" }, 400);
+  }
 
   switch (action) {
     case "activate": {
@@ -170,6 +271,37 @@ Deno.serve(async (req) => {
         return json({ error: "db_error" }, 500);
       }
       return json({ ok: true, quake_id: quakeId });
+    }
+
+    // Sondeo del propio dispositivo: ¿tengo un check-in sin resolver ahora
+    // mismo? Se llama en un timer corto mientras la app está en primer plano
+    // (no hay push real todavía — ver §7 de 10-alerta-sismo-checkin.md).
+    case "poll": {
+      const { data: optin, error: findError } = await db
+        .from("safety_optins")
+        .select("id")
+        .eq("device_id", deviceId)
+        .eq("active", true)
+        .maybeSingle();
+      if (findError) {
+        console.error("safety-optin poll find", findError.code);
+        return json({ error: "db_error" }, 500);
+      }
+      if (!optin) return json({ ok: true, checkin: null });
+
+      const { data: checkin, error: checkinError } = await db
+        .from("safety_checkins")
+        .select("quake_id, status, notified_at")
+        .eq("optin_id", optin.id)
+        .is("resolved_at", null)
+        .order("notified_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (checkinError) {
+        console.error("safety-optin poll checkin", checkinError.code);
+        return json({ error: "db_error" }, 500);
+      }
+      return json({ ok: true, checkin: checkin ?? null });
     }
 
     // Respuesta al push "¿Estás bien?" — 'ok' o 'needs_help'. Si no responde,

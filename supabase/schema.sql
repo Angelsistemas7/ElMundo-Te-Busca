@@ -205,7 +205,7 @@ alter table manager_requests enable row level security;
 -- solo el servidor (service role) la lee/escribe.
 create table if not exists app_roles (
   user_id    uuid not null references auth.users(id) on delete cascade,
-  role       text not null check (role in ('admin','moderator','hospital_moderator','aid_point_moderator')),
+  role       text not null check (role in ('admin','moderator','hospital_moderator','aid_point_moderator','volunteer')),
   granted_by text,
   created_at timestamptz not null default now(),
   primary key (user_id, role)
@@ -215,9 +215,13 @@ create index if not exists app_roles_role_idx on app_roles (role);
 -- Migración para bases ya creadas: rol 'moderator' (reportes de hallazgos,
 -- posts de comunidad, visto bueno a personas/puntos de ayuda/hospitales —
 -- SIN Colaboradores, gestores, héroes ni denuncias, eso sigue solo para 'admin').
+-- Y rol 'volunteer' (app móvil): puede ver, vía la Edge Function `safety-optin`
+-- (acción `list-needs-help`), a quién le falta responder o dijo que no está
+-- bien tras un sismo. Se asigna a mano igual que los demás roles — no hay
+-- flujo de autoservicio para pedirlo.
 alter table app_roles drop constraint if exists app_roles_role_check;
 alter table app_roles add constraint app_roles_role_check
-  check (role in ('admin','moderator','hospital_moderator','aid_point_moderator'));
+  check (role in ('admin','moderator','hospital_moderator','aid_point_moderator','volunteer'));
 
 alter table app_roles enable row level security;
 -- Sin políticas a propósito: quién tiene qué rol no es público, y asignarlo
@@ -823,7 +827,16 @@ alter table safety_optins   enable row level security;
 alter table safety_checkins enable row level security;
 -- Sin políticas a propósito: la ubicación de una persona en vivo no es
 -- pública ni siquiera de lectura general. Se resuelve todo en la Edge
--- Function con service role. Cuando exista el rol volunteer/rescuer en
--- app_roles (hoy solo admin/moderator/hospital_moderator/aid_point_moderator,
--- ver arriba), se añade aquí una política de SELECT sobre safety_checkins
--- acotada a status IN ('needs_help','no_response') y resolved_at is null.
+-- Function con service role, incluida la lectura de voluntarios
+-- (`list-needs-help`, que valida el rol 'volunteer' server-side antes de
+-- devolver nada). No se abre una política RLS para esto a propósito: RLS
+-- filtra filas, no decide "esta persona tiene rol X", y esa decisión ya vive
+-- en la Edge Function — duplicarla en SQL es una segunda fuente de verdad
+-- que se puede desincronizar.
+
+-- Tipo de sangre, opcional: lo pide la Red de auxilio para que un voluntario
+-- que llega hasta la persona sepa algo útil de inmediato. Nunca se muestra
+-- en ningún listado público, solo en `list-needs-help` a un 'volunteer'.
+alter table profiles add column if not exists blood_type text
+  check (blood_type is null or blood_type in
+    ('O-','O+','A-','A+','B-','B+','AB-','AB+'));
