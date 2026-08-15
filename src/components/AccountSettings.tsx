@@ -16,17 +16,39 @@ export function AccountSettings({
   username,
   recoveryEmail,
   emailNotifications,
+  hasPassword,
 }: {
   username: string;
   recoveryEmail: string | null;
   emailNotifications: boolean;
+  hasPassword: boolean;
 }) {
   return (
     <div className="space-y-6">
-      <PasswordSection />
+      {hasPassword ? <PasswordSection /> : <GoogleAccountSection />}
       <EmailSection recoveryEmail={recoveryEmail} emailNotifications={emailNotifications} />
-      <DangerSection username={username} />
+      <DangerSection username={username} hasPassword={hasPassword} />
     </div>
+  );
+}
+
+// ── Cuenta de Google (sin contraseña propia) ──────────────────────────────
+// Quien entró con Google no tiene contraseña en este sitio: la clave la guarda
+// Google. Mostrar aquí el formulario de "cambiar contraseña" solo llevaría a un
+// error incomprensible ("la contraseña actual no es correcta" cuando nunca hubo
+// ninguna), así que en su lugar se explica dónde se administra de verdad.
+function GoogleAccountSection() {
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+      <h2 className="flex items-center gap-2 font-bold text-zinc-900">
+        <KeyRound className="h-4.5 w-4.5 text-zinc-500" />
+        Contraseña
+      </h2>
+      <p className="mt-2 text-sm text-zinc-500">
+        Entras con tu cuenta de Google, así que aquí no hay contraseña que cambiar. Tu clave y la
+        verificación en dos pasos se administran desde tu cuenta de Google.
+      </p>
+    </section>
   );
 }
 
@@ -197,7 +219,7 @@ function EmailSection({
 }
 
 // ── Eliminar cuenta ───────────────────────────────────────────────────────
-function DangerSection({ username }: { username: string }) {
+function DangerSection({ username, hasPassword }: { username: string; hasPassword: boolean }) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -241,12 +263,20 @@ function DangerSection({ username }: { username: string }) {
           setError(null);
         }}
         title="Eliminar cuenta"
-        subtitle="Escribe tu contraseña y tu nombre de usuario para confirmar. No hay vuelta atrás."
+        subtitle={
+          hasPassword
+            ? "Escribe tu contraseña y tu nombre de usuario para confirmar. No hay vuelta atrás."
+            : "Escribe tu nombre de usuario para confirmar. No hay vuelta atrás."
+        }
       >
         <form onSubmit={onSubmit} className="space-y-4">
-          <Field label="Contraseña" htmlFor="del-password" required>
-            <PasswordInput id="del-password" name="password" autoComplete="current-password" />
-          </Field>
+          {/* Las cuentas de Google no tienen contraseña propia: la confirmación
+              es teclear el nombre de usuario. */}
+          {hasPassword && (
+            <Field label="Contraseña" htmlFor="del-password" required>
+              <PasswordInput id="del-password" name="password" autoComplete="current-password" />
+            </Field>
+          )}
           <Field
             label={`Escribe tu usuario ("${username}") para confirmar`}
             htmlFor="del-confirm"

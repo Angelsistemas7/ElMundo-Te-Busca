@@ -31,14 +31,32 @@ function synthEmail(username: string): string {
   return `${username.toLowerCase()}@${SYNTH_DOMAIN}`;
 }
 
-/** Usuario de la sesión actual (o null). Lee la cookie de sesión. */
+/** Usuario de la sesión actual (o null). Lee la cookie de sesión.
+ *
+ *  Una cuenta recién creada con Google, que todavía no eligió nombre de
+ *  usuario, cuenta como SIN sesión a estos efectos: si no, aparecería
+ *  publicando y comentando como "Usuario" (el nombre es lo único que la
+ *  identifica ante los demás). Para esa etapa intermedia está
+ *  `getPendingOAuthUser()`, que sí la ve. */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const sb = await getSupabaseServer();
   if (!sb) return null;
   const { data, error } = await sb.auth.getUser();
   if (error || !data.user) return null;
-  const username = (data.user.user_metadata?.username as string | undefined) ?? "Usuario";
+  const username = data.user.user_metadata?.username as string | undefined;
+  if (!username) return null;
   return { id: data.user.id, username };
+}
+
+/** Sesión abierta a la que aún le falta elegir nombre de usuario (primer
+ *  ingreso con Google). Solo la usa `/cuenta/usuario`. */
+export async function getPendingOAuthUser(): Promise<{ id: string; email: string | null } | null> {
+  const sb = await getSupabaseServer();
+  if (!sb) return null;
+  const { data } = await sb.auth.getUser();
+  if (!data.user) return null;
+  if (data.user.user_metadata?.username) return null; // ya completa
+  return { id: data.user.id, email: data.user.email ?? null };
 }
 
 export async function isUsernameTaken(username: string): Promise<boolean> {
@@ -203,6 +221,136 @@ export async function signOut(): Promise<void> {
   if (sb) await sb.auth.signOut();
 }
 
+// ── Entrar con Google ───────────────────────────────────────────────────────
+// Google es un proveedor MÁS dentro del mismo Supabase Auth (no un sistema de
+// cuentas aparte): el usuario que crea vive en `auth.users` igual que los de
+// usuario+contraseña, así que todo lo que cuelga de ahí (las publicaciones con
+// `user_id`, los gestores delegados, las RLS) sigue funcionando sin cambios.
+//
+// Diferencia real con el registro por contraseña: Google entrega correo y
+// nombre real, pero NO un nombre de usuario, y aquí el nombre de usuario es la
+// identidad pública (comentarios, /perfil/publico, asignación de gestores). Por
+// eso el primer ingreso con Google deja la sesión abierta pero SIN fila en
+// `profiles`, y `/cuenta/usuario` la completa. Mientras tanto la cuenta existe
+// pero no puede publicar bajo un nombre — es un estado intermedio a propósito.
+
+/** URL a la que hay que mandar el navegador para entrar con Google.
+ *  `null` si Supabase no está configurado o si el proveedor no está activo. */
+export async function getGoogleAuthUrl(next: string): Promise<string | null> {
+  const sb = await getSupabaseServer();
+  if (!sb) return null;
+  const origin = siteOrigin();
+  if (!origin) return null;
+
+  // `next` viene del cliente: solo se acepta una ruta interna. Sin esto, un
+  // enlace preparado por un tercero podría mandar a la víctima a un dominio
+  // ajeno DESPUÉS de iniciar sesión (redirección abierta / phishing).
+  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+
+  const { data, error } = await sb.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+      // La redirección la hace el navegador con la URL que devolvemos, no el
+      // SDK (esto corre en el servidor, no hay `window`).
+      skipBrowserRedirect: true,
+      // Muestra el selector de cuentas en vez de entrar con la última usada:
+      // en teléfonos prestados o compartidos —lo normal en un refugio— entrar
+      // sin querer con la cuenta de otra persona sería un problema serio.
+      queryParams: { prompt: "select_account" },
+    },
+  });
+  if (error || !data?.url) return null;
+  return data.url;
+}
+
+/** Cierra el ciclo de OAuth: cambia el `code` de la URL por una sesión real
+ *  (cookie httpOnly). Devuelve si el usuario ya tiene nombre de usuario. */
+export async function completeOAuthLogin(
+  code: string,
+): Promise<{ ok: false } | { ok: true; needsUsername: boolean }> {
+  const sb = await getSupabaseServer();
+  if (!sb) return { ok: false };
+  const { data, error } = await sb.auth.exchangeCodeForSession(code);
+  if (error || !data.user) return { ok: false };
+  // Mismo criterio que `getCurrentUser`/`getPendingOAuthUser`: el nombre vive
+  // en los metadatos de la sesión, así no hace falta consultar `profiles` aquí.
+  // Si el correo de Google coincide con una cuenta que ya existía, Supabase
+  // enlaza ambas identidades al mismo usuario y este ya trae su nombre.
+  return { ok: true, needsUsername: !data.user.user_metadata?.username };
+}
+
+/** ¿La cuenta ya tiene fila en `profiles`? Se comprueba contra la base (no
+ *  contra los metadatos) justo antes de insertar, para no crear dos perfiles
+ *  del mismo usuario si algo se reintenta. */
+async function hasProfile(userId: string): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+  if (!admin) return true; // sin service role no podemos saberlo: no bloqueamos
+  const { data } = await admin
+    .from("profiles")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+/** Completa el registro de una cuenta de Google con el nombre de usuario que
+ *  eligió. Solo funciona si la sesión existe y AÚN no tiene perfil: así nadie
+ *  puede usar esto para cambiarse el nombre después (eso sería otra función,
+ *  con sus propias reglas). */
+export async function completeOAuthProfile(username: string): Promise<AuthResult> {
+  const sb = await getSupabaseServer();
+  const admin = getSupabaseAdmin();
+  if (!sb || !admin) return { ok: false, error: "No disponible en modo demostración." };
+
+  const { data: userData } = await sb.auth.getUser();
+  const user = userData.user;
+  if (!user) return { ok: false, error: "Tu sesión expiró. Vuelve a entrar con Google." };
+  if (await hasProfile(user.id)) {
+    return { ok: false, error: "Esta cuenta ya tiene nombre de usuario." };
+  }
+
+  const name = username.trim();
+  if (await isUsernameTaken(name)) {
+    return { ok: false, error: "Ese nombre de usuario ya está en uso. Elige otro." };
+  }
+
+  const email = (user.email ?? "").toLowerCase();
+  const { error: profErr } = await admin.from("profiles").insert({
+    user_id: user.id,
+    username: name,
+    username_lower: name.toLowerCase(),
+    login_email: email,
+    // Con Google el correo ya está verificado por Google: sirve de una vez como
+    // correo de recuperación, sin pedirlo aparte.
+    recovery_email: email || null,
+  });
+  if (profErr) {
+    // Carrera: alguien tomó el nombre entre la comprobación y el insert.
+    return { ok: false, error: "Ese nombre de usuario ya está en uso. Elige otro." };
+  }
+
+  // Igual que en `signUp`: el nombre vive también en los metadatos de la sesión
+  // para que `getCurrentUser()` no tenga que consultar `profiles` cada vez.
+  await admin.auth.admin.updateUserById(user.id, {
+    user_metadata: { ...user.user_metadata, username: name, has_recovery: Boolean(email) },
+  });
+
+  return { ok: true, username: name };
+}
+
+/** ¿Esta cuenta tiene contraseña propia? Las creadas solo con Google no la
+ *  tienen, así que "cambiar contraseña" y la confirmación por contraseña al
+ *  eliminar la cuenta no aplican (ver `AccountSettings`). */
+export async function currentUserHasPassword(): Promise<boolean> {
+  const sb = await getSupabaseServer();
+  if (!sb) return true;
+  const { data } = await sb.auth.getUser();
+  if (!data.user) return true;
+  const providers = (data.user.app_metadata?.providers as string[] | undefined) ?? [];
+  return providers.includes("email");
+}
+
 // ── Recuperar contraseña (solo si el usuario dio un correo) ──────────────────
 // NUNCA se arma con cabeceras de la petición (Host/X-Forwarded-Host): esas las
 // controla quien hace la petición, no el servidor. Si nginx no tiene un
@@ -258,6 +406,8 @@ export interface MyProfile {
   avatarUrl: string | null;
   recoveryEmail: string | null;
   emailNotifications: boolean;
+  /** false en cuentas creadas solo con Google (no hay contraseña que cambiar). */
+  hasPassword: boolean;
 }
 
 /** Perfil completo de la sesión actual (para /perfil y /configuracion). Hace
@@ -267,7 +417,10 @@ export async function getMyProfile(): Promise<MyProfile | null> {
   const user = await getCurrentUser();
   if (!user) return null;
   const admin = getSupabaseAdmin();
-  if (!admin) return { ...user, avatarUrl: null, recoveryEmail: null, emailNotifications: false };
+  const hasPassword = await currentUserHasPassword();
+  if (!admin) {
+    return { ...user, avatarUrl: null, recoveryEmail: null, emailNotifications: false, hasPassword };
+  }
   const { data } = await admin
     .from("profiles")
     .select("avatar_url, recovery_email, email_notifications")
@@ -278,6 +431,7 @@ export async function getMyProfile(): Promise<MyProfile | null> {
     avatarUrl: (data?.avatar_url as string | null) ?? null,
     recoveryEmail: (data?.recovery_email as string | null) ?? null,
     emailNotifications: Boolean(data?.email_notifications),
+    hasPassword,
   };
 }
 
@@ -399,11 +553,16 @@ export async function deleteAccount(
   if (confirmUsername.trim().toLowerCase() !== (prof.username as string).toLowerCase()) {
     return { ok: false, error: "El nombre de usuario no coincide." };
   }
-  const { error: verifyErr } = await admin.auth.signInWithPassword({
-    email: prof.login_email as string,
-    password,
-  });
-  if (verifyErr) return { ok: false, error: "La contraseña no es correcta." };
+  // Las cuentas creadas con Google no tienen contraseña que verificar: la
+  // fricción ahí es teclear el nombre de usuario (arriba). Verificar de todos
+  // modos fallaría siempre y las dejaría sin forma de borrarse.
+  if (await currentUserHasPassword()) {
+    const { error: verifyErr } = await admin.auth.signInWithPassword({
+      email: prof.login_email as string,
+      password,
+    });
+    if (verifyErr) return { ok: false, error: "La contraseña no es correcta." };
+  }
 
   const { error } = await admin.auth.admin.deleteUser(userData.user.id);
   if (error) return { ok: false, error: "No se pudo eliminar la cuenta. Intenta de nuevo." };

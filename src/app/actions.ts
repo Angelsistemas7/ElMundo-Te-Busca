@@ -65,8 +65,10 @@ import {
 } from "@/lib/data";
 import {
   changePassword,
+  completeOAuthProfile,
   deleteAccount,
   getCurrentUser,
+  getGoogleAuthUrl,
   getMyProfile,
   requestPasswordReset,
   signIn,
@@ -99,6 +101,7 @@ import {
   complaintSchema,
   hospitalPatientSchema,
   hospitalSchema,
+  chooseUsernameSchema,
   isSafePhotoUrl,
   loginSchema,
   managerRequestSchema,
@@ -205,6 +208,34 @@ export async function signOutAction(): Promise<{ ok: true }> {
   await signOut();
   revalidatePath("/");
   return { ok: true };
+}
+
+/** Devuelve la URL de Google a la que el navegador debe ir para entrar.
+ *  Sin Turnstile a propósito: la pantalla de Google ya es la barrera anti-bot,
+ *  y aquí todavía no se crea nada en la base — la cuenta nace al volver. */
+export async function startGoogleLoginAction(
+  next: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const url = await getGoogleAuthUrl(next);
+  if (!url) {
+    return {
+      ok: false,
+      error: "Entrar con Google no está disponible ahora mismo. Usa tu usuario y contraseña.",
+    };
+  }
+  return { ok: true, url };
+}
+
+/** Completa el primer ingreso con Google fijando el nombre de usuario. */
+export async function chooseUsernameAction(form: FormData): Promise<AuthActionResult> {
+  const parsed = chooseUsernameSchema.safeParse({ username: getField(form, "username") });
+  if (!parsed.success) {
+    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+  }
+  const res = await completeOAuthProfile(parsed.data.username);
+  if (!res.ok) return { ok: false, error: res.error };
+  revalidatePath("/");
+  return { ok: true, username: res.username };
 }
 
 /** Pide un enlace de recuperación. Respuesta SIEMPRE genérica (no revela si el

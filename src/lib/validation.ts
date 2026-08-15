@@ -245,6 +245,14 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
+// Quien entra con Google no trae nombre de usuario (Google da correo y nombre
+// real, no un alias). Como el nombre de usuario es lo que se ve en comentarios
+// y perfiles públicos, se le pide en un paso aparte tras el primer ingreso —
+// mismas reglas que al registrarse con contraseña.
+export const chooseUsernameSchema = signupSchema.pick({ username: true });
+
+export type ChooseUsernameInput = z.infer<typeof chooseUsernameSchema>;
+
 // ── Gestores delegados (asignación desde el panel admin) ─────────────────────
 // El admin asigna a un usuario (por su nombre de usuario) como gestor de un
 // recurso concreto (hospital o punto de ayuda).

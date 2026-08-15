@@ -24,6 +24,7 @@ export default async function ConfiguracionPage() {
         username={profile.username}
         recoveryEmail={profile.recoveryEmail}
         emailNotifications={profile.emailNotifications}
+        hasPassword={profile.hasPassword}
       />
     </div>
   );

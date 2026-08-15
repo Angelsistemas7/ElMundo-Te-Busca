@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LogIn, Loader2, MailCheck } from "lucide-react";
 import {
   getSessionUserAction,
@@ -14,12 +14,14 @@ import { Modal } from "./Modal";
 import { Field, Input, PasswordInput } from "./FormControls";
 import { Turnstile, type TurnstileHandle } from "./Turnstile";
 import { ProfileMenu } from "./ProfileMenu";
+import { GoogleSignInButton } from "./GoogleSignInButton";
 
 type SessionUser = { id: string; username: string } | null;
 type Mode = "login" | "register" | "reset";
 
 export function AuthMenu() {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<SessionUser>(null);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("login");
@@ -141,92 +143,105 @@ export function AuthMenu() {
             </button>
           </div>
         ) : (
-          <form key={mode} onSubmit={onSubmit} className="space-y-4">
-            <Field label="Nombre de usuario" htmlFor="username" required error={fieldErrors?.username}>
-              <Input id="username" name="username" autoComplete="username" placeholder="ej. maria_g" />
-            </Field>
-
+          <>
             {mode !== "reset" && (
-              <Field
-                label="Contraseña"
-                htmlFor="password"
-                required
-                error={fieldErrors?.password}
-                hint={
-                  mode === "register"
-                    ? "Mínimo 10 caracteres. No uses la misma de tu correo o redes, pero elige una que recuerdes."
-                    : undefined
-                }
-              >
-                <PasswordInput
-                  id="password"
-                  name="password"
-                  autoComplete={mode === "register" ? "new-password" : "current-password"}
-                  placeholder="••••••••••"
-                />
+              <div className="mb-5 space-y-4">
+                <GoogleSignInButton next={pathname} />
+                <div className="flex items-center gap-3">
+                  <span className="h-px flex-1 bg-zinc-200" />
+                  <span className="text-xs font-medium text-zinc-400">o con tu usuario</span>
+                  <span className="h-px flex-1 bg-zinc-200" />
+                </div>
+              </div>
+            )}
+
+            <form key={mode} onSubmit={onSubmit} className="space-y-4">
+              <Field label="Nombre de usuario" htmlFor="username" required error={fieldErrors?.username}>
+                <Input id="username" name="username" autoComplete="username" placeholder="ej. maria_g" />
               </Field>
-            )}
 
-            {mode === "login" && (
-              <button
-                type="button"
-                onClick={() => switchMode("reset")}
-                className="-mt-1 text-xs font-medium text-zinc-500 hover:text-brand-700"
-              >
-                ¿Olvidaste tu clave?
-              </button>
-            )}
-
-            {mode === "register" && (
-              <Field
-                label="Correo (opcional)"
-                htmlFor="email"
-                error={fieldErrors?.email}
-                hint="Solo se usa para recuperar tu clave si la olvidas. Si lo dejas vacío, no podrás recuperarla."
-              >
-                <Input id="email" name="email" type="email" autoComplete="email" placeholder="tu@correo.com" />
-              </Field>
-            )}
-
-            <Turnstile ref={turnstileRef} />
-
-            {result && !result.ok && (
-              <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
-                {result.error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="press flex w-full items-center justify-center gap-2 rounded-xl bg-brand-400 px-5 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-brand-300 disabled:opacity-60"
-            >
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {mode === "register" ? "Crear cuenta" : mode === "reset" ? "Enviar enlace" : "Entrar"}
-            </button>
-
-            <p className="text-center text-sm text-zinc-500">
-              {mode === "register" ? (
-                <>
-                  ¿Ya tienes cuenta?{" "}
-                  <button type="button" onClick={() => switchMode("login")} className="font-medium text-brand-700 hover:underline">
-                    Inicia sesión
-                  </button>
-                </>
-              ) : mode === "reset" ? (
-                <button type="button" onClick={() => switchMode("login")} className="font-medium text-brand-700 hover:underline">
-                  Volver a iniciar sesión
-                </button>
-              ) : (
-                <>
-                  ¿No tienes cuenta?{" "}
-                  <button type="button" onClick={() => switchMode("register")} className="font-medium text-brand-700 hover:underline">
-                    Créala (es opcional)
-                  </button>
-                </>
+              {mode !== "reset" && (
+                <Field
+                  label="Contraseña"
+                  htmlFor="password"
+                  required
+                  error={fieldErrors?.password}
+                  hint={
+                    mode === "register"
+                      ? "Mínimo 10 caracteres. No uses la misma de tu correo o redes, pero elige una que recuerdes."
+                      : undefined
+                  }
+                >
+                  <PasswordInput
+                    id="password"
+                    name="password"
+                    autoComplete={mode === "register" ? "new-password" : "current-password"}
+                    placeholder="••••••••••"
+                  />
+                </Field>
               )}
-            </p>
-          </form>
+
+              {mode === "login" && (
+                <button
+                  type="button"
+                  onClick={() => switchMode("reset")}
+                  className="-mt-1 text-xs font-medium text-zinc-500 hover:text-brand-700"
+                >
+                  ¿Olvidaste tu clave?
+                </button>
+              )}
+
+              {mode === "register" && (
+                <Field
+                  label="Correo (opcional)"
+                  htmlFor="email"
+                  error={fieldErrors?.email}
+                  hint="Solo se usa para recuperar tu clave si la olvidas. Si lo dejas vacío, no podrás recuperarla."
+                >
+                  <Input id="email" name="email" type="email" autoComplete="email" placeholder="tu@correo.com" />
+                </Field>
+              )}
+
+              <Turnstile ref={turnstileRef} />
+
+              {result && !result.ok && (
+                <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+                  {result.error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="press flex w-full items-center justify-center gap-2 rounded-xl bg-brand-400 px-5 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-brand-300 disabled:opacity-60"
+              >
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {mode === "register" ? "Crear cuenta" : mode === "reset" ? "Enviar enlace" : "Entrar"}
+              </button>
+
+              <p className="text-center text-sm text-zinc-500">
+                {mode === "register" ? (
+                  <>
+                    ¿Ya tienes cuenta?{" "}
+                    <button type="button" onClick={() => switchMode("login")} className="font-medium text-brand-700 hover:underline">
+                      Inicia sesión
+                    </button>
+                  </>
+                ) : mode === "reset" ? (
+                  <button type="button" onClick={() => switchMode("login")} className="font-medium text-brand-700 hover:underline">
+                    Volver a iniciar sesión
+                  </button>
+                ) : (
+                  <>
+                    ¿No tienes cuenta?{" "}
+                    <button type="button" onClick={() => switchMode("register")} className="font-medium text-brand-700 hover:underline">
+                      Créala (es opcional)
+                    </button>
+                  </>
+                )}
+              </p>
+            </form>
+          </>
         )}
       </Modal>
     </>
