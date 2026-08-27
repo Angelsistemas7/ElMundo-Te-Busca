@@ -1,0 +1,35 @@
+name: Pruebas
+
+# Comprobación rápida de cada rama y de cada PR: tipos + pruebas unitarias de
+# `src/lib`. No necesita secretos ni red (las pruebas no tocan Supabase ni APIs
+# externas), así que corre también en PR de forks.
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: pruebas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Vitest 4 exige Node >= 20.19 (o >= 22.12).
+          node-version: 22.12.0
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar tipos
+        run: npm run typecheck
+
+      - name: Pruebas unitarias con cobertura
+        run: npm run test:coverage

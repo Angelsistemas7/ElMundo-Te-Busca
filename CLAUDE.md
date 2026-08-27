@@ -22,7 +22,11 @@ npm install
 npm run dev          # http://localhost:3000  (modo demostración, datos en memoria)
 npm run build        # SIEMPRE compilar tras cambios; es la verificación principal
 npm run typecheck
+npm test             # pruebas unitarias de src/lib (Vitest, sin red ni base de datos)
+npm run test:coverage
 ```
+Al añadir lógica en `src/lib`, añade sus pruebas en `test/` (ver
+`docs/investigacion/COBERTURA-PRUEBAS.md`: arnés, qué está cubierto y qué no).
 Sin `.env.local`, la app corre en **modo demostración** con datos de ejemplo
 (`src/lib/seed.ts`) en memoria. Con Supabase configurado (`.env.example`), usa la
 base real. Despliegue paso a paso: `docs/GUIA-DESPLIEGUE.md`. Costos: `docs/COSTOS-Y-DESPLIEGUE.md`.

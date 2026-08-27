@@ -4,6 +4,8 @@
 
 **Metodología:** ningún hallazgo se acepta solo porque "suena razonable" — cada afirmación sobre el código cita archivo:línea verificable, y cada afirmación externa (CVE, precio, ley, estado de un proyecto) cita fuente. Donde algo no se pudo confirmar (config del dashboard de Supabase, texto primario de una sentencia), se dice explícito en vez de asumir.
 
+> **Cobertura de pruebas (2026-08-27):** el repositorio ya tiene arnés de pruebas (Vitest) y 178 pruebas unitarias de `src/lib`, más un workflow de CI. Estado, justificación del arnés, mapa de riesgo de lo que sigue sin cubrir (Server Actions, rama Supabase, UI) y hallazgos: [COBERTURA-PRUEBAS.md](COBERTURA-PRUEBAS.md).
+
 ## ✅ Ya resuelto en esta sesión (no repetir)
 - **Denuncia no-anónima**: `/denuncias` mostraba "Reportado por {nombre real}" a cualquier visitante — corregido en `ComplaintCard.tsx`, verificado por tipos y en navegador. El admin sigue viendo el nombre para moderación.
 - **Óvalo de la barra móvil** desalineado — corregido en `MobileNav.tsx`.

@@ -14,6 +14,9 @@ env.download
 next-env.d.ts
 *.tsbuildinfo
 
+# Informe de cobertura de las pruebas (se genera con `npm run test:coverage`).
+coverage/
+
 # Fotos de personas reales (para importar a Supabase Storage): NUNCA al repo.
 # Son datos personales, a veces de menores. Se suben a Storage, no a git.
 fotos-personas/

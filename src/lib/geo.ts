@@ -108,10 +108,15 @@ export const QUAKE_INFO = COUNTRIES[DEFAULT_COUNTRY].quakeInfo;
 function jitter(coord: LatLng, seed: string): LatLng {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  // El hash es un entero de 32 bits CON signo: con `%` sobre un valor negativo
+  // el resto también es negativo, lo que invertía el sentido de los dos
+  // desplazamientos (la latitud subía al norte, hacia el mar, y la longitud se
+  // iba hasta el triple del rango previsto). Se toma el valor absoluto.
+  const mag = Math.abs(h);
   // Longitud: ±0.005° (~0.5 km) a ambos lados.
-  const dx = ((h % 100) / 100 - 0.5) * 0.01;
+  const dx = ((mag % 100) / 100 - 0.5) * 0.01;
   // Latitud: solo hacia el sur (nunca sube hacia el mar).
-  const dy = -(((h >> 8) % 100) / 100) * 0.006;
+  const dy = -(((mag >> 8) % 100) / 100) * 0.006;
   return [coord[0] + dy, coord[1] + dx];
 }
 
