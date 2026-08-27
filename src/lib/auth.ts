@@ -3,6 +3,7 @@ import { getSupabaseServer } from "./supabaseServer";
 import { getSupabaseAdmin } from "./supabase";
 import { isSafePhotoUrl } from "./validation";
 import { clientIp, createLockout } from "./ipLockout";
+import { safeNextPath } from "./safeNext";
 import type { SignupInput, LoginInput } from "./validation";
 
 // Freno de fuerza bruta contra el login de cuentas de usuario: 8 intentos
@@ -245,7 +246,7 @@ export async function getGoogleAuthUrl(next: string): Promise<string | null> {
   // `next` viene del cliente: solo se acepta una ruta interna. Sin esto, un
   // enlace preparado por un tercero podría mandar a la víctima a un dominio
   // ajeno DESPUÉS de iniciar sesión (redirección abierta / phishing).
-  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const safeNext = safeNextPath(next);
 
   const { data, error } = await sb.auth.signInWithOAuth({
     provider: "google",

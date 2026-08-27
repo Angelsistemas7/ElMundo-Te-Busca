@@ -27,7 +27,12 @@ import {
   verifyAndApplyReport,
 } from "@/lib/data";
 import type { ManagedEntity, AppRole } from "@/lib/types";
-import { managerAssignSchema, newsItemSchema, roleAssignSchema } from "@/lib/validation";
+import {
+  isSafePhotoUrl,
+  managerAssignSchema,
+  newsItemSchema,
+  roleAssignSchema,
+} from "@/lib/validation";
 
 export async function loginAdminAction(form: FormData): Promise<{ ok: boolean; error?: string }> {
   const password = String(form.get("password") ?? "");
@@ -145,7 +150,13 @@ export async function createNewsItemAction(
     return { ok: false, error: "Revisa los campos marcados.", fieldErrors };
   }
   try {
-    await createNewsItem(parsed.data, get("photoUrl") || null);
+    // La foto se valida igual que en el resto de las acciones: solo una URL del
+    // bucket propio de Storage. Aunque aquí quien publica es el equipo, esta
+    // URL termina en un `fetch()` del servidor al armar la imagen de compartir
+    // (src/lib/ogImage.ts): sin este filtro sería una vía de SSRF.
+    const rawPhotoUrl = get("photoUrl") || null;
+    const photoUrl = rawPhotoUrl && isSafePhotoUrl(rawPhotoUrl) ? rawPhotoUrl : null;
+    await createNewsItem(parsed.data, photoUrl);
     revalidatePath(parsed.data.kind === "ayuda" ? "/ayuda" : "/comunidad");
     revalidatePath("/admin");
     return { ok: true };

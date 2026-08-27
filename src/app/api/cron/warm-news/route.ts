@@ -1,6 +1,24 @@
 import { NextResponse } from "next/server";
 import { getVerifiedNews, getWorldPress } from "@/lib/news";
 import { COUNTRY_CODES } from "@/lib/countries";
+import { constantTimeEqual } from "@/lib/constantTime";
+
+// El secreto se manda por cabecera (`Authorization: Bearer …` o `X-Cron-Secret`).
+// Una query string viaja en la línea de petición: queda escrita en los logs de
+// acceso de nginx, en los de Cloudflare y en el propio log del cron, así que
+// ese camino solo se mantiene por compatibilidad con el crontab ya instalado
+// (ver docs/DESPLIEGUE-VPS.md) y conviene migrarlo a la cabecera.
+function providedSecret(request: Request): string | null {
+  const auth = request.headers.get("authorization");
+  if (auth) {
+    const bearer = /^Bearer\s+(.+)$/i.exec(auth.trim());
+    if (bearer) return bearer[1];
+  }
+  return (
+    request.headers.get("x-cron-secret") ??
+    new URL(request.url).searchParams.get("secret")
+  );
+}
 
 // Endpoint interno para "calentar" la caché de noticias (src/lib/news.ts) desde
 // un cron del VPS, en vez de dejar que la llene la primera visita real del día
@@ -19,8 +37,8 @@ export async function GET(request: Request) {
   }
 
   if (expected) {
-    const provided = new URL(request.url).searchParams.get("secret");
-    if (provided !== expected) {
+    const provided = providedSecret(request);
+    if (!provided || !constantTimeEqual(provided, expected)) {
       return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
     }
   }
