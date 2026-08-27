@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { getSupabase, getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
 import { getCurrentUser } from "./auth";
+import { constantTimeEqual } from "./constantTime";
 import { COUNTRIES, COUNTRY_CODES, DEFAULT_COUNTRY, isCountryCode, type CountryCode } from "./countries";
 import { haversineKm } from "./geo";
 import {
@@ -1035,7 +1036,7 @@ export async function verifyOwner(personId: string, token: string): Promise<bool
   if (token) {
     if (!getSupabase()) {
       // Modo memoria (demo).
-      if (mem.ownerTokens[personId] === token) return true;
+      if (constantTimeEqual(mem.ownerTokens[personId] ?? "", token)) return true;
     } else {
       const sb = getSupabaseAdmin();
       if (sb) {
@@ -1044,7 +1045,7 @@ export async function verifyOwner(personId: string, token: string): Promise<bool
           .select("token")
           .eq("person_id", personId)
           .maybeSingle();
-        if (data && data.token === token) return true;
+        if (data && constantTimeEqual(data.token, token)) return true;
       }
     }
   }
@@ -1226,7 +1227,10 @@ export async function verifyResourceOwner(
       // Modo memoria (demo).
       if (
         mem.resourceOwners.some(
-          (o) => o.entityType === entityType && o.entityId === entityId && o.token === token,
+          (o) =>
+            o.entityType === entityType &&
+            o.entityId === entityId &&
+            constantTimeEqual(o.token, token),
         )
       )
         return true;
@@ -1239,7 +1243,7 @@ export async function verifyResourceOwner(
           .eq("entity_type", entityType)
           .eq("entity_id", entityId)
           .maybeSingle();
-        if (data && data.token === token) return true;
+        if (data && constantTimeEqual(data.token, token)) return true;
       }
     }
   }

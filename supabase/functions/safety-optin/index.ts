@@ -258,6 +258,28 @@ Deno.serve(async (req) => {
       }
       if (!optin) return json({ error: "not_opted_in" }, 404);
 
+      // Un check-in de prueba sin resolver ya cubre lo que pide el botón. Sin
+      // este freno, cualquiera puede activarse con un device_id inventado (esta
+      // función no exige sesión) y llamar `test-alert` en bucle: cada llamada
+      // insertaba una fila con `quake_id` distinto y a los 5 minutos aparecía
+      // como 'no_response' en la lista que miran los voluntarios, o sea que se
+      // podía inundar la cola de rescate real con avisos falsos.
+      const { data: pendiente, error: pendienteError } = await db
+        .from("safety_checkins")
+        .select("quake_id")
+        .eq("optin_id", optin.id)
+        .is("resolved_at", null)
+        .order("notified_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (pendienteError) {
+        console.error("safety-optin test-alert pending", pendienteError.code);
+        return json({ error: "db_error" }, 500);
+      }
+      if (pendiente) {
+        return json({ ok: true, quake_id: pendiente.quake_id, already_pending: true });
+      }
+
       const quakeId = `manual-test-${Date.now()}`;
       const { error: insertError } = await db.from("safety_checkins").insert({
         optin_id: optin.id,

@@ -4,6 +4,7 @@ import { AtSign, ShieldX } from "lucide-react";
 import { getCurrentUser, getPendingOAuthUser } from "@/lib/auth";
 import { ChooseUsernameForm } from "@/components/ChooseUsernameForm";
 import { PageHeader } from "@/components/PageHeader";
+import { safeNextPath } from "@/lib/safeNext";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export default async function ElegirUsuarioPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const safeNext = safeNextPath(next);
 
   const pending = await getPendingOAuthUser();
   if (!pending) {

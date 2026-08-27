@@ -27,6 +27,12 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
+          // HSTS: el navegador recuerda un año que este dominio es solo HTTPS,
+          // así una visita futura no puede degradarse a HTTP (donde la cookie
+          // de sesión o el token del enlace de gestión viajarían en claro). Sin
+          // `includeSubdomains`: hay subdominios del proyecto que no se sirven
+          // desde aquí y podrían no tener TLS propio.
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
         ],
       },
     ];
