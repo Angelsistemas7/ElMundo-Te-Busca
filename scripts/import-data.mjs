@@ -119,11 +119,13 @@ async function main() {
   console.log(`📋 ${records.length} registros leídos, ${rows.length} válidos para importar.`);
 
   let inserted = 0;
+  let failed = 0;
   const BATCH = 500;
   for (let i = 0; i < rows.length; i += BATCH) {
     const chunk = rows.slice(i, i + BATCH);
     const { error, count } = await sb.from("persons").insert(chunk, { count: "exact" });
     if (error) {
+      failed += chunk.length;
       console.error(`❌ Error en lote ${i / BATCH + 1}:`, error.message);
     } else {
       inserted += count ?? chunk.length;
@@ -131,9 +133,10 @@ async function main() {
     }
   }
 
-  console.log(`\n✅ Importación terminada: ${inserted} personas en la base de datos.`);
+  console.log(`\nImportación terminada: ${inserted} personas insertadas, ${failed} con error.`);
   console.log("   (Las fotos se referencian por URL. Para alojarlas en tu Storage,");
   console.log("    descárgalas desde una fuente autorizada y súbelas al bucket 'photos'.)");
+  if (failed > 0) process.exitCode = 1;
 }
 
 main().catch((e) => {

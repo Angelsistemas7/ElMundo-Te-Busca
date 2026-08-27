@@ -71,7 +71,13 @@ export function DenunciaButton({ country = "ve" }: { country?: string }) {
           const url = await uploadPhoto(compressed);
           if (url) data.set("photoUrl", url);
         } catch {
-          /* sigue sin foto */
+          setResult({
+            ok: false,
+            code: "internal",
+            error: "No se pudo subir la foto. Intenta de nuevo.",
+          });
+          setStep("form");
+          return;
         }
       }
       const res = await createComplaintAction(data);

@@ -18,6 +18,7 @@ import { AyudaTabs } from "@/components/AyudaTabs";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { CardGridSkeleton } from "@/components/ListSkeletons";
+import { withServerFallback } from "@/lib/error-reporting";
 
 export const dynamic = "force-dynamic";
 
@@ -79,10 +80,10 @@ async function HospitalesContent({
 }) {
   const [{ items: shown, total }, counts, allHospitals] = await Promise.all([
     getHospitalsPage({ country, status, estado, dateFrom, dateTo }, page, pageSize, sort),
-    getPatientCounts(),
+    withServerFallback("page.hospitals.patient-counts", getPatientCounts(), {}),
     // Conteos del resumen por estado: siempre sobre el total (cacheada 60s),
     // sin los demás filtros, para que sigan sirviendo de acceso rápido.
-    getHospitals(country),
+    withServerFallback("page.hospitals.summary", getHospitals(country), []),
   ]);
   const byStatus = (s: HospitalStatus) => allHospitals.filter((h) => h.status === s).length;
   const summary: HospitalStatus[] = ["operativo", "saturado", "lleno", "cerrado"];

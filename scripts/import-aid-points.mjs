@@ -83,11 +83,13 @@ async function main() {
   console.log(`📋 ${records.length} registros leídos, ${rows.length} válidos para importar.`);
 
   let inserted = 0;
+  let failed = 0;
   const BATCH = 200;
   for (let i = 0; i < rows.length; i += BATCH) {
     const chunk = rows.slice(i, i + BATCH);
     const { error, count } = await sb.from("aid_points").insert(chunk, { count: "exact" });
     if (error) {
+      failed += chunk.length;
       console.error(`❌ Error en lote ${i / BATCH + 1}:`, error.message);
     } else {
       inserted += count ?? chunk.length;
@@ -95,7 +97,8 @@ async function main() {
     }
   }
 
-  console.log(`\n✅ Importación terminada: ${inserted} puntos de ayuda en la base de datos.`);
+  console.log(`\nImportación terminada: ${inserted} puntos insertados, ${failed} con error.`);
+  if (failed > 0) process.exitCode = 1;
 }
 
 main().catch((e) => {

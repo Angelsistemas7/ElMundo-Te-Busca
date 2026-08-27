@@ -83,7 +83,12 @@ export function CreatePostButton({
           const url = await uploadPhoto(await compressImage(fileRef.current));
           if (url) form.set("photoUrl", url);
         } catch {
-          /* sin foto */
+          setResult({
+            ok: false,
+            code: "internal",
+            error: "No se pudo subir la foto. Intenta de nuevo.",
+          });
+          return;
         }
       }
       const res = await createPostAction(form);

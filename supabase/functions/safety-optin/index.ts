@@ -95,12 +95,16 @@ Deno.serve(async (req) => {
     // 10-alerta-sismo-checkin.md. Se resuelve aquí mismo (sin cron aparte)
     // porque un voluntario solo necesita la lista al momento de mirarla.
     const limiteEspera = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    await db
+    const { error: expirationError } = await db
       .from("safety_checkins")
       .update({ status: "no_response" })
       .eq("status", "pending")
       .is("resolved_at", null)
       .lt("notified_at", limiteEspera);
+    if (expirationError) {
+      console.error("safety-optin list-needs-help expire", expirationError.code);
+      return json({ error: "db_error" }, 500);
+    }
 
     const { data: checkins, error: listError } = await db
       .from("safety_checkins")

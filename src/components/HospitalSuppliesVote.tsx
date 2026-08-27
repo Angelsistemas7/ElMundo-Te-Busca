@@ -24,6 +24,7 @@ export function HospitalSuppliesVote({
   const [vn, setVn] = useState(votesNoSupplies);
   const [voted, setVoted] = useState<"yes" | "no" | null>(null);
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const v = localStorage.getItem(`vtb_hospvote_${id}`);
@@ -38,6 +39,7 @@ export function HospitalSuppliesVote({
 
   async function vote(kind: "yes" | "no") {
     if (voted || loggedIn !== true) return;
+    setError(null);
     setVoted(kind);
     if (kind === "yes") setVs((n) => n + 1);
     else setVn((n) => n + 1);
@@ -48,6 +50,7 @@ export function HospitalSuppliesVote({
       if (kind === "yes") setVs((n) => Math.max(0, n - 1));
       else setVn((n) => Math.max(0, n - 1));
       localStorage.removeItem(`vtb_hospvote_${id}`);
+      setError(res.error ?? "No se pudo guardar. Intenta de nuevo.");
     }
     router.refresh();
   }
@@ -96,6 +99,7 @@ export function HospitalSuppliesVote({
           No <span className="tabular-nums">{vn}</span>
         </button>
         {loggedIn === false && <span className="text-xs text-zinc-400">· inicia sesión para opinar</span>}
+        {error && <span className="text-xs font-medium text-rose-600">{error}</span>}
       </div>
     </div>
   );

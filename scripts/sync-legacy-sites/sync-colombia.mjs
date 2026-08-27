@@ -142,6 +142,7 @@ async function main() {
   }
 
   console.log(`\nColombia: ${inserted} nuevas, ${skipped} ya existían, ${errors} errores.`);
+  if (errors > 0) process.exitCode = 1;
 }
 
 main().catch((e) => {

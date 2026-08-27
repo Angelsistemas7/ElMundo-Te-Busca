@@ -20,6 +20,7 @@ import { AyudaTabs } from "@/components/AyudaTabs";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { CardGridSkeleton } from "@/components/ListSkeletons";
+import { withServerFallback } from "@/lib/error-reporting";
 
 export const dynamic = "force-dynamic";
 
@@ -133,16 +134,23 @@ async function AidPointsGrid({
 // secundario que puede tardar más (llamada externa) sin tapar la grilla.
 async function AyudaExtrasSection({ country }: { country: string }) {
   const [heroes, quakes, curatedAyuda, admin] = await Promise.all([
-    getHeroes(country),
-    getRecentQuakes(country),
-    // Si la tabla aún no existe (esquema sin migrar), no rompemos la página.
-    getNewsItems("ayuda", country).catch(() => []),
-    isAdmin(),
+    withServerFallback("page.aid.heroes", getHeroes(country), []),
+    withServerFallback("page.aid.quakes", getRecentQuakes(country), []),
+    withServerFallback("page.aid.news", getNewsItems("ayuda", country), []),
+    withServerFallback("page.aid.admin", isAdmin(), false),
   ]);
   // Independientes entre sí: en paralelo en vez de una detrás de otra.
   const [heroComments, newsComments] = await Promise.all([
-    getCommentsForEntities("hero", heroes.map((h) => h.id)),
-    getCommentsForEntities("news_item", curatedAyuda.map((n) => n.id)),
+    withServerFallback(
+      "page.aid.hero-comments",
+      getCommentsForEntities("hero", heroes.map((h) => h.id)),
+      {},
+    ),
+    withServerFallback(
+      "page.aid.news-comments",
+      getCommentsForEntities("news_item", curatedAyuda.map((n) => n.id)),
+      {},
+    ),
   ]);
 
   return (

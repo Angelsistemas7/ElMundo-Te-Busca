@@ -1,3 +1,5 @@
+import { reportServerError } from "./error-reporting";
+
 // Verificación del token de Cloudflare Turnstile en el servidor.
 // Si no hay TURNSTILE_SECRET_KEY configurado, se omite la verificación
 // (modo desarrollo) pero se deja registrado en consola.
@@ -26,7 +28,8 @@ export async function verifyTurnstile(token: string | null, ip?: string): Promis
     const res = await fetch(VERIFY_URL, { method: "POST", body, signal: AbortSignal.timeout(6000) });
     const data = (await res.json()) as { success: boolean };
     return data.success === true;
-  } catch {
+  } catch (error) {
+    reportServerError("turnstile.verify", error);
     return false;
   }
 }

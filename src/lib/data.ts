@@ -69,6 +69,7 @@ import type {
   VolunteerInput,
 } from "./validation";
 import { isSafePhotoUrl } from "./validation";
+import { reportServerError } from "./error-reporting";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Capa de acceso a datos. Una sola interfaz; dos implementaciones:
@@ -181,9 +182,12 @@ async function deleteStoragePhoto(url: string | null | undefined): Promise<void>
   if (!sb) return;
   try {
     const path = new URL(url).pathname.replace("/storage/v1/object/public/photos/", "");
-    if (path) await sb.storage.from("photos").remove([path]);
-  } catch {
-    /* mejor esfuerzo: no rompe el borrado del registro */
+    if (path) {
+      const { error } = await sb.storage.from("photos").remove([path]);
+      if (error) reportServerError("storage.delete-photo", error);
+    }
+  } catch (error) {
+    reportServerError("storage.delete-photo", error);
   }
 }
 
@@ -978,7 +982,11 @@ async function sessionOwns(table: string, id: string): Promise<boolean> {
   if (!sb) return false;
   const user = await getCurrentUser();
   if (!user) return false;
-  const { data } = await sb.from(table).select("user_id").eq("id", id).maybeSingle();
+  const { data, error } = await sb.from(table).select("user_id").eq("id", id).maybeSingle();
+  if (error) {
+    reportServerError("permissions.session-owner", error, { table, entityId: id });
+    return false;
+  }
   return Boolean(data && (data as { user_id?: string }).user_id === user.id);
 }
 
@@ -994,13 +1002,17 @@ async function sessionIsManager(entityType: ManagedEntity, entityId: string): Pr
   }
   const sb = getSupabaseAdmin();
   if (!sb) return false;
-  const { data } = await sb
+  const { data, error } = await sb
     .from("resource_managers")
     .select("user_id")
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
     .eq("user_id", user.id)
     .maybeSingle();
+  if (error) {
+    reportServerError("permissions.resource-manager", error, { entityType, entityId });
+    return false;
+  }
   return Boolean(data);
 }
 
@@ -1039,11 +1051,12 @@ export async function verifyOwner(personId: string, token: string): Promise<bool
     } else {
       const sb = getSupabaseAdmin();
       if (sb) {
-        const { data } = await sb
+        const { data, error } = await sb
           .from("person_owners")
           .select("token")
           .eq("person_id", personId)
           .maybeSingle();
+        if (error) reportServerError("permissions.person-owner-token", error, { personId });
         if (data && data.token === token) return true;
       }
     }
@@ -1120,7 +1133,8 @@ export async function deletePerson(id: string): Promise<void> {
     delete mem.ownerTokens[id];
     return;
   }
-  const { data } = await sb.from("persons").select("photo_url").eq("id", id).maybeSingle();
+  const { data, error: photoError } = await sb.from("persons").select("photo_url").eq("id", id).maybeSingle();
+  if (photoError) reportServerError("persons.delete.photo", photoError, { entityId: id });
   const { error } = await sb.from("persons").delete().eq("id", id);
   if (error) throw error;
   await deleteStoragePhoto(data?.photo_url as string | undefined);
@@ -1233,12 +1247,15 @@ export async function verifyResourceOwner(
     } else {
       const sb = getSupabaseAdmin();
       if (sb) {
-        const { data } = await sb
+        const { data, error } = await sb
           .from("resource_owners")
           .select("token")
           .eq("entity_type", entityType)
           .eq("entity_id", entityId)
           .maybeSingle();
+        if (error) {
+          reportServerError("permissions.resource-owner-token", error, { entityType, entityId });
+        }
         if (data && data.token === token) return true;
       }
     }
@@ -1276,7 +1293,11 @@ export async function getAllResourceManagers(): Promise<ResourceManager[]> {
   const ids = [...new Set(rows.map((r) => r.user_id as string))];
   const nameById: Record<string, string> = {};
   if (ids.length > 0) {
-    const { data: profs } = await sb.from("profiles").select("user_id, username").in("user_id", ids);
+    const { data: profs, error: profilesError } = await sb
+      .from("profiles")
+      .select("user_id, username")
+      .in("user_id", ids);
+    if (profilesError) reportServerError("resource-managers.profiles", profilesError);
     for (const p of profs ?? []) nameById[p.user_id as string] = p.username as string;
   }
   return rows.map((r) => ({
@@ -1387,7 +1408,11 @@ export async function getPendingManagerRequests(): Promise<ManagerRequest[]> {
   const ids = [...new Set(rows.map((r) => r.user_id as string))];
   const nameById: Record<string, string> = {};
   if (ids.length > 0) {
-    const { data: profs } = await sb.from("profiles").select("user_id, username").in("user_id", ids);
+    const { data: profs, error: profilesError } = await sb
+      .from("profiles")
+      .select("user_id, username")
+      .in("user_id", ids);
+    if (profilesError) reportServerError("manager-requests.profiles", profilesError);
     for (const p of profs ?? []) nameById[p.user_id as string] = p.username as string;
   }
   return rows.map((r) => ({
@@ -1421,7 +1446,12 @@ export async function approveManagerRequest(requestId: string, grantedBy: string
     .single();
   if (error) throw error;
   if (!data) return;
-  const { data: prof } = await sb.from("profiles").select("username").eq("user_id", data.user_id).single();
+  const { data: prof, error: profileError } = await sb
+    .from("profiles")
+    .select("username")
+    .eq("user_id", data.user_id)
+    .single();
+  if (profileError) throw profileError;
   await addResourceManager(
     data.entity_type as ManagedEntity,
     data.entity_id as string,
@@ -1453,12 +1483,16 @@ export async function hasAppRole(userId: string, role: AppRole): Promise<boolean
   if (!getSupabase()) return mem.appRoles.some((r) => r.userId === userId && r.role === role);
   const sb = getSupabaseAdmin();
   if (!sb) return false;
-  const { data } = await sb
+  const { data, error } = await sb
     .from("app_roles")
     .select("user_id")
     .eq("user_id", userId)
     .eq("role", role)
     .maybeSingle();
+  if (error) {
+    reportServerError("permissions.app-role", error, { role });
+    return false;
+  }
   return Boolean(data);
 }
 
@@ -1476,7 +1510,11 @@ export async function getAllAppRoles(): Promise<AppRoleGrant[]> {
   const ids = [...new Set(rows.map((r) => r.user_id as string))];
   const nameById: Record<string, string> = {};
   if (ids.length > 0) {
-    const { data: profs } = await sb.from("profiles").select("user_id, username").in("user_id", ids);
+    const { data: profs, error: profilesError } = await sb
+      .from("profiles")
+      .select("user_id, username")
+      .in("user_id", ids);
+    if (profilesError) reportServerError("app-roles.profiles", profilesError);
     for (const p of profs ?? []) nameById[p.user_id as string] = p.username as string;
   }
   return rows.map((r) => ({
@@ -1757,7 +1795,8 @@ export async function deleteAidPoint(id: string): Promise<void> {
     await deleteResourceOwner("aid_point", id);
     return;
   }
-  const { data } = await sb.from("aid_points").select("photo_url").eq("id", id).maybeSingle();
+  const { data, error: photoError } = await sb.from("aid_points").select("photo_url").eq("id", id).maybeSingle();
+  if (photoError) reportServerError("aid-points.delete.photo", photoError, { entityId: id });
   const { error } = await sb.from("aid_points").delete().eq("id", id);
   if (error) throw error;
   await deleteResourceOwner("aid_point", id);
@@ -1808,13 +1847,14 @@ export async function voteAidAvailability(
     return;
   }
 
-  const { data: existing } = await sb
+  const { data: existing, error: existingError } = await sb
     .from("consensus_votes")
     .select("vote")
     .eq("entity_type", "aid_point")
     .eq("entity_id", id)
     .eq("user_id", userId)
     .maybeSingle();
+  if (existingError) throw existingError;
   if (existing?.vote === vote) return;
 
   const { data, error } = await sb
@@ -2113,7 +2153,11 @@ async function attachAuthorProfiles<T extends { authorAvatarUrl?: string | null;
   if (ids.length === 0) return items;
   const sb = getSupabaseAdmin() ?? getSupabase();
   if (!sb) return items;
-  const { data } = await sb.from("profiles").select("user_id, username, avatar_url").in("user_id", ids);
+  const { data, error } = await sb.from("profiles").select("user_id, username, avatar_url").in("user_id", ids);
+  if (error) {
+    reportServerError("comments.profiles", error);
+    return items;
+  }
   if (!data || data.length === 0) return items;
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const byId = new Map(
@@ -2862,6 +2906,8 @@ export async function getMyPublications(userId: string): Promise<MyPublication[]
     sb.from("complaints").select("id, body, created_at").eq("user_id", userId),
     sb.from("pets").select("id, name, created_at").eq("user_id", userId),
   ]);
+  const queryError = [persons, posts, aids, marches, hospitals, complaints, pets].find((result) => result.error)?.error;
+  if (queryError) throw queryError;
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const out: MyPublication[] = [];
   for (const r of (persons.data ?? []) as any[]) {
@@ -2928,6 +2974,8 @@ export async function getDigitalVolunteerStats(userId: string): Promise<Voluntee
     sb.from("comments").select("id", { count: "exact", head: true }).eq("user_id", userId),
     sb.from("saved_items").select("id", { count: "exact", head: true }).eq("user_id", userId),
   ]);
+  if (commentsMadeRes.error) throw commentsMadeRes.error;
+  if (savedByMeRes.error) throw savedByMeRes.error;
 
   const myIds = pubs.map((p) => p.id);
   if (myIds.length === 0) {
@@ -2958,15 +3006,36 @@ export async function getDigitalVolunteerStats(userId: string): Promise<Voluntee
     await Promise.all([
       sb.from("comments").select("id", { count: "exact", head: true }).in("entity_id", myIds),
       sb.from("saved_items").select("id", { count: "exact", head: true }).in("entity_id", myIds),
-      personIds.length ? sb.from("persons").select("reactions").in("id", personIds) : Promise.resolve({ data: [] as any[] }),
-      postIds.length ? sb.from("posts").select("reactions").in("id", postIds) : Promise.resolve({ data: [] as any[] }),
-      aidIds.length ? sb.from("aid_points").select("likes").in("id", aidIds) : Promise.resolve({ data: [] as any[] }),
-      marchIds.length ? sb.from("marches").select("likes").in("id", marchIds) : Promise.resolve({ data: [] as any[] }),
-      hospIds.length ? sb.from("hospitals").select("likes").in("id", hospIds) : Promise.resolve({ data: [] as any[] }),
+      personIds.length
+        ? sb.from("persons").select("reactions").in("id", personIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
+      postIds.length
+        ? sb.from("posts").select("reactions").in("id", postIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
+      aidIds.length
+        ? sb.from("aid_points").select("likes").in("id", aidIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
+      marchIds.length
+        ? sb.from("marches").select("likes").in("id", marchIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
+      hospIds.length
+        ? sb.from("hospitals").select("likes").in("id", hospIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
       complaintIds.length
         ? sb.from("complaints").select("supports").in("id", complaintIds)
-        : Promise.resolve({ data: [] as any[] }),
+        : Promise.resolve({ data: [] as any[], error: null }),
     ]);
+  const statsError = [
+    commentsReceivedRes,
+    savedByOthersRes,
+    personsRes,
+    postsRes,
+    aidRes,
+    marchRes,
+    hospRes,
+    complaintsRes,
+  ].find((result) => result.error)?.error;
+  if (statsError) throw statsError;
 
   const reactionsReceived =
     sumJsonReactions(personsRes.data ?? []) +
@@ -2995,11 +3064,12 @@ export async function getDigitalVolunteerStats(userId: string): Promise<Voluntee
 export async function getSavedItems(userId: string): Promise<SavedItem[]> {
   const sb = getSupabaseAdmin() ?? getSupabase();
   if (!sb) return [];
-  const { data } = await sb
+  const { data, error } = await sb
     .from("saved_items")
     .select("entity_type, entity_id, title, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
+  if (error) throw error;
   /* eslint-disable @typescript-eslint/no-explicit-any */
   return ((data ?? []) as any[]).map((r) => ({
     type: r.entity_type as SavedEntity,
@@ -3097,7 +3167,8 @@ export async function deletePost(id: string): Promise<void> {
     await deleteResourceOwner("post", id);
     return;
   }
-  const { data } = await sb.from("posts").select("photo_url").eq("id", id).maybeSingle();
+  const { data, error: photoError } = await sb.from("posts").select("photo_url").eq("id", id).maybeSingle();
+  if (photoError) reportServerError("posts.delete.photo", photoError, { entityId: id });
   const { error } = await sb.from("posts").delete().eq("id", id);
   if (error) throw error;
   await deleteResourceOwner("post", id);
@@ -3483,7 +3554,8 @@ export async function deletePet(id: string): Promise<void> {
     await deleteResourceOwner("pet", id);
     return;
   }
-  const { data } = await sb.from("pets").select("photo_url").eq("id", id).maybeSingle();
+  const { data, error: photoError } = await sb.from("pets").select("photo_url").eq("id", id).maybeSingle();
+  if (photoError) reportServerError("pets.delete.photo", photoError, { entityId: id });
   const { error } = await sb.from("pets").delete().eq("id", id);
   if (error) throw error;
   await deleteResourceOwner("pet", id);
@@ -3680,7 +3752,8 @@ export async function createVolunteer(
 export async function hasVolunteered(userId: string): Promise<boolean> {
   const sb = getSupabaseAdmin() ?? getSupabase();
   if (!sb) return false;
-  const { data } = await sb.from("volunteers").select("id").eq("user_id", userId).limit(1);
+  const { data, error } = await sb.from("volunteers").select("id").eq("user_id", userId).limit(1);
+  if (error) throw error;
   return Boolean(data && data.length > 0);
 }
 
@@ -3819,7 +3892,8 @@ export async function deleteHero(id: string): Promise<void> {
     mem.heroes = mem.heroes.filter((h) => h.id !== id);
     return;
   }
-  const { data } = await sb.from("heroes").select("photo_url").eq("id", id).maybeSingle();
+  const { data, error: photoError } = await sb.from("heroes").select("photo_url").eq("id", id).maybeSingle();
+  if (photoError) reportServerError("heroes.delete.photo", photoError, { entityId: id });
   const { error } = await sb.from("heroes").delete().eq("id", id);
   if (error) throw error;
   await deleteStoragePhoto(data?.photo_url as string | undefined);
@@ -3938,7 +4012,8 @@ export async function deleteNewsItem(id: string): Promise<void> {
     mem.newsItems = mem.newsItems.filter((n) => n.id !== id);
     return;
   }
-  const { data } = await sb.from("news_items").select("photo_url").eq("id", id).maybeSingle();
+  const { data, error: photoError } = await sb.from("news_items").select("photo_url").eq("id", id).maybeSingle();
+  if (photoError) reportServerError("news-items.delete.photo", photoError, { entityId: id });
   const { error } = await sb.from("news_items").delete().eq("id", id);
   if (error) throw error;
   await deleteStoragePhoto(data?.photo_url as string | undefined);
@@ -4181,13 +4256,14 @@ export async function voteHospitalSupplies(
     return;
   }
 
-  const { data: existing } = await sb
+  const { data: existing, error: existingError } = await sb
     .from("consensus_votes")
     .select("vote")
     .eq("entity_type", "hospital")
     .eq("entity_id", id)
     .eq("user_id", userId)
     .maybeSingle();
+  if (existingError) throw existingError;
   if (existing?.vote === vote) return;
 
   const { data, error } = await sb
