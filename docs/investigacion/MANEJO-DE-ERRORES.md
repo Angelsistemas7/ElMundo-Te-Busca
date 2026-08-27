@@ -1,6 +1,6 @@
 # Auditoría de manejo de errores
 
-**Fecha:** 27 de agosto de 2026  
+**Fecha:** 27 de agosto de 2026
 **Alcance:** capa de datos, Server Actions, subidas, integraciones externas, rutas API, fronteras de Next.js, listados, Edge Functions y scripts operativos.
 
 ## Resumen ejecutivo
