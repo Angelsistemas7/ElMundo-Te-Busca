@@ -4,11 +4,9 @@ import { ArrowLeft, KeyRound, ShieldX } from "lucide-react";
 import { getPersonById, verifyOwner } from "@/lib/data";
 import { OwnerManagePanel } from "@/components/OwnerManagePanel";
 import { PageHeader } from "@/components/PageHeader";
+import { type SearchParams, str } from "@/lib/searchParams";
 
 export const dynamic = "force-dynamic";
-
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export default async function GestionPage({
   params,

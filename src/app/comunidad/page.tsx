@@ -22,20 +22,13 @@ import { CommunityIllustration } from "@/components/illustrations/CommunityIllus
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { PostFeedSkeleton } from "@/components/ListSkeletons";
+import { type SearchParams, str, num } from "@/lib/searchParams";
 
 export const dynamic = "force-dynamic";
 
 // Por defecto se muestran 20 por página (el resto de listados usa 10) —
 // pedido explícito del dueño, Comunidad suele tener más volumen.
 const COMMUNITY_DEFAULT_PAGE_SIZE = 20;
-
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const num = (v: string | string[] | undefined) => {
-  const s = str(v);
-  const n = s ? Number(s) : NaN;
-  return Number.isFinite(n) ? n : undefined;
-};
 
 function buildFilterFields(regions: readonly string[]): FilterField[] {
   return [
