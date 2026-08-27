@@ -15,8 +15,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Queda en el log del servidor/cliente para diagnóstico; no se muestra.
-    console.error(error);
+    console.error("[ui.route-error]", { digest: error.digest ?? "sin-digest" });
   }, [error]);
 
   return (

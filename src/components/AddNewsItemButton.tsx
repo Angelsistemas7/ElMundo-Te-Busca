@@ -49,7 +49,8 @@ export function AddNewsItemButton({ kind }: { kind: NewsKind }) {
           const url = await uploadPhoto(await compressImage(fileRef.current));
           if (url) form.set("photoUrl", url);
         } catch {
-          /* sigue sin foto */
+          setError("No se pudo subir la foto. Intenta de nuevo.");
+          return;
         }
       }
       const res = await createNewsItemAction(form);

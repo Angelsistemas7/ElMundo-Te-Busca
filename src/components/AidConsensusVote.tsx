@@ -23,6 +23,7 @@ export function AidConsensusVote({
   const [vd, setVd] = useState(votesDepleted);
   const [voted, setVoted] = useState<"available" | "depleted" | null>(null);
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const v = localStorage.getItem(`vtb_aidvote_${id}`);
@@ -37,6 +38,7 @@ export function AidConsensusVote({
 
   async function vote(kind: "available" | "depleted") {
     if (voted || loggedIn !== true) return;
+    setError(null);
     setVoted(kind);
     if (kind === "available") setVa((n) => n + 1);
     else setVd((n) => n + 1);
@@ -48,6 +50,7 @@ export function AidConsensusVote({
       if (kind === "available") setVa((n) => Math.max(0, n - 1));
       else setVd((n) => Math.max(0, n - 1));
       localStorage.removeItem(`vtb_aidvote_${id}`);
+      setError(res.error ?? "No se pudo guardar. Intenta de nuevo.");
     }
     router.refresh();
   }
@@ -82,6 +85,7 @@ export function AidConsensusVote({
         <X className="h-3.5 w-3.5" /> Se acabó <span className="tabular-nums">{vd}</span>
       </button>
       {loggedIn === false && <span className="text-xs text-zinc-400">· inicia sesión para opinar</span>}
+      {error && <span className="text-xs font-medium text-rose-600">{error}</span>}
     </div>
   );
 }

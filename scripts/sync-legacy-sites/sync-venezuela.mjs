@@ -118,6 +118,7 @@ async function main() {
     const recent = await fetchPersons(page, `${BASE}/?`);
     await processBatch(recent);
   } catch (e) {
+    errors++;
     console.error("  [error trayendo el top-24]", e.message);
   }
 
@@ -127,12 +128,14 @@ async function main() {
       const persons = await fetchPersons(page, `${BASE}/?query=${encodeURIComponent(term)}`);
       await processBatch(persons);
     } catch (e) {
+      errors++;
       console.error(`  [error en "${term}"]`, e.message);
     }
   }
 
   await browser.close();
   console.log(`\nVenezuela: ${inserted} nuevas, ${skipped} ya existían, ${errors} errores.`);
+  if (errors > 0) process.exitCode = 1;
 }
 
 main().catch((e) => {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getVerifiedNews, getWorldPress } from "@/lib/news";
 import { COUNTRY_CODES } from "@/lib/countries";
+import { reportServerError } from "@/lib/error-reporting";
 
 // Endpoint interno para "calentar" la caché de noticias (src/lib/news.ts) desde
 // un cron del VPS, en vez de dejar que la llene la primera visita real del día
@@ -15,24 +16,42 @@ export async function GET(request: Request) {
   // (de pago) además de consumir la cuota gratis de GNews (100/día), así que
   // dejarlo abierto sin clave permite que cualquiera lo llame a lo loco.
   if (!expected && process.env.NODE_ENV === "production") {
-    return NextResponse.json({ ok: false, error: "CRON_SECRET no configurado" }, { status: 500 });
+    reportServerError("api.warm-news.config", new Error("CRON_SECRET ausente"));
+    return NextResponse.json(
+      { ok: false, code: "service_unavailable", error: "Servicio no disponible." },
+      { status: 503 },
+    );
   }
 
   if (expected) {
     const provided = new URL(request.url).searchParams.get("secret");
     if (provided !== expected) {
-      return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, code: "unauthorized", error: "No autorizado." },
+        { status: 401 },
+      );
     }
   }
 
   // Calienta la caché de CADA país activo (antes solo Venezuela) — sin esto,
   // el primer visitante de Colombia después de que venza el TTL sigue
   // esperando a GDELT/GNews en vivo.
-  const counts = await Promise.all(
-    COUNTRY_CODES.map(async (country) => {
-      const [verified] = await Promise.all([getVerifiedNews(10, country), getWorldPress(10, country)]);
-      return [country, verified.length] as const;
-    }),
-  );
-  return NextResponse.json({ ok: true, verifiedCounts: Object.fromEntries(counts) });
+  try {
+    const counts = await Promise.all(
+      COUNTRY_CODES.map(async (country) => {
+        const [verified] = await Promise.all([
+          getVerifiedNews(10, country),
+          getWorldPress(10, country),
+        ]);
+        return [country, verified.length] as const;
+      }),
+    );
+    return NextResponse.json({ ok: true, verifiedCounts: Object.fromEntries(counts) });
+  } catch (error) {
+    reportServerError("api.warm-news", error);
+    return NextResponse.json(
+      { ok: false, code: "service_unavailable", error: "No se pudo actualizar la caché." },
+      { status: 503 },
+    );
+  }
 }

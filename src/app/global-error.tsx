@@ -1,8 +1,20 @@
 "use client";
 
+import { useEffect } from "react";
+
 // Frontera de error de último recurso: solo se usa si falla el propio layout
 // raíz. Debe traer sus etiquetas <html>/<body> porque reemplaza todo el árbol.
-export default function GlobalError({ reset }: { error: Error; reset: () => void }) {
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    console.error("[ui.global-error]", { digest: error.digest ?? "sin-digest" });
+  }, [error]);
+
   return (
     <html lang="es">
       <body

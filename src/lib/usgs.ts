@@ -1,5 +1,6 @@
 import "server-only";
 import { COUNTRIES, COUNTRY_CODES, DEFAULT_COUNTRY, getCountry, isCountryCode, type CountryCode } from "./countries";
+import { reportServerError } from "./error-reporting";
 
 // Sismos recientes alrededor del país activo desde la API pública y GRATUITA
 // del USGS (Servicio Geológico de EE. UU.). No requiere clave. Los sismos no
@@ -67,7 +68,8 @@ export async function getRecentQuakes(
         time: f.properties.time,
         url: f.properties.url,
       }));
-  } catch {
+  } catch (error) {
+    reportServerError("usgs.recent-quakes", error, { country: country ?? null });
     return []; // si la API falla, la UI muestra un aviso suave
   }
 }

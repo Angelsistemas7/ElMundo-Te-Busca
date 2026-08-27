@@ -49,7 +49,12 @@ export function RegisterHospitalButton({ country = "ve" }: { country?: string } 
           const url = await uploadPhoto(compressed);
           if (url) form.set("photoUrl", url);
         } catch {
-          /* continúa sin foto */
+          setResult({
+            ok: false,
+            code: "internal",
+            error: "No se pudo subir la foto. Intenta de nuevo.",
+          });
+          return;
         }
       }
       const res = await registerHospitalAction(form);

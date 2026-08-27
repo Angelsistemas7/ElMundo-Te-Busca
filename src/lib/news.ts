@@ -1,5 +1,6 @@
 import "server-only";
 import { COUNTRIES, DEFAULT_COUNTRY, type CountryCode } from "./countries";
+import { reportServerError } from "./error-reporting";
 
 // Noticias y reportes de ayuda humanitaria desde dos APIs públicas y GRATUITAS,
 // sin clave:
@@ -99,7 +100,8 @@ export async function getWorldPress(limit = 14, country: CountryCode = DEFAULT_C
       if (out.length >= limit) break;
     }
     return out;
-  } catch {
+  } catch (error) {
+    reportServerError("news.google-rss.parse", error, { country });
     return [];
   }
 }
@@ -159,9 +161,9 @@ async function loadDiskCacheOnce(country: CountryCode) {
       verifiedNewsCacheByCountry[country] = parsed;
       console.log(`[news] (${country}) caché recuperada de disco, edad ms:`, Date.now() - parsed.fetchedAt);
     }
-  } catch {
-    // No hay archivo todavía (primer arranque) o está corrupto: se ignora,
-    // se sigue igual que si no hubiera caché.
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? String(error.code) : "";
+    if (code !== "ENOENT") reportServerError("news.cache.read", error, { country });
   }
 }
 
@@ -171,8 +173,8 @@ async function saveDiskCache(country: CountryCode) {
   try {
     const { writeFile } = await import("node:fs/promises");
     await writeFile(diskCacheFile(country), JSON.stringify(cache));
-  } catch (e) {
-    console.error(`[news] (${country}) no se pudo guardar la caché en disco:`, e);
+  } catch (error) {
+    reportServerError("news.cache.write", error, { country });
   }
 }
 
@@ -209,7 +211,7 @@ async function translateTitles(items: { id: string; title: string }[]): Promise<
       }),
     });
     if (!res.ok) {
-      console.error("[news] traducción OpenAI falló", res.status, await res.text());
+      console.error("[news.translate.http]", { status: res.status });
       return {};
     }
     const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
@@ -218,8 +220,8 @@ async function translateTitles(items: { id: string; title: string }[]): Promise<
     const result = parsed.traducciones && typeof parsed.traducciones === "object" ? parsed.traducciones : {};
     console.log("[news] traducción OpenAI ok:", Object.keys(result).length, "titulares traducidos");
     return result;
-  } catch (e) {
-    console.error("[news] traducción OpenAI excepción:", e);
+  } catch (error) {
+    reportServerError("news.translate", error);
     return {};
   }
 }
@@ -243,7 +245,7 @@ async function fetchFromGdelt(fetchLimit: number, country: CountryCode): Promise
       headers: { "user-agent": "Mozilla/5.0 (compatible; ElMundoTeBusca/1.0)" },
     });
     if (!res.ok) {
-      console.error("[news] GDELT respondió mal:", res.status, await res.text().catch(() => ""));
+      console.error("[news.gdelt.http]", { status: res.status });
       return [];
     }
     const json = (await res.json()) as {
@@ -300,8 +302,8 @@ async function fetchFromGdelt(fetchLimit: number, country: CountryCode): Promise
     }
 
     return [...spanish, ...other];
-  } catch (e) {
-    console.error("[news] fetchFromGdelt excepción:", e);
+  } catch (error) {
+    reportServerError("news.gdelt", error);
     return [];
   }
 }
@@ -326,7 +328,7 @@ async function fetchFromGNews(fetchLimit: number, country: CountryCode): Promise
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) {
-      console.error("[news] GNews respondió mal:", res.status, await res.text().catch(() => ""));
+      console.error("[news.gnews.http]", { status: res.status });
       return [];
     }
     const json = (await res.json()) as {
@@ -357,8 +359,8 @@ async function fetchFromGNews(fetchLimit: number, country: CountryCode): Promise
     }
     console.log("[news] GNews trajo", out.length, "artículos");
     return out;
-  } catch (e) {
-    console.error("[news] fetchFromGNews excepción:", e);
+  } catch (error) {
+    reportServerError("news.gnews", error);
     return [];
   }
 }
@@ -473,8 +475,9 @@ async function loadCrisisStatsDiskCacheOnce(country: CountryCode) {
     const raw = await readFile(crisisStatsDiskCacheFile(country), "utf-8");
     const parsed = JSON.parse(raw) as CrisisStatsCache;
     if (parsed.stats && !crisisStatsCacheByCountry[country]) crisisStatsCacheByCountry[country] = parsed;
-  } catch {
-    // Primer arranque sin archivo todavía, o corrupto: se ignora.
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? String(error.code) : "";
+    if (code !== "ENOENT") reportServerError("news.crisis-cache.read", error, { country });
   }
 }
 
@@ -484,8 +487,8 @@ async function saveCrisisStatsDiskCache(country: CountryCode) {
   try {
     const { writeFile } = await import("node:fs/promises");
     await writeFile(crisisStatsDiskCacheFile(country), JSON.stringify(cache));
-  } catch (e) {
-    console.error(`[news] (${country}) no se pudo guardar la caché de cifras en disco:`, e);
+  } catch (error) {
+    reportServerError("news.crisis-cache.write", error, { country });
   }
 }
 
@@ -505,7 +508,7 @@ async function fetchGdeltForCrisisStats(
       headers: { "user-agent": "Mozilla/5.0 (compatible; ElMundoTeBusca/1.0)" },
     });
     if (!res.ok) {
-      console.error("[news] GDELT (cifras) respondió mal:", res.status, await res.text().catch(() => ""));
+      console.error("[news.crisis-gdelt.http]", { status: res.status });
       return [];
     }
     const json = (await res.json()) as {
@@ -532,8 +535,8 @@ async function fetchGdeltForCrisisStats(
       });
     }
     return out;
-  } catch (e) {
-    console.error("[news] fetchGdeltForCrisisStats excepción:", e);
+  } catch (error) {
+    reportServerError("news.crisis-gdelt", error);
     return [];
   }
 }
@@ -608,8 +611,8 @@ async function extractCrisisFigures(
       out[key] = { value, articleIndex: idx };
     }
     return out;
-  } catch (e) {
-    console.error("[news] extractCrisisFigures excepción:", e);
+  } catch (error) {
+    reportServerError("news.crisis-figures", error);
     return {};
   }
 }

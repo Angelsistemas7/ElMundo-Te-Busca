@@ -57,7 +57,12 @@ export function RegisterPetButton({ country = "ve" }: { country?: string } = {})
           const url = await uploadPhoto(compressed);
           if (url) form.set("photoUrl", url);
         } catch {
-          /* sigue sin foto */
+          setResult({
+            ok: false,
+            code: "internal",
+            error: "No se pudo subir la foto. Intenta de nuevo.",
+          });
+          return;
         }
       }
       const res = await registerPetAction(form);

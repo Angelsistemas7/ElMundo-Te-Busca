@@ -83,6 +83,7 @@ import { isAdmin } from "@/lib/admin";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { clientIp } from "@/lib/ipLockout";
 import { interactionLimiter } from "@/lib/rateLimit";
+import { reportServerError } from "@/lib/error-reporting";
 import type {
   Comment,
   CommentEntity,
@@ -115,9 +116,40 @@ import {
   heroSchema,
 } from "@/lib/validation";
 
+export type ActionErrorCode =
+  | "turnstile"
+  | "rate_limit"
+  | "validation"
+  | "authentication"
+  | "permission"
+  | "not_found"
+  | "internal";
+
+export type ActionFailure = {
+  ok: false;
+  code?: ActionErrorCode;
+  error: string;
+  fieldErrors?: Record<string, string>;
+};
+
 export type ActionResult =
   | { ok: true; message: string; id?: string; ownerToken?: string }
-  | { ok: false; error: string; fieldErrors?: Record<string, string> };
+  | ActionFailure;
+
+type SimpleActionResult = { ok: true } | ActionFailure;
+
+function actionFailure(
+  code: ActionErrorCode,
+  error: string,
+  fieldErrors?: Record<string, string>,
+): ActionFailure {
+  return { ok: false, code, error, ...(fieldErrors ? { fieldErrors } : {}) };
+}
+
+function internalFailure(context: string, error: unknown, message: string): ActionFailure {
+  reportServerError(`action.${context}`, error);
+  return actionFailure("internal", message);
+}
 
 /** Cambia el país activo (portada, listados, formularios). Ver `country-server.ts`. */
 export async function setActiveCountryAction(country: string): Promise<void> {
@@ -165,7 +197,7 @@ function getPhotoUrl(form: FormData): string | null {
 // ── Cuentas (login opcional) ────────────────────────────────────────────────
 export type AuthActionResult =
   | { ok: true; username: string }
-  | { ok: false; error: string; fieldErrors?: Record<string, string> };
+  | ActionFailure;
 
 export async function signUpAction(form: FormData): Promise<AuthActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
@@ -453,7 +485,8 @@ export async function checkPersonDuplicatesAction(
       photoHash: photoHash || null,
       country: await getActiveCountry(),
     });
-  } catch {
+  } catch (error) {
+    reportServerError("action.check-person-duplicates", error);
     return [];
   }
 }
@@ -461,7 +494,7 @@ export async function checkPersonDuplicatesAction(
 export async function registerPersonAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+    return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
   }
 
   const parsed = personSchema.safeParse({
@@ -485,7 +518,7 @@ export async function registerPersonAction(form: FormData): Promise<ActionResult
   });
 
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   // La foto: en producción se sube a Supabase Storage desde el cliente y aquí
@@ -524,8 +557,8 @@ export async function registerPersonAction(form: FormData): Promise<ActionResult
       id: person.id,
       ownerToken,
     };
-  } catch {
-    return { ok: false, error: "No se pudo guardar el registro. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("register-person", error, "No se pudo guardar el registro. Intenta de nuevo.");
   }
 }
 
@@ -533,7 +566,7 @@ export async function registerPersonAction(form: FormData): Promise<ActionResult
 export async function reportStatusAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+    return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
   }
 
   // Reportar "localizado" o "fallecido" exige cuenta (igual que denuncias):
@@ -544,10 +577,10 @@ export async function reportStatusAction(form: FormData): Promise<ActionResult> 
   if (reportedStatus === "localizado" || reportedStatus === "fallecido") {
     const user = await getCurrentUser();
     if (!user) {
-      return {
-        ok: false,
-        error: "Para reportar que alguien apareció o falleció necesitas iniciar sesión. Así evitamos reportes falsos.",
-      };
+      return actionFailure(
+        "authentication",
+        "Para reportar que alguien apareció o falleció necesitas iniciar sesión. Así evitamos reportes falsos.",
+      );
     }
   }
 
@@ -562,7 +595,7 @@ export async function reportStatusAction(form: FormData): Promise<ActionResult> 
   });
 
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   try {
@@ -576,8 +609,8 @@ export async function reportStatusAction(form: FormData): Promise<ActionResult> 
       message:
         "Gracias. Tu reporte ya es visible en la ficha de la persona. Un moderador lo verificará para confirmar el cambio de estado oficial; mientras tanto, la información ya ayuda a quien busca.",
     };
-  } catch {
-    return { ok: false, error: "No se pudo enviar el reporte. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("report-status", error, "No se pudo enviar el reporte. Intenta de nuevo.");
   }
 }
 
@@ -597,7 +630,7 @@ function buildCategoryStatus(form: FormData, types: string[]): Record<string, st
 export async function registerAidPointAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+    return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
   }
 
   const types = form.getAll("types").filter((v): v is string => typeof v === "string");
@@ -616,7 +649,7 @@ export async function registerAidPointAction(form: FormData): Promise<ActionResu
   });
 
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   const photoUrl = getPhotoUrl(form);
@@ -635,8 +668,8 @@ export async function registerAidPointAction(form: FormData): Promise<ActionResu
       ownerToken,
       message: "Punto de ayuda publicado. Aparecerá como 'por verificar' hasta que se confirme.",
     };
-  } catch {
-    return { ok: false, error: "No se pudo guardar el punto. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("register-aid-point", error, "No se pudo guardar el punto. Intenta de nuevo.");
   }
 }
 
@@ -652,7 +685,7 @@ export async function getAidPointOptionsAction(): Promise<{ id: string; label: s
 export async function registerMarchAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+    return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
   }
 
   const parsed = marchSchema.safeParse({
@@ -668,7 +701,7 @@ export async function registerMarchAction(form: FormData): Promise<ActionResult>
   });
 
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   try {
@@ -684,8 +717,12 @@ export async function registerMarchAction(form: FormData): Promise<ActionResult>
       ownerToken,
       message: "Convocatoria publicada. Comparte el punto de salida con tu comunidad.",
     };
-  } catch {
-    return { ok: false, error: "No se pudo publicar la convocatoria. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure(
+      "register-march",
+      error,
+      "No se pudo publicar la convocatoria. Intenta de nuevo.",
+    );
   }
 }
 
@@ -712,11 +749,11 @@ export async function postCommentAction(form: FormData): Promise<ActionResult> {
   // freno cubre ese caso: una cuenta ya creada no podría, aun así, inundar de
   // comentarios en bucle.
   if (await tooManyInteractions()) {
-    return { ok: false, error: "Vas muy rápido. Espera un momento e intenta de nuevo." };
+    return actionFailure("rate_limit", "Vas muy rápido. Espera un momento e intenta de nuevo.");
   }
   const entityTypeRaw = getField(form, "entityType");
   if (!COMMENT_ENTITY_TYPES.includes(entityTypeRaw as CommentEntity)) {
-    return { ok: false, error: "Tipo de publicación no válido." };
+    return actionFailure("validation", "Tipo de publicación no válido.");
   }
   const entityType = entityTypeRaw as CommentEntity;
   const entityId = getField(form, "entityId");
@@ -732,15 +769,15 @@ export async function postCommentAction(form: FormData): Promise<ActionResult> {
   if (!sessionUser) {
     const token = getField(form, "cf-turnstile-response") || null;
     if (!(await verifyTurnstile(token))) {
-      return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+      return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
     }
   }
 
   if (!entityId || authorName.length < 2 || (body.length < 2 && !photoUrl)) {
-    return { ok: false, error: "Escribe tu nombre y un comentario (o adjunta una foto)." };
+    return actionFailure("validation", "Escribe tu nombre y un comentario (o adjunta una foto).");
   }
   if (body.length > 1000) {
-    return { ok: false, error: "El comentario es demasiado largo." };
+    return actionFailure("validation", "El comentario es demasiado largo.");
   }
 
   try {
@@ -754,62 +791,70 @@ export async function postCommentAction(form: FormData): Promise<ActionResult> {
       sessionUser?.id ?? null,
     );
     return { ok: true, message: "Comentario publicado.", id: comment.id };
-  } catch {
-    return { ok: false, error: "No se pudo publicar el comentario." };
+  } catch (error) {
+    return internalFailure("post-comment", error, "No se pudo publicar el comentario. Intenta de nuevo.");
   }
 }
 
-export async function likeCommentAction(id: string): Promise<{ ok: boolean }> {
-  if (await tooManyInteractions()) return { ok: false };
+export async function likeCommentAction(id: string): Promise<SimpleActionResult> {
+  if (await tooManyInteractions()) {
+    return actionFailure("rate_limit", "Vas muy rápido. Espera un momento e intenta de nuevo.");
+  }
   try {
     await likeComment(id);
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (error) {
+    return internalFailure("like-comment", error, "No se pudo registrar tu reacción. Intenta de nuevo.");
   }
 }
 
 // ── "Me gusta" en publicaciones de recursos ──────────────────────────────────
-export async function likeAidPointAction(id: string): Promise<{ ok: boolean }> {
-  if (await tooManyInteractions()) return { ok: false };
+export async function likeAidPointAction(id: string): Promise<SimpleActionResult> {
+  if (await tooManyInteractions()) {
+    return actionFailure("rate_limit", "Vas muy rápido. Espera un momento e intenta de nuevo.");
+  }
   try {
     await likeAidPoint(id);
     revalidatePath("/ayuda");
     revalidatePath(`/ayuda/${id}`);
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (error) {
+    return internalFailure("like-aid-point", error, "No se pudo registrar tu reacción. Intenta de nuevo.");
   }
 }
 
-export async function likeMarchAction(id: string): Promise<{ ok: boolean }> {
-  if (await tooManyInteractions()) return { ok: false };
+export async function likeMarchAction(id: string): Promise<SimpleActionResult> {
+  if (await tooManyInteractions()) {
+    return actionFailure("rate_limit", "Vas muy rápido. Espera un momento e intenta de nuevo.");
+  }
   try {
     await likeMarch(id);
     revalidatePath("/caravanas");
     revalidatePath(`/caravanas/${id}`);
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (error) {
+    return internalFailure("like-march", error, "No se pudo registrar tu reacción. Intenta de nuevo.");
   }
 }
 
-export async function likeHospitalAction(id: string): Promise<{ ok: boolean }> {
-  if (await tooManyInteractions()) return { ok: false };
+export async function likeHospitalAction(id: string): Promise<SimpleActionResult> {
+  if (await tooManyInteractions()) {
+    return actionFailure("rate_limit", "Vas muy rápido. Espera un momento e intenta de nuevo.");
+  }
   try {
     await likeHospital(id);
     revalidatePath("/hospitales");
     revalidatePath(`/hospitales/${id}`);
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (error) {
+    return internalFailure("like-hospital", error, "No se pudo registrar tu reacción. Intenta de nuevo.");
   }
 }
 
 export async function createPostAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+    return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
   }
 
   const parsed = postSchema.safeParse({
@@ -824,7 +869,7 @@ export async function createPostAction(form: FormData): Promise<ActionResult> {
   });
 
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   const photoUrl = getPhotoUrl(form);
@@ -842,8 +887,8 @@ export async function createPostAction(form: FormData): Promise<ActionResult> {
       ownerToken,
       message: "Publicado. Gracias por mantener informada a la comunidad.",
     };
-  } catch {
-    return { ok: false, error: "No se pudo publicar. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("create-post", error, "No se pudo publicar. Intenta de nuevo.");
   }
 }
 
@@ -851,7 +896,7 @@ export async function createPostAction(form: FormData): Promise<ActionResult> {
 export async function registerPetAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+    return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
   }
 
   const parsed = petSchema.safeParse({
@@ -864,7 +909,7 @@ export async function registerPetAction(form: FormData): Promise<ActionResult> {
     contactPhone: getField(form, "contactPhone"),
   });
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   const photoUrl = getPhotoUrl(form);
@@ -882,8 +927,8 @@ export async function registerPetAction(form: FormData): Promise<ActionResult> {
       ownerToken,
       message: "Publicado. Gracias por ayudar a reunir a las mascotas con su familia.",
     };
-  } catch {
-    return { ok: false, error: "No se pudo publicar. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("register-pet", error, "No se pudo publicar. Intenta de nuevo.");
   }
 }
 
@@ -913,8 +958,8 @@ export async function ownerUpdatePetAction(form: FormData): Promise<ActionResult
     revalidatePath(`/mascotas/${id}`);
     revalidatePath("/mascotas");
     return { ok: true, message: "Mascota actualizada." };
-  } catch {
-    return { ok: false, error: "No se pudo actualizar. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("owner-update-pet", error, "No se pudo actualizar. Intenta de nuevo.");
   }
 }
 
@@ -932,8 +977,8 @@ export async function ownerSetPetStatusAction(
     revalidatePath("/mascotas");
     revalidatePath(`/mascotas/${id}`);
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo actualizar el estado." };
+  } catch (error) {
+    return internalFailure("owner-set-pet-status", error, "No se pudo actualizar el estado.");
   }
 }
 
@@ -947,8 +992,8 @@ export async function ownerDeletePetAction(
     await deletePet(id);
     revalidatePath("/mascotas");
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo eliminar." };
+  } catch (error) {
+    return internalFailure("owner-delete-pet", error, "No se pudo eliminar.");
   }
 }
 
@@ -956,7 +1001,7 @@ export async function ownerDeletePetAction(
 export async function registerVolunteerAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+    return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
   }
 
   const parsed = volunteerSchema.safeParse({
@@ -972,7 +1017,7 @@ export async function registerVolunteerAction(form: FormData): Promise<ActionRes
     contactEmail: getField(form, "contactEmail"),
   });
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   const photoUrl = getPhotoUrl(form);
@@ -986,8 +1031,8 @@ export async function registerVolunteerAction(form: FormData): Promise<ActionRes
     revalidatePath("/voluntarios");
     revalidatePath("/");
     return { ok: true, id: volunteer.id, message: "¡Gracias por ofrecerte! Tu disponibilidad ya es visible." };
-  } catch {
-    return { ok: false, error: "No se pudo publicar. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("register-volunteer", error, "No se pudo publicar. Intenta de nuevo.");
   }
 }
 
@@ -1032,8 +1077,12 @@ export async function createManagerRequestAction(form: FormData): Promise<Action
       ok: true,
       message: "Solicitud enviada. Un moderador la revisará y te avisaremos cuando se apruebe.",
     };
-  } catch {
-    return { ok: false, error: "No se pudo enviar la solicitud. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure(
+      "create-manager-request",
+      error,
+      "No se pudo enviar la solicitud. Intenta de nuevo.",
+    );
   }
 }
 
@@ -1044,7 +1093,7 @@ export async function createManagerRequestAction(form: FormData): Promise<Action
 export async function registerHeroAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+    return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
   }
 
   const parsed = heroSchema.safeParse({
@@ -1057,7 +1106,7 @@ export async function registerHeroAction(form: FormData): Promise<ActionResult> 
     sourceUrl: getField(form, "sourceUrl"),
   });
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   const photoUrl = getPhotoUrl(form);
@@ -1076,24 +1125,28 @@ export async function registerHeroAction(form: FormData): Promise<ActionResult> 
       message:
         "¡Gracias! Tu propuesta ya aparece como «sin verificar». Un moderador la revisará para darle el visto bueno.",
     };
-  } catch {
-    return { ok: false, error: "No se pudo publicar. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("register-hero", error, "No se pudo publicar. Intenta de nuevo.");
   }
 }
 
-export async function likeHeroAction(id: string): Promise<{ ok: boolean }> {
-  if (await tooManyInteractions()) return { ok: false };
+export async function likeHeroAction(id: string): Promise<SimpleActionResult> {
+  if (await tooManyInteractions()) {
+    return actionFailure("rate_limit", "Vas muy rápido. Espera un momento e intenta de nuevo.");
+  }
   try {
     await likeHero(id);
     revalidatePath("/ayuda");
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (error) {
+    return internalFailure("like-hero", error, "No se pudo registrar tu reacción. Intenta de nuevo.");
   }
 }
 
-export async function likeNewsItemAction(id: string): Promise<{ ok: boolean }> {
-  if (await tooManyInteractions()) return { ok: false };
+export async function likeNewsItemAction(id: string): Promise<SimpleActionResult> {
+  if (await tooManyInteractions()) {
+    return actionFailure("rate_limit", "Vas muy rápido. Espera un momento e intenta de nuevo.");
+  }
   try {
     await likeNewsItem(id);
     // No sabemos aquí si es kind=ayuda o kind=noticia (solo el id); se
@@ -1101,8 +1154,8 @@ export async function likeNewsItemAction(id: string): Promise<{ ok: boolean }> {
     revalidatePath("/ayuda");
     revalidatePath("/comunidad");
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (error) {
+    return internalFailure("like-news-item", error, "No se pudo registrar tu reacción. Intenta de nuevo.");
   }
 }
 
@@ -1113,7 +1166,10 @@ export async function likeNewsItemAction(id: string): Promise<{ ok: boolean }> {
 export async function createComplaintAction(form: FormData): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) {
-    return { ok: false, error: "Inicia sesión para denunciar. Las denuncias no son anónimas ante el sistema." };
+    return actionFailure(
+      "authentication",
+      "Inicia sesión para denunciar. Las denuncias no son anónimas ante el sistema.",
+    );
   }
 
   const parsed = complaintSchema.safeParse({
@@ -1123,7 +1179,7 @@ export async function createComplaintAction(form: FormData): Promise<ActionResul
     locationText: getField(form, "locationText"),
   });
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   const photoUrl = getPhotoUrl(form);
@@ -1141,8 +1197,12 @@ export async function createComplaintAction(form: FormData): Promise<ActionResul
       id: complaint.id,
       message: "Denuncia publicada. Gracias por reportar de forma responsable.",
     };
-  } catch {
-    return { ok: false, error: "No se pudo publicar la denuncia. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure(
+      "create-complaint",
+      error,
+      "No se pudo publicar la denuncia. Intenta de nuevo.",
+    );
   }
 }
 
@@ -1154,8 +1214,8 @@ export async function supportComplaintAction(id: string): Promise<{ ok: boolean;
     await supportComplaint(id);
     revalidatePath("/denuncias");
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo registrar tu apoyo." };
+  } catch (error) {
+    return internalFailure("support-complaint", error, "No se pudo registrar tu apoyo. Intenta de nuevo.");
   }
 }
 
@@ -1185,8 +1245,8 @@ export async function ownerUpdatePostAction(form: FormData): Promise<ActionResul
     await updatePostFields(id, parsed.data);
     revalidatePath("/comunidad");
     return { ok: true, message: "Publicación actualizada." };
-  } catch {
-    return { ok: false, error: "No se pudo actualizar. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("owner-update-post", error, "No se pudo actualizar. Intenta de nuevo.");
   }
 }
 
@@ -1200,19 +1260,21 @@ export async function ownerDeletePostAction(
     await deletePost(id);
     revalidatePath("/comunidad");
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo eliminar." };
+  } catch (error) {
+    return internalFailure("owner-delete-post", error, "No se pudo eliminar.");
   }
 }
 
-export async function reactToPostAction(id: string, kind: ReactionKind): Promise<{ ok: boolean }> {
-  if (await tooManyInteractions()) return { ok: false };
+export async function reactToPostAction(id: string, kind: ReactionKind): Promise<SimpleActionResult> {
+  if (await tooManyInteractions()) {
+    return actionFailure("rate_limit", "Vas muy rápido. Espera un momento e intenta de nuevo.");
+  }
   try {
     await reactToPost(id, kind);
     revalidatePath("/comunidad");
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (error) {
+    return internalFailure("react-to-post", error, "No se pudo registrar tu reacción. Intenta de nuevo.");
   }
 }
 
@@ -1225,14 +1287,16 @@ export async function getPersonCommentsAction(personId: string) {
 export async function reactToPersonAction(
   id: string,
   kind: PersonReaction,
-): Promise<{ ok: boolean }> {
-  if (await tooManyInteractions()) return { ok: false };
+): Promise<SimpleActionResult> {
+  if (await tooManyInteractions()) {
+    return actionFailure("rate_limit", "Vas muy rápido. Espera un momento e intenta de nuevo.");
+  }
   try {
     await reactToPerson(id, kind);
     revalidatePath(`/persona/${id}`);
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (error) {
+    return internalFailure("react-to-person", error, "No se pudo registrar tu reacción. Intenta de nuevo.");
   }
 }
 
@@ -1249,8 +1313,8 @@ export async function ownerSetStatusAction(
     revalidatePath("/");
     revalidatePath("/se-busca");
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo actualizar." };
+  } catch (error) {
+    return internalFailure("owner-set-person-status", error, "No se pudo actualizar.");
   }
 }
 
@@ -1286,8 +1350,8 @@ export async function ownerUpdateAction(form: FormData): Promise<ActionResult> {
     await updatePersonFields(id, parsed.data);
     revalidatePath(`/persona/${id}`);
     return { ok: true, message: "Datos actualizados." };
-  } catch {
-    return { ok: false, error: "No se pudo actualizar. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("owner-update-person", error, "No se pudo actualizar. Intenta de nuevo.");
   }
 }
 
@@ -1302,8 +1366,8 @@ export async function ownerDeleteAction(
     revalidatePath("/se-busca");
     revalidatePath("/sin-identificar");
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo eliminar." };
+  } catch (error) {
+    return internalFailure("owner-delete-person", error, "No se pudo eliminar.");
   }
 }
 
@@ -1339,8 +1403,8 @@ export async function ownerUpdateAidPointAction(form: FormData): Promise<ActionR
     revalidatePath("/ayuda");
     revalidatePath("/mapa");
     return { ok: true, message: "Punto actualizado." };
-  } catch {
-    return { ok: false, error: "No se pudo actualizar. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("owner-update-aid-point", error, "No se pudo actualizar. Intenta de nuevo.");
   }
 }
 
@@ -1355,8 +1419,8 @@ export async function ownerDeleteAidPointAction(
     revalidatePath("/ayuda");
     revalidatePath("/mapa");
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo eliminar." };
+  } catch (error) {
+    return internalFailure("owner-delete-aid-point", error, "No se pudo eliminar.");
   }
 }
 
@@ -1388,8 +1452,8 @@ export async function ownerUpdateMarchAction(form: FormData): Promise<ActionResu
     revalidatePath("/caravanas");
     revalidatePath("/mapa");
     return { ok: true, message: "Caravana actualizada." };
-  } catch {
-    return { ok: false, error: "No se pudo actualizar. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("owner-update-march", error, "No se pudo actualizar. Intenta de nuevo.");
   }
 }
 
@@ -1404,8 +1468,8 @@ export async function ownerDeleteMarchAction(
     revalidatePath("/caravanas");
     revalidatePath("/mapa");
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo eliminar." };
+  } catch (error) {
+    return internalFailure("owner-delete-march", error, "No se pudo eliminar.");
   }
 }
 
@@ -1417,15 +1481,15 @@ export async function voteAidAvailabilityAction(
   // disponibilidad oficial la fija el dueño del punto o el admin.
   const user = await getCurrentUser();
   if (!user) {
-    return { ok: false, error: "Inicia sesión para opinar sobre la disponibilidad." };
+    return actionFailure("authentication", "Inicia sesión para opinar sobre la disponibilidad.");
   }
   try {
     await voteAidAvailability(id, vote, user.id);
     revalidatePath("/ayuda");
     revalidatePath("/mapa");
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo registrar tu voto." };
+  } catch (error) {
+    return internalFailure("vote-aid-availability", error, "No se pudo registrar tu voto. Intenta de nuevo.");
   }
 }
 
@@ -1444,8 +1508,12 @@ export async function ownerSetAidAvailabilityAction(
     revalidatePath(`/ayuda/${id}`);
     revalidatePath("/mapa");
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo actualizar la disponibilidad." };
+  } catch (error) {
+    return internalFailure(
+      "owner-set-aid-availability",
+      error,
+      "No se pudo actualizar la disponibilidad. Intenta de nuevo.",
+    );
   }
 }
 
@@ -1455,15 +1523,15 @@ export async function voteHospitalSuppliesAction(
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await getCurrentUser();
   if (!user) {
-    return { ok: false, error: "Inicia sesión para opinar sobre los insumos." };
+    return actionFailure("authentication", "Inicia sesión para opinar sobre los insumos.");
   }
   try {
     await voteHospitalSupplies(id, vote, user.id);
     revalidatePath("/hospitales");
     revalidatePath(`/hospitales/${id}`);
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo registrar tu voto." };
+  } catch (error) {
+    return internalFailure("vote-hospital-supplies", error, "No se pudo registrar tu voto. Intenta de nuevo.");
   }
 }
 
@@ -1471,7 +1539,7 @@ export async function voteHospitalSuppliesAction(
 export async function registerHospitalAction(form: FormData): Promise<ActionResult> {
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+    return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
   }
 
   const parsed = hospitalSchema.safeParse({
@@ -1488,7 +1556,7 @@ export async function registerHospitalAction(form: FormData): Promise<ActionResu
   });
 
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   const photoUrl = getPhotoUrl(form);
@@ -1502,8 +1570,12 @@ export async function registerHospitalAction(form: FormData): Promise<ActionResu
     revalidatePath("/hospitales");
     revalidatePath("/mapa");
     return { ok: true, id: hospital.id, message: "Hospital publicado. Aparecerá como 'por verificar' hasta que se confirme." };
-  } catch {
-    return { ok: false, error: "No se pudo publicar el hospital. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure(
+      "register-hospital",
+      error,
+      "No se pudo publicar el hospital. Intenta de nuevo.",
+    );
   }
 }
 
@@ -1524,11 +1596,10 @@ export async function updateHospitalStatusAction(
   // o un GESTOR delegado. El resto de la comunidad opina con el voto de insumos
   // (no vinculante) o por comentarios. No basta con tener sesión.
   if (!(await isAdmin()) && !(await canManageHospital(id))) {
-    return {
-      ok: false,
-      error:
-        "Solo el equipo o un gestor designado puede actualizar el estado oficial. Puedes opinar con el voto de insumos o por comentarios.",
-    };
+    return actionFailure(
+      "permission",
+      "Solo el equipo o un gestor designado puede actualizar el estado oficial. Puedes opinar con el voto de insumos o por comentarios.",
+    );
   }
   try {
     await updateHospitalStatus(id, status, needsText);
@@ -1536,8 +1607,12 @@ export async function updateHospitalStatusAction(
     revalidatePath(`/hospitales/${id}`);
     revalidatePath("/mapa");
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (error) {
+    return internalFailure(
+      "update-hospital-status",
+      error,
+      "No se pudo actualizar el estado. Intenta de nuevo.",
+    );
   }
 }
 
@@ -1547,15 +1622,15 @@ export async function addHospitalPatientAction(form: FormData): Promise<ActionRe
   // por cuenta, gestor delegado de ESE hospital, o moderador de hospitales.
   // Antes estaba abierto a cualquier visitante sin sesión (ver INFORME-SEGURIDAD.md).
   if (!(await isAdmin()) && !(await canManageHospital(hospitalId))) {
-    return {
-      ok: false,
-      error: "Solo el personal autorizado de este hospital puede agregar pacientes a la lista.",
-    };
+    return actionFailure(
+      "permission",
+      "Solo el personal autorizado de este hospital puede agregar pacientes a la lista.",
+    );
   }
 
   const token = getField(form, "cf-turnstile-response") || null;
   if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+    return actionFailure("turnstile", "No se pudo verificar que eres una persona. Intenta de nuevo.");
   }
 
   const parsed = hospitalPatientSchema.safeParse({
@@ -1568,7 +1643,7 @@ export async function addHospitalPatientAction(form: FormData): Promise<ActionRe
   });
 
   if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
+    return actionFailure("validation", "Revisa los campos marcados.", zodToFieldErrors(parsed.error));
   }
 
   try {
@@ -1576,7 +1651,7 @@ export async function addHospitalPatientAction(form: FormData): Promise<ActionRe
     revalidatePath(`/hospitales/${parsed.data.hospitalId}`);
     revalidatePath("/hospitales");
     return { ok: true, message: "Paciente agregado a la lista del hospital." };
-  } catch {
-    return { ok: false, error: "No se pudo agregar. Intenta de nuevo." };
+  } catch (error) {
+    return internalFailure("add-hospital-patient", error, "No se pudo agregar. Intenta de nuevo.");
   }
 }

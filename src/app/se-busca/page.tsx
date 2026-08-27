@@ -29,6 +29,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { clampPageSize } from "@/lib/utils";
 import { PersonGridSkeleton } from "@/components/ListSkeletons";
+import { withServerFallback } from "@/lib/error-reporting";
 // El aviso de "modo demostración" (DevModeNotice) ya se muestra en el home
 // (/) — no se repite en cada página.
 
@@ -96,8 +97,12 @@ async function SeBuscaResults({
       ? Promise.resolve(null)
       : getPersons({ ...baseQuery, page, pageSize: isReconoces ? 60 : pageSize }),
     groupBy ? getPersonGroups(baseQuery, groupBy) : Promise.resolve(null),
-    showBuscaExtras ? getRecentlyLocated(12, country) : Promise.resolve([]),
-    user ? hasVolunteered(user.id) : Promise.resolve(false),
+    showBuscaExtras
+      ? withServerFallback("page.people.recently-located", getRecentlyLocated(12, country), [])
+      : Promise.resolve([]),
+    user
+      ? withServerFallback("page.people.volunteer-status", hasVolunteered(user.id), false)
+      : Promise.resolve(false),
   ]);
 
   const total = groupBy

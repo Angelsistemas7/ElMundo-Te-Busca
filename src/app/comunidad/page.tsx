@@ -22,6 +22,7 @@ import { CommunityIllustration } from "@/components/illustrations/CommunityIllus
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { PostFeedSkeleton } from "@/components/ListSkeletons";
+import { withServerFallback } from "@/lib/error-reporting";
 
 export const dynamic = "force-dynamic";
 
@@ -109,11 +110,15 @@ async function CommunityFeed({
   // hasta que su autor (o el admin) lo borre — no hay límite de tiempo: un
   // rescate sigue siendo urgente mientras exista, sin importar cuánto lleve.
   const [featuredPosts, rescuePosts, pageResult, adminLevel, aidPoints] = await Promise.all([
-    type === "all" ? getPosts({ country, pinnedOnly: true, search: q }) : Promise.resolve([]),
-    type === "all" ? getPosts({ country, type: "rescate", search: q }) : Promise.resolve([]),
+    type === "all"
+      ? withServerFallback("page.community.featured", getPosts({ country, pinnedOnly: true, search: q }), [])
+      : Promise.resolve([]),
+    type === "all"
+      ? withServerFallback("page.community.rescues", getPosts({ country, type: "rescate", search: q }), [])
+      : Promise.resolve([]),
     getPostsPage({ ...postFilter, country }, page, pageSize, sort),
-    getAdminLevel(),
-    getAidPoints(country),
+    withServerFallback("page.community.admin-level", getAdminLevel(), null),
+    withServerFallback("page.community.aid-points", getAidPoints(country), []),
   ]);
   const aidPointNameById = new Map(aidPoints.map((p) => [p.id, p.name]));
   // Admin o moderador: puede eliminar cualquier post directo desde el muro,
@@ -128,7 +133,11 @@ async function CommunityFeed({
 
   const allShown = [...featured, ...pinned, ...restPosts];
   // Una sola consulta para los comentarios de todo lo que se ve en esta carga (evita el N+1).
-  const commentsByPost = await getCommentsForEntities("post", allShown.map((p) => p.id));
+  const commentsByPost = await withServerFallback(
+    "page.community.comments",
+    getCommentsForEntities("post", allShown.map((p) => p.id)),
+    {},
+  );
   const withComments = (posts: typeof allShown) => posts.map((post) => ({ ...post, comments: commentsByPost[post.id] ?? [] }));
 
   return (

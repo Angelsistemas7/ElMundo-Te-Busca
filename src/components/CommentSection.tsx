@@ -144,7 +144,8 @@ export function CommentSection({
         photoUrl = await uploadPhoto(await compressImage(fileRef.current));
         if (photoUrl) form.set("photoUrl", photoUrl);
       } catch {
-        /* continúa sin foto */
+        setError("No se pudo subir la foto. Intenta de nuevo.");
+        return;
       }
     }
 
@@ -392,6 +393,7 @@ export function CommentSection({
 function CommentLike({ id, likes }: { id: string; likes: number }) {
   const [count, setCount] = useState(likes);
   const [liked, setLiked] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (localStorage.getItem(`vtb_clike_${id}`)) setLiked(true);
@@ -399,10 +401,17 @@ function CommentLike({ id, likes }: { id: string; likes: number }) {
 
   async function like() {
     if (liked) return;
+    setError(false);
     setLiked(true);
     setCount((n) => n + 1);
     localStorage.setItem(`vtb_clike_${id}`, "1");
-    await likeCommentAction(id);
+    const res = await likeCommentAction(id);
+    if (!res.ok) {
+      setLiked(false);
+      setCount((n) => Math.max(0, n - 1));
+      localStorage.removeItem(`vtb_clike_${id}`);
+      setError(true);
+    }
   }
 
   return (
@@ -417,6 +426,11 @@ function CommentLike({ id, likes }: { id: string; likes: number }) {
     >
       <Heart className={cn("h-3.5 w-3.5", liked && "fill-rose-500 text-rose-500")} />
       <span className="tabular-nums">{count}</span>
+      {error && (
+        <span aria-live="polite" className="text-rose-600">
+          No se pudo guardar. Intenta de nuevo.
+        </span>
+      )}
     </button>
   );
 }
