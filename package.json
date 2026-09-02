@@ -28,11 +28,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/leaflet": "^1.9.21",
-    "@types/node": "^22.10.5",
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^26.4.0",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.2"
+    "typescript": "^7.0.2"
   }
 }
