@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import {
   BadgeCheck,
@@ -21,27 +22,89 @@ import { PersonReactions } from "@/components/PersonReactions";
 import { PersonShareButton } from "@/components/PersonShareButton";
 import { BackLink } from "@/components/BackLink";
 import { MiniMap } from "@/components/map/MiniMap";
+import { CommentSectionSkeleton, SaveButtonSkeleton } from "@/components/ListSkeletons";
 
 export const dynamic = "force-dynamic";
+
+// El botón "Guardar" es para seguir un caso AJENO. Si eres el autor (por
+// cuenta) ya lo sigues, así que se oculta. Separado en su propio Suspense
+// (columna izquierda) para no bloquear el primer pintado del resto de la
+// ficha con `getCurrentUser` + `getMyPublications` (esta última trae TODAS
+// las publicaciones del usuario solo para un booleano).
+async function SaveButtonSlot({ personId, title }: { personId: string; title: string }) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return <SaveButton type="person" id={personId} title={title} className="w-full justify-center" />;
+  }
+  const mine = await getMyPublications(user.id);
+  const isOwner = mine.some((p) => p.type === "person" && p.id === personId);
+  if (isOwner) return null;
+  return <SaveButton type="person" id={personId} title={title} className="w-full justify-center" />;
+}
+
+// Comentarios + reportes de estado: la parte más pesada (y menos urgente que
+// el nombre/foto/estado) de la ficha, en su propio Suspense (columna derecha).
+async function PersonForumSection({ personId }: { personId: string }) {
+  const [comments, reports] = await Promise.all([
+    getComments("person", personId),
+    getStatusReports(personId),
+  ]);
+
+  return (
+    <CommentSection
+      entityType="person"
+      entityId={personId}
+      initialComments={comments}
+      title="Información de la comunidad"
+      placeholder="¿La reconoces? ¿Sabes algo? Comparte de forma responsable."
+      prefix={
+        reports.length > 0 ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+              <ShieldQuestion className="h-4 w-4" />
+              Reportes de estado ({reports.length})
+            </h3>
+            <p className="mt-1 text-xs text-amber-700">
+              Se muestran de inmediato; un reporte <strong>verificado</strong> ha sido
+              confirmado por un moderador.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {reports.map((r) => (
+                <li key={r.id} className="rounded-xl border border-amber-200 bg-white p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                      {PERSON_STATUS_LABEL[r.reportedStatus]}
+                    </span>
+                    {r.verified ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                        <BadgeCheck className="h-3.5 w-3.5" /> Verificado
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                        <ShieldQuestion className="h-3.5 w-3.5" /> Sin verificar
+                      </span>
+                    )}
+                    <span className="text-xs text-zinc-400">{timeAgo(r.createdAt)}</span>
+                  </div>
+                  <p className="mt-1.5 text-sm text-zinc-700">
+                    <span className="font-medium">{r.reporterRelationship}:</span>{" "}
+                    {r.locationFound}
+                  </p>
+                  {r.notes && <p className="mt-0.5 text-sm text-zinc-500">“{r.notes}”</p>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : undefined
+      }
+    />
+  );
+}
 
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const person = await getPersonById(id);
   if (!person) notFound();
-
-  const [comments, reports] = await Promise.all([
-    getComments("person", id),
-    getStatusReports(id),
-  ]);
-
-  // El botón "Guardar" es para seguir un caso AJENO. Si eres el autor (por
-  // cuenta) ya lo sigues, así que se oculta. Solo consultamos si hay sesión.
-  const user = await getCurrentUser();
-  let isOwner = false;
-  if (user) {
-    const mine = await getMyPublications(user.id);
-    isOwner = mine.some((p) => p.type === "person" && p.id === person.id);
-  }
 
   const s = statusStyle(person.status);
   const fullName = `${person.firstName} ${person.lastName}`.trim();
@@ -80,9 +143,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
           <ReportStatusButton personId={person.id} personName={displayName} personCountry={person.country} />
 
-          {!isOwner && (
-            <SaveButton type="person" id={person.id} title={displayName} className="w-full justify-center" />
-          )}
+          <Suspense fallback={<SaveButtonSkeleton />}>
+            <SaveButtonSlot personId={person.id} title={displayName} />
+          </Suspense>
           <PersonShareButton
             personId={person.id}
             name={displayName}
@@ -200,53 +263,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             </div>
           )}
 
-          <CommentSection
-            entityType="person"
-            entityId={person.id}
-            initialComments={comments}
-            title="Información de la comunidad"
-            placeholder="¿La reconoces? ¿Sabes algo? Comparte de forma responsable."
-            prefix={
-              reports.length > 0 ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold text-amber-900">
-                    <ShieldQuestion className="h-4 w-4" />
-                    Reportes de estado ({reports.length})
-                  </h3>
-                  <p className="mt-1 text-xs text-amber-700">
-                    Se muestran de inmediato; un reporte <strong>verificado</strong> ha sido
-                    confirmado por un moderador.
-                  </p>
-                  <ul className="mt-3 space-y-2">
-                    {reports.map((r) => (
-                      <li key={r.id} className="rounded-xl border border-amber-200 bg-white p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                            {PERSON_STATUS_LABEL[r.reportedStatus]}
-                          </span>
-                          {r.verified ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                              <BadgeCheck className="h-3.5 w-3.5" /> Verificado
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                              <ShieldQuestion className="h-3.5 w-3.5" /> Sin verificar
-                            </span>
-                          )}
-                          <span className="text-xs text-zinc-400">{timeAgo(r.createdAt)}</span>
-                        </div>
-                        <p className="mt-1.5 text-sm text-zinc-700">
-                          <span className="font-medium">{r.reporterRelationship}:</span>{" "}
-                          {r.locationFound}
-                        </p>
-                        {r.notes && <p className="mt-0.5 text-sm text-zinc-500">“{r.notes}”</p>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : undefined
-            }
-          />
+          <Suspense fallback={<CommentSectionSkeleton />}>
+            <PersonForumSection personId={person.id} />
+          </Suspense>
         </div>
       </div>
     </div>

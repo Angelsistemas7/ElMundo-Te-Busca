@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { BadgeCheck, Clock3, MapPin, Phone, ShieldQuestion, Stethoscope } from "lucide-react";
@@ -12,18 +13,40 @@ import { HospitalPatients } from "@/components/HospitalPatients";
 import { LikeButton } from "@/components/LikeButton";
 import { SaveButton } from "@/components/SaveButton";
 import { CommentSection } from "@/components/CommentSection";
+import { CommentSectionSkeleton } from "@/components/ListSkeletons";
 
 export const dynamic = "force-dynamic";
+
+// Pacientes + comentarios: lo secundario de la ficha, diferido en su propio
+// Suspense para que el cascarón (nombre, estado, contacto) pinte de inmediato.
+async function HospitalSecondary({ hospitalId }: { hospitalId: string }) {
+  const [patients, comments] = await Promise.all([
+    getHospitalPatients(hospitalId),
+    getComments("hospital", hospitalId),
+  ]);
+  return (
+    <>
+      <div className="mt-6">
+        <HospitalPatients hospitalId={hospitalId} patients={patients} />
+      </div>
+      <div className="mt-6">
+        <CommentSection
+          entityType="hospital"
+          entityId={hospitalId}
+          initialComments={comments}
+          title="Comentarios, fotos y listas"
+          placeholder="Personal y comunidad: aporta el estado, sube una foto de la lista de atendidos. Por favor, verifica que la información sea verídica: hay familias buscando con desesperación."
+        />
+      </div>
+    </>
+  );
+}
 
 export default async function HospitalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const hospital = await getHospitalById(id);
   if (!hospital) notFound();
 
-  const [patients, comments] = await Promise.all([
-    getHospitalPatients(id),
-    getComments("hospital", id),
-  ]);
   const s = HOSPITAL_STATUS_STYLE[hospital.status];
 
   return (
@@ -110,19 +133,9 @@ export default async function HospitalPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      <div className="mt-6">
-        <HospitalPatients hospitalId={hospital.id} patients={patients} />
-      </div>
-
-      <div className="mt-6">
-        <CommentSection
-          entityType="hospital"
-          entityId={hospital.id}
-          initialComments={comments}
-          title="Comentarios, fotos y listas"
-          placeholder="Personal y comunidad: aporta el estado, sube una foto de la lista de atendidos. Por favor, verifica que la información sea verídica: hay familias buscando con desesperación."
-        />
-      </div>
+      <Suspense fallback={<CommentSectionSkeleton />}>
+        <HospitalSecondary hospitalId={hospital.id} />
+      </Suspense>
     </div>
   );
 }

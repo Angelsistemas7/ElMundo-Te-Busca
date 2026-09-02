@@ -4249,7 +4249,7 @@ export async function getHospitalPatients(hospitalId: string): Promise<HospitalP
 }
 
 /** Conteo de pacientes por hospital (para mostrar en el listado). */
-export async function getPatientCounts(): Promise<Record<string, number>> {
+async function getPatientCountsImpl(): Promise<Record<string, number>> {
   const sb = getSupabase();
   if (!sb) {
     const counts: Record<string, number> = {};
@@ -4262,6 +4262,12 @@ export async function getPatientCounts(): Promise<Record<string, number>> {
   for (const r of data ?? []) counts[r.hospital_id] = (counts[r.hospital_id] ?? 0) + 1;
   return counts;
 }
+// Traía la tabla completa (todos los hospitales, todos los países) sin
+// ningún filtro en cada carga de /hospitales — mismo criterio de caché 60s
+// que sus vecinas (getHospitals, getAidPoints, etc.).
+export const getPatientCounts = unstable_cache(getPatientCountsImpl, ["patient-counts"], {
+  revalidate: 60,
+});
 
 export async function addHospitalPatient(input: HospitalPatientInput): Promise<HospitalPatient> {
   const now = new Date().toISOString();

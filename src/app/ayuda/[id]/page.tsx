@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -15,20 +16,97 @@ import { AidConsensusVote } from "@/components/AidConsensusVote";
 import { LikeButton } from "@/components/LikeButton";
 import { CommentSection } from "@/components/CommentSection";
 import { BackLink } from "@/components/BackLink";
+import { CommentSectionSkeleton } from "@/components/ListSkeletons";
 
 export const dynamic = "force-dynamic";
+
+// "Gestionar este punto" depende de sesión/rol (hasta 3 consultas
+// encadenadas en `canManageAidPoint`) — en su propio Suspense para no
+// retrasar el primer pintado de la ficha por un enlace secundario.
+async function GestionarLink({ pointId }: { pointId: string }) {
+  const canManage = await canManageAidPoint(pointId);
+  if (!canManage) return null;
+  return (
+    <Link
+      href={`/ayuda/${pointId}/gestion`}
+      className="press inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+    >
+      <Settings className="h-4 w-4" />
+      Gestionar este punto
+    </Link>
+  );
+}
+
+// Publicaciones/caravanas vinculadas + comentarios: lo menos urgente de la
+// ficha, en un solo Suspense (mismo criterio que la ficha de persona).
+async function AyudaSecondary({ pointId, country }: { pointId: string; country: string }) {
+  const [comments, linkedPosts, allMarches] = await Promise.all([
+    getComments("aid_point", pointId),
+    getPosts({ country, aidPointId: pointId }),
+    getMarches(),
+  ]);
+  const linkedMarches = allMarches.filter((m) => m.aidPointId === pointId);
+
+  return (
+    <>
+      {(linkedPosts.length > 0 || linkedMarches.length > 0) && (
+        <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5">
+          <h2 className="font-bold text-zinc-900">Necesidades y caravanas vinculadas a este punto</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Publicaciones de la comunidad que la gente vinculó a este punto de ayuda al publicar.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {linkedPosts.map((p) => (
+              <li key={`post-${p.id}`}>
+                <Link
+                  href="/comunidad"
+                  className="flex items-start gap-2 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm transition hover:bg-zinc-50"
+                >
+                  <span className="shrink-0">{POST_TYPE_EMOJI[p.type]}</span>
+                  <span className="min-w-0">
+                    <span className="block font-medium text-zinc-800">{POST_TYPE_LABEL[p.type]}</span>
+                    <span className="line-clamp-2 text-zinc-600">{p.body}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+            {linkedMarches.map((m) => (
+              <li key={`march-${m.id}`}>
+                <Link
+                  href={`/caravanas/${m.id}`}
+                  className="flex items-start gap-2 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm transition hover:bg-zinc-50"
+                >
+                  <span className="shrink-0">🚐</span>
+                  <span className="min-w-0">
+                    <span className="block font-medium text-zinc-800">{m.title}</span>
+                    <span className="text-zinc-600">
+                      {m.originText} → {m.destinationText}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-6">
+        <CommentSection
+          entityType="aid_point"
+          entityId={pointId}
+          initialComments={comments}
+          title="Comentarios y evidencias"
+          placeholder="¿Estuviste aquí? Confirma, agradece o sube una foto como evidencia."
+        />
+      </div>
+    </>
+  );
+}
 
 export default async function AidPointPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const point = await getAidPointById(id);
   if (!point) notFound();
-  const [comments, canManage, linkedPosts, allMarches] = await Promise.all([
-    getComments("aid_point", id),
-    canManageAidPoint(id),
-    getPosts({ country: point.country ?? "ve", aidPointId: id }),
-    getMarches(),
-  ]);
-  const linkedMarches = allMarches.filter((m) => m.aidPointId === id);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
@@ -126,68 +204,15 @@ export default async function AidPointPage({ params }: { params: Promise<{ id: s
           </div>
           <p className="text-xs text-zinc-400">Actualizado {timeAgo(point.updatedAt)}</p>
 
-          {canManage && (
-            <Link
-              href={`/ayuda/${point.id}/gestion`}
-              className="press inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
-            >
-              <Settings className="h-4 w-4" />
-              Gestionar este punto
-            </Link>
-          )}
+          <Suspense fallback={null}>
+            <GestionarLink pointId={point.id} />
+          </Suspense>
         </div>
       </article>
 
-      {(linkedPosts.length > 0 || linkedMarches.length > 0) && (
-        <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5">
-          <h2 className="font-bold text-zinc-900">Necesidades y caravanas vinculadas a este punto</h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            Publicaciones de la comunidad que la gente vinculó a este punto de ayuda al publicar.
-          </p>
-          <ul className="mt-3 space-y-2">
-            {linkedPosts.map((p) => (
-              <li key={`post-${p.id}`}>
-                <Link
-                  href="/comunidad"
-                  className="flex items-start gap-2 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm transition hover:bg-zinc-50"
-                >
-                  <span className="shrink-0">{POST_TYPE_EMOJI[p.type]}</span>
-                  <span className="min-w-0">
-                    <span className="block font-medium text-zinc-800">{POST_TYPE_LABEL[p.type]}</span>
-                    <span className="line-clamp-2 text-zinc-600">{p.body}</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-            {linkedMarches.map((m) => (
-              <li key={`march-${m.id}`}>
-                <Link
-                  href={`/caravanas/${m.id}`}
-                  className="flex items-start gap-2 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm transition hover:bg-zinc-50"
-                >
-                  <span className="shrink-0">🚐</span>
-                  <span className="min-w-0">
-                    <span className="block font-medium text-zinc-800">{m.title}</span>
-                    <span className="text-zinc-600">
-                      {m.originText} → {m.destinationText}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="mt-6">
-        <CommentSection
-          entityType="aid_point"
-          entityId={point.id}
-          initialComments={comments}
-          title="Comentarios y evidencias"
-          placeholder="¿Estuviste aquí? Confirma, agradece o sube una foto como evidencia."
-        />
-      </div>
+      <Suspense fallback={<CommentSectionSkeleton />}>
+        <AyudaSecondary pointId={point.id} country={point.country ?? "ve"} />
+      </Suspense>
     </div>
   );
 }
