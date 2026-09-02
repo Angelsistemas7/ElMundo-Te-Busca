@@ -1,0 +1,68 @@
+name: Backup Supabase DB
+
+# Respaldo diario mientras se confirma/activa el plan de Supabase con backups
+# automáticos (ver docs/investigacion-mi-sesion-20260813/02-backups-continuidad.md).
+# El dump se cifra y se sube a un repo PRIVADO aparte
+# (Angelsistemas7/elmundotebusca-backups) — nunca a este repo, que es
+# público: Supabase advierte explícitamente contra commitear dumps de datos
+# reales en un repositorio público.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # diario, 06:00 UTC (~02:00 hora VE)
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Dump roles, esquema y datos
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "::error::Falta el secret SUPABASE_DB_URL (Project Settings > Database > Connection string, Session pooler)."
+            exit 1
+          fi
+          mkdir -p backups
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backups/data.sql --data-only --use-copy
+
+      - name: Cifrar (contiene PII de personas desaparecidas)
+        env:
+          BACKUP_GPG_PASSPHRASE: ${{ secrets.BACKUP_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKUP_GPG_PASSPHRASE:-}" ]; then
+            echo "::error::Falta el secret BACKUP_GPG_PASSPHRASE."
+            exit 1
+          fi
+          tar czf backups.tar.gz backups/
+          gpg --batch --yes --passphrase "$BACKUP_GPG_PASSPHRASE" -c backups.tar.gz
+          mv backups.tar.gz.gpg "backup-$(date -u +%Y-%m-%d).tar.gz.gpg"
+          rm -rf backups backups.tar.gz
+
+      - name: Subir al repo privado de backups
+        env:
+          BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKUP_REPO_TOKEN:-}" ]; then
+            echo "::error::Falta el secret BACKUP_REPO_TOKEN (token con permiso de escritura solo sobre elmundotebusca-backups)."
+            exit 1
+          fi
+          FILE="backup-$(date -u +%Y-%m-%d).tar.gz.gpg"
+          git clone "https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/Angelsistemas7/elmundotebusca-backups.git" backups-repo
+          mv "$FILE" backups-repo/
+          cd backups-repo
+          git config user.name "backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          git add "$FILE"
+          git commit -m "backup: dump automatico ${FILE}"
+          git push
