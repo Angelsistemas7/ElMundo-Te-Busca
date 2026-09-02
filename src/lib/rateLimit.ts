@@ -39,3 +39,11 @@ export function createRateLimiter(max: number, windowMs: number, maxTrackedKeys 
 // que importa es frenar el volumen total de escrituras desde una IP, no
 // permitir 40 de cada tipo (eso sería 40 × 8 endpoints = 320 escrituras/30s).
 export const interactionLimiter = createRateLimiter(40, 30_000);
+
+// checkPersonDuplicatesAction: de solo lectura, sin Turnstile a propósito
+// (comentario en actions.ts), pero tampoco tenía ningún freno de volumen —
+// un script podía llamarla sin límite (carga de lecturas, y tantear cédulas
+// contra la base a alta velocidad). Instancia propia, no la de
+// `interactionLimiter`: un usuario real reintentando el formulario de
+// registro no debería competir por el mismo cupo que los "me gusta".
+export const duplicateCheckLimiter = createRateLimiter(20, 60_000);
