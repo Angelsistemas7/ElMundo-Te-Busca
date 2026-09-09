@@ -82,7 +82,7 @@ import {
 import { isAdmin } from "@/lib/admin";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { clientIp } from "@/lib/ipLockout";
-import { interactionLimiter } from "@/lib/rateLimit";
+import { duplicateCheckLimiter, interactionLimiter } from "@/lib/rateLimit";
 import type {
   Comment,
   CommentEntity,
@@ -445,6 +445,7 @@ export async function checkPersonDuplicatesAction(
   photoHash?: string,
 ): Promise<PersonDuplicateMatch[]> {
   if (!firstName.trim() && !cedula.trim() && !photoHash) return [];
+  if (!duplicateCheckLimiter.allow(await clientIp())) return [];
   try {
     return await findPersonDuplicates({
       firstName,

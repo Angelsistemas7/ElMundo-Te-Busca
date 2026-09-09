@@ -22,7 +22,7 @@ Ningún valor de secreto aparece en este informe.
 | Alto | Redirección abierta por barra invertida en el flujo de ingreso (`next=/\dominio`) | Corregido |
 | Alto | Dependencias vulnerables: `sharp`, `postcss` | `sharp` propio corregido; los de Next quedan propuestos |
 | Medio | Foto de noticia del panel sin validar → SSRF del servidor | Corregido |
-| Medio | Falta `Strict-Transport-Security` | Corregido |
+| Medio | Falta `Strict-Transport-Security` | Ya resuelto en `main` mientras se hacía esta revisión |
 | Medio | Ubicación exacta de voluntarios legible en la base | Propuesta pendiente de decisión |
 | Bajo | `lint` no está configurado (`next lint` pide configuración interactiva) | Propuesta pendiente de decisión |
 
@@ -189,15 +189,17 @@ al armar la imagen de compartir (`src/lib/ogImage.ts`), o sea que servía para
 hacer que el servidor pidiera direcciones internas. Requiere sesión de admin,
 por eso es Medio y no Alto. Corregido aplicando `isSafePhotoUrl`.
 
-## Medio 2 — Faltaba `Strict-Transport-Security` — CORREGIDO
+## Medio 2 — Faltaba `Strict-Transport-Security` — YA RESUELTO EN `main`
 
 - `next.config.ts`
 
-Había `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` y
-`Permissions-Policy`, pero no HSTS: una primera visita por HTTP podía
-degradarse y llevar la cookie de sesión o el token del enlace de gestión en
-claro. Añadido `max-age=31536000` sin `includeSubdomains` (hay subdominios que
-no se sirven desde aquí).
+Cuando empezó esta revisión había `X-Frame-Options`,
+`X-Content-Type-Options`, `Referrer-Policy` y `Permissions-Policy`, pero no
+HSTS: una primera visita por HTTP podía degradarse y llevar la cookie de sesión
+o el token del enlace de gestión en claro. Se llegó a añadir aquí, pero `main`
+ya trae `Strict-Transport-Security: max-age=15552000; includeSubDomains` junto a
+COOP/CORP y la CSP en modo report-only, así que al integrar se conservó la
+versión de `main` (más completa) y este PR no toca las cabeceras.
 
 ## Medio 3 — Ubicación exacta de voluntarios legible en la base
 

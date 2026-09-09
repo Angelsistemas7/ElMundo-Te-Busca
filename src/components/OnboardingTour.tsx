@@ -517,7 +517,7 @@ export function OnboardingTour() {
             style={{ width: cardWidth, ...cardStyle }}
           >
             <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wide text-brand-600">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-brand-700">
                 {stepIndex + 1}/{steps.length}
               </span>
               <button

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -15,18 +16,55 @@ import { formatDateTime } from "@/lib/utils";
 import { LikeButton } from "@/components/LikeButton";
 import { CommentSection } from "@/components/CommentSection";
 import { BackLink } from "@/components/BackLink";
+import { CommentSectionSkeleton } from "@/components/ListSkeletons";
 
 export const dynamic = "force-dynamic";
+
+async function LinkedAidPointChip({ aidPointId }: { aidPointId: string }) {
+  const point = await getAidPointById(aidPointId);
+  if (!point) return null;
+  return (
+    <Link
+      href={`/ayuda/${point.id}`}
+      className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-100"
+    >
+      <HandHeart className="h-3.5 w-3.5" />
+      Vinculada a {point.name}
+    </Link>
+  );
+}
+
+async function GestionarCaravanaLink({ marchId }: { marchId: string }) {
+  const canManage = await canManageMarch(marchId);
+  if (!canManage) return null;
+  return (
+    <Link
+      href={`/caravanas/${marchId}/gestion`}
+      className="press inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+    >
+      <Settings className="h-4 w-4" />
+      Gestionar esta caravana
+    </Link>
+  );
+}
+
+async function CaravanaComments({ marchId }: { marchId: string }) {
+  const comments = await getComments("march", marchId);
+  return (
+    <CommentSection
+      entityType="march"
+      entityId={marchId}
+      initialComments={comments}
+      title="Coordinación y comentarios"
+      placeholder="¿Qué vas a llevar? ¿Te sumas? Coordina aquí o sube una foto."
+    />
+  );
+}
 
 export default async function CaravanaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const march = await getMarchById(id);
   if (!march) notFound();
-  const [comments, canManage, linkedAidPoint] = await Promise.all([
-    getComments("march", id),
-    canManageMarch(id),
-    march.aidPointId ? getAidPointById(march.aidPointId) : Promise.resolve(null),
-  ]);
   const isPast = new Date(march.departAt).getTime() < Date.now();
 
   return (
@@ -65,14 +103,10 @@ export default async function CaravanaPage({ params }: { params: Promise<{ id: s
 
         {march.description && <p className="text-sm text-zinc-600">{march.description}</p>}
 
-        {linkedAidPoint && (
-          <Link
-            href={`/ayuda/${linkedAidPoint.id}`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-100"
-          >
-            <HandHeart className="h-3.5 w-3.5" />
-            Vinculada a {linkedAidPoint.name}
-          </Link>
+        {march.aidPointId && (
+          <Suspense fallback={null}>
+            <LinkedAidPointChip aidPointId={march.aidPointId} />
+          </Suspense>
         )}
 
         {march.whatsappUrl && (
@@ -101,25 +135,15 @@ export default async function CaravanaPage({ params }: { params: Promise<{ id: s
           </a>
         </div>
 
-        {canManage && (
-          <Link
-            href={`/caravanas/${march.id}/gestion`}
-            className="press inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
-          >
-            <Settings className="h-4 w-4" />
-            Gestionar esta caravana
-          </Link>
-        )}
+        <Suspense fallback={null}>
+          <GestionarCaravanaLink marchId={march.id} />
+        </Suspense>
       </article>
 
       <div className="mt-6">
-        <CommentSection
-          entityType="march"
-          entityId={march.id}
-          initialComments={comments}
-          title="Coordinación y comentarios"
-          placeholder="¿Qué vas a llevar? ¿Te sumas? Coordina aquí o sube una foto."
-        />
+        <Suspense fallback={<CommentSectionSkeleton />}>
+          <CaravanaComments marchId={march.id} />
+        </Suspense>
       </div>
     </div>
   );

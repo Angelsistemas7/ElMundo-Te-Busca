@@ -55,10 +55,6 @@ export const ComplaintCard = memo(function ComplaintCard({ complaint, comments }
         <PhotoView src={complaint.photoUrl} className="mt-3 h-64 w-full rounded-xl sm:h-80" />
       )}
 
-      <div className="mt-2 text-xs text-zinc-500">
-        Reportado por <span className="font-medium text-zinc-700">{complaint.authorName}</span>
-      </div>
-
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3">
         <SupportButton id={complaint.id} supports={complaint.supports} />
         <SaveButton type="complaint" id={complaint.id} title={complaint.body} className="ml-auto" showLabel={false} />

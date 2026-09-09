@@ -124,3 +124,29 @@ export function PostFeedSkeleton({ count = 4 }: { count?: number }) {
     </div>
   );
 }
+
+// Sección de comentarios/reportes en una ficha individual (persona, ayuda,
+// hospital, caravana): título + 2 filas simuladas de comentario.
+export function CommentSectionSkeleton() {
+  return (
+    <div className="animate-pulse rounded-2xl border border-zinc-200 bg-white p-5">
+      <Bar className="h-4 w-40" />
+      <div className="mt-4 space-y-3">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="flex gap-3">
+            <div className="h-8 w-8 shrink-0 rounded-full bg-zinc-200" />
+            <div className="flex-1 space-y-2">
+              <Bar className="h-3.5 w-1/4" />
+              <Bar className="h-3.5 w-3/4" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Botón "Guardar" mientras se resuelve si el visitante es el autor (que no lo ve).
+export function SaveButtonSkeleton() {
+  return <div className="animate-pulse h-11 w-full rounded-xl bg-zinc-100" />;
+}
