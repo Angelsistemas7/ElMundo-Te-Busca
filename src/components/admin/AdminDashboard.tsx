@@ -997,8 +997,14 @@ function ManagerControls({
   );
 }
 
-// ── Roles globales (admin por cuenta, moderador de hospitales/ayuda) ────────
-const ROLE_OPTIONS: AppRole[] = ["admin", "moderator", "hospital_moderator", "aid_point_moderator"];
+// ── Roles globales (admin por cuenta, moderadores y Red de auxilio) ─────────
+const ROLE_OPTIONS: AppRole[] = [
+  "admin",
+  "moderator",
+  "hospital_moderator",
+  "aid_point_moderator",
+  "volunteer",
+];
 
 function RoleGrants({ roles, demoOpen }: { roles: AppRoleGrant[]; demoOpen: boolean }) {
   const router = useRouter();

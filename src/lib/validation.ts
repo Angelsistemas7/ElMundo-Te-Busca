@@ -268,7 +268,7 @@ export const managerAssignSchema = z.object({
 export type ManagerAssignInput = z.infer<typeof managerAssignSchema>;
 
 export const roleAssignSchema = z.object({
-  role: z.enum(["admin", "moderator", "hospital_moderator", "aid_point_moderator"]),
+  role: z.enum(["admin", "moderator", "hospital_moderator", "aid_point_moderator", "volunteer"]),
   username: z
     .string()
     .trim()

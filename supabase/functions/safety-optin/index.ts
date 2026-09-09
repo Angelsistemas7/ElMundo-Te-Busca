@@ -12,6 +12,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const TEST_ALERTS_ENABLED = Deno.env.get("ENABLE_SAFETY_TEST_ALERTS") === "true";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -95,12 +96,16 @@ Deno.serve(async (req) => {
     // 10-alerta-sismo-checkin.md. Se resuelve aquí mismo (sin cron aparte)
     // porque un voluntario solo necesita la lista al momento de mirarla.
     const limiteEspera = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    await db
+    const { error: pendingError } = await db
       .from("safety_checkins")
       .update({ status: "no_response" })
       .eq("status", "pending")
       .is("resolved_at", null)
       .lt("notified_at", limiteEspera);
+    if (pendingError) {
+      console.error("safety-optin list-needs-help pending", pendingError.code);
+      return json({ error: "db_error" }, 500);
+    }
 
     const { data: checkins, error: listError } = await db
       .from("safety_checkins")
@@ -151,16 +156,24 @@ Deno.serve(async (req) => {
         last_location_at: string | null;
       } | null;
       const perfil = optin?.user_id ? perfiles.get(optin.user_id) : undefined;
+      const lastLocationAt = optin?.last_location_at
+        ? Date.parse(optin.last_location_at)
+        : Number.NaN;
+      const notifiedAt = Date.parse(c.notified_at as string);
+      const hasCurrentLocation =
+        optin?.last_lat != null &&
+        optin.last_lng != null &&
+        Number.isFinite(lastLocationAt) &&
+        Number.isFinite(notifiedAt) &&
+        lastLocationAt >= notifiedAt;
       return {
         id: c.id,
         quake_id: c.quake_id,
         status: c.status,
         notified_at: c.notified_at,
         responded_at: c.responded_at,
-        // Ubicación actual si el dispositivo la sigue reportando; si no, la
-        // que tenía en el momento exacto del sismo.
-        lat: optin?.last_lat ?? c.lat,
-        lng: optin?.last_lng ?? c.lng,
+        lat: hasCurrentLocation ? optin.last_lat : c.lat,
+        lng: hasCurrentLocation ? optin.last_lng : c.lng,
         username: perfil?.username ?? null,
         blood_type: perfil?.blood_type ?? null,
       };
@@ -243,9 +256,12 @@ Deno.serve(async (req) => {
     }
 
     // Dispara un check-in de prueba sin esperar un sismo real ni el cron de
-    // USGS (que todavía no existe) — para poder probar el flujo completo
-    // (push + botones + compartir ubicación) de punta a punta hoy mismo.
+    // USGS. Está deshabilitado por defecto: solo se habilita temporalmente en
+    // un entorno controlado con ENABLE_SAFETY_TEST_ALERTS=true.
     case "test-alert": {
+      if (!TEST_ALERTS_ENABLED) {
+        return json({ error: "test_alerts_disabled" }, 403);
+      }
       const { data: optin, error: findError } = await db
         .from("safety_optins")
         .select("id, last_lat, last_lng")
@@ -305,11 +321,10 @@ Deno.serve(async (req) => {
     }
 
     // Respuesta al push "¿Estás bien?" — 'ok' o 'needs_help'. Si no responde,
-    // un cron aparte (todavía no implementado) marca 'no_response' pasada la
-    // ventana de espera (ver §5 de 10-alerta-sismo-checkin.md).
+    // `list-needs-help` marca 'no_response' pasada la ventana de espera.
     case "respond": {
       const { quake_id: quakeId, status } = body;
-      if (typeof quakeId !== "string" || quakeId.length === 0) {
+      if (typeof quakeId !== "string" || quakeId.length === 0 || quakeId.length > 128) {
         return json({ error: "invalid_quake_id" }, 400);
       }
       if (status !== "ok" && status !== "needs_help") {
@@ -333,15 +348,19 @@ Deno.serve(async (req) => {
       };
       if (status === "ok") update.resolved_at = new Date().toISOString();
 
-      const { error } = await db
+      const { data: updated, error } = await db
         .from("safety_checkins")
         .update(update)
         .eq("optin_id", optin.id)
-        .eq("quake_id", quakeId);
+        .eq("quake_id", quakeId)
+        .is("resolved_at", null)
+        .select("id")
+        .maybeSingle();
       if (error) {
         console.error("safety-optin respond", error.code);
         return json({ error: "db_error" }, 500);
       }
+      if (!updated) return json({ error: "checkin_not_found" }, 404);
       return json({ ok: true });
     }
 

@@ -434,14 +434,21 @@ export interface ManagerRequest {
  *   • admin              → mismo alcance que el ADMIN_TOKEN, pero por cuenta.
  *   • hospital_moderator → puede actualizar estado/insumos de CUALQUIER hospital.
  *   • aid_point_moderator→ puede fijar disponible/agotado en CUALQUIER punto.
+ *   • volunteer          → puede atender alertas privadas de la Red de auxilio.
  */
-export type AppRole = "admin" | "moderator" | "hospital_moderator" | "aid_point_moderator";
+export type AppRole =
+  | "admin"
+  | "moderator"
+  | "hospital_moderator"
+  | "aid_point_moderator"
+  | "volunteer";
 
 export const APP_ROLE_LABEL: Record<AppRole, string> = {
   admin: "Admin completo",
   moderator: "Moderador",
   hospital_moderator: "Moderador de hospitales",
   aid_point_moderator: "Moderador de puntos de ayuda",
+  volunteer: "Voluntario de la Red de auxilio",
 };
 
 /** Rol global asignado a una cuenta (ver `AppRole`). */
