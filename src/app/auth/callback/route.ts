@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { completeOAuthLogin } from "@/lib/auth";
+import { safeNextPath } from "@/lib/safeNext";
 
 // Vuelta de Google tras aprobar el ingreso. Google manda aquí un `code` de un
 // solo uso; se cambia por la sesión real (cookie httpOnly) y se sigue viaje.
@@ -27,10 +28,9 @@ export async function GET(request: NextRequest) {
   const origin = publicOrigin(request);
   const params = request.nextUrl.searchParams;
 
-  const rawNext = params.get("next") ?? "/";
   // Solo rutas internas (ver `getGoogleAuthUrl`): impide que un enlace armado
   // por un tercero termine mandando a otro dominio con la sesión ya iniciada.
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  const next = safeNextPath(params.get("next"));
 
   // La persona canceló en la pantalla de Google, o Google devolvió un error.
   // No es un fallo del sitio: se vuelve a la página de origen sin ruido.

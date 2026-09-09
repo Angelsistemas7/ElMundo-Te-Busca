@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { constantTimeEqual } from "@/lib/constantTime";
 
 // ── Modo mantenimiento (temporal, manual) ───────────────────────────────────
 // Con MAINTENANCE_MODE=true, todo el sitio muestra /mantenimiento excepto
@@ -19,7 +20,7 @@ function maintenanceRedirect(request: NextRequest): NextResponse | null {
 
   const adminToken = process.env.ADMIN_TOKEN;
   const cookie = request.cookies.get("vtb_admin")?.value;
-  if (adminToken && cookie === adminToken) return null;
+  if (adminToken && cookie && constantTimeEqual(cookie, adminToken)) return null;
 
   // IMPORTANTE: redirect, no rewrite. Un rewrite hace que Next.js vuelva a
   // pedirse la ruta A SÍ MISMO puertas adentro usando el origen de
