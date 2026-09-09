@@ -20,16 +20,9 @@ import { AyudaTabs } from "@/components/AyudaTabs";
 import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { CardGridSkeleton } from "@/components/ListSkeletons";
+import { type SearchParams, str, num } from "@/lib/searchParams";
 
 export const dynamic = "force-dynamic";
-
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const num = (v: string | string[] | undefined) => {
-  const s = str(v);
-  const n = s ? Number(s) : NaN;
-  return Number.isFinite(n) ? n : undefined;
-};
 
 const TYPE_EMOJI: Record<AidPointType, string> = {
   comida: "🍲",

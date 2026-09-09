@@ -146,6 +146,35 @@ function getField(form: FormData, name: string): string {
   return typeof v === "string" ? v : "";
 }
 
+/** Error que devuelven TODAS las acciones cuando zod rechaza el formulario:
+ *  mismo mensaje general y los errores por campo para pintarlos en el form. */
+function invalidFields(error: {
+  issues: { path: (string | number)[]; message: string }[];
+}): { ok: false; error: string; fieldErrors: Record<string, string> } {
+  return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(error) };
+}
+
+/** Comprueba el captcha de un formulario público. Devuelve el error listo para
+ *  retornar si no pasa, o `null` si la verificación fue correcta. */
+async function captchaError(form: FormData): Promise<{ ok: false; error: string } | null> {
+  const token = getField(form, "cf-turnstile-response") || null;
+  if (await verifyTurnstile(token)) return null;
+  return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
+}
+
+const INVALID_OWNER_LINK = "Enlace de gestión no válido.";
+
+/** Comprueba el enlace privado de gestión (token del autor o sesión de admin,
+ *  ver `verifyResourceOwner`). Devuelve el error listo o `null` si es válido. */
+async function ownerLinkError(
+  type: Parameters<typeof verifyResourceOwner>[0],
+  id: string,
+  token: string,
+): Promise<{ ok: false; error: string } | null> {
+  if (await verifyResourceOwner(type, id, token)) return null;
+  return { ok: false, error: INVALID_OWNER_LINK };
+}
+
 /** true si esta IP ya se pasó del límite de interacciones anónimas de un clic
  *  (me gusta, reacciones) en la ventana actual. Estas acciones no llevan
  *  Turnstile ni requieren sesión — sin este freno, un script podría llamarlas
@@ -168,18 +197,14 @@ export type AuthActionResult =
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 export async function signUpAction(form: FormData): Promise<AuthActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
   const parsed = signupSchema.safeParse({
     username: getField(form, "username"),
     password: getField(form, "password"),
     email: getField(form, "email"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
   const res = await signUp(parsed.data);
   if (!res.ok) return { ok: false, error: res.error };
   revalidatePath("/");
@@ -187,17 +212,13 @@ export async function signUpAction(form: FormData): Promise<AuthActionResult> {
 }
 
 export async function signInAction(form: FormData): Promise<AuthActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
   const parsed = loginSchema.safeParse({
     username: getField(form, "username"),
     password: getField(form, "password"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
   const res = await signIn(parsed.data);
   if (!res.ok) return { ok: false, error: res.error };
   revalidatePath("/");
@@ -229,9 +250,7 @@ export async function startGoogleLoginAction(
 /** Completa el primer ingreso con Google fijando el nombre de usuario. */
 export async function chooseUsernameAction(form: FormData): Promise<AuthActionResult> {
   const parsed = chooseUsernameSchema.safeParse({ username: getField(form, "username") });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
   const res = await completeOAuthProfile(parsed.data.username);
   if (!res.ok) return { ok: false, error: res.error };
   revalidatePath("/");
@@ -254,9 +273,7 @@ export async function updatePasswordAction(form: FormData): Promise<AuthActionRe
   const parsed = signupSchema.pick({ password: true }).safeParse({
     password: getField(form, "password"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
   const res = await updatePassword(parsed.data.password);
   if (!res.ok) return { ok: false, error: res.error };
   revalidatePath("/");
@@ -460,10 +477,8 @@ export async function checkPersonDuplicatesAction(
 }
 
 export async function registerPersonAction(form: FormData): Promise<ActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
 
   const parsed = personSchema.safeParse({
     firstName: getField(form, "firstName"),
@@ -485,9 +500,7 @@ export async function registerPersonAction(form: FormData): Promise<ActionResult
     photoHash: getField(form, "photoHash"),
   });
 
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   // La foto: en producción se sube a Supabase Storage desde el cliente y aquí
   // llega la URL. De momento aceptamos la URL ya subida (o null).
@@ -532,10 +545,8 @@ export async function registerPersonAction(form: FormData): Promise<ActionResult
 
 // ── Reportar cambio de estado ("tengo información" / "lo encontré") ──────────
 export async function reportStatusAction(form: FormData): Promise<ActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
 
   // Reportar "localizado" o "fallecido" exige cuenta (igual que denuncias):
   // son los dos reportes que más daño hacen si son falsos (falsa esperanza o
@@ -562,9 +573,7 @@ export async function reportStatusAction(form: FormData): Promise<ActionResult> 
     notes: getField(form, "notes"),
   });
 
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   try {
     const report = await createStatusReport(parsed.data);
@@ -596,10 +605,8 @@ function buildCategoryStatus(form: FormData, types: string[]): Record<string, st
 }
 
 export async function registerAidPointAction(form: FormData): Promise<ActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
 
   const types = form.getAll("types").filter((v): v is string => typeof v === "string");
   const parsed = aidPointSchema.safeParse({
@@ -616,9 +623,7 @@ export async function registerAidPointAction(form: FormData): Promise<ActionResu
     contactPhone: getField(form, "contactPhone"),
   });
 
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   const photoUrl = getPhotoUrl(form);
 
@@ -651,10 +656,8 @@ export async function getAidPointOptionsAction(): Promise<{ id: string; label: s
 
 // ── Registrar marcha / caravana ──────────────────────────────────────────────
 export async function registerMarchAction(form: FormData): Promise<ActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
 
   const parsed = marchSchema.safeParse({
     title: getField(form, "title"),
@@ -668,9 +671,7 @@ export async function registerMarchAction(form: FormData): Promise<ActionResult>
     aidPointId: getField(form, "aidPointId"),
   });
 
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   try {
     const { march, ownerToken } = await createMarch(
@@ -731,10 +732,8 @@ export async function postCommentAction(form: FormData): Promise<ActionResult> {
 
   // Anti-bot solo para anónimos; con sesión (identidad verificada) no hace falta.
   if (!sessionUser) {
-    const token = getField(form, "cf-turnstile-response") || null;
-    if (!(await verifyTurnstile(token))) {
-      return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-    }
+    const captcha = await captchaError(form);
+    if (captcha) return captcha;
   }
 
   if (!entityId || authorName.length < 2 || (body.length < 2 && !photoUrl)) {
@@ -808,10 +807,8 @@ export async function likeHospitalAction(id: string): Promise<{ ok: boolean }> {
 }
 
 export async function createPostAction(form: FormData): Promise<ActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
 
   const parsed = postSchema.safeParse({
     type: getField(form, "type"),
@@ -824,9 +821,7 @@ export async function createPostAction(form: FormData): Promise<ActionResult> {
     aidPointId: getField(form, "aidPointId"),
   });
 
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   const photoUrl = getPhotoUrl(form);
 
@@ -850,10 +845,8 @@ export async function createPostAction(form: FormData): Promise<ActionResult> {
 
 // ── Mascotas ──────────────────────────────────────────────────────────────────
 export async function registerPetAction(form: FormData): Promise<ActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
 
   const parsed = petSchema.safeParse({
     status: getField(form, "status"),
@@ -864,9 +857,7 @@ export async function registerPetAction(form: FormData): Promise<ActionResult> {
     locationText: getField(form, "locationText"),
     contactPhone: getField(form, "contactPhone"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   const photoUrl = getPhotoUrl(form);
 
@@ -892,9 +883,8 @@ export async function registerPetAction(form: FormData): Promise<ActionResult> {
 export async function ownerUpdatePetAction(form: FormData): Promise<ActionResult> {
   const id = getField(form, "petId");
   const token = getField(form, "token");
-  if (!(await verifyResourceOwner("pet", id, token))) {
-    return { ok: false, error: "Enlace de gestión no válido." };
-  }
+  const invalid = await ownerLinkError("pet", id, token);
+  if (invalid) return invalid;
 
   const parsed = petSchema.safeParse({
     status: getField(form, "status"),
@@ -905,9 +895,7 @@ export async function ownerUpdatePetAction(form: FormData): Promise<ActionResult
     locationText: getField(form, "locationText"),
     contactPhone: getField(form, "contactPhone"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   try {
     await updatePetFields(id, parsed.data);
@@ -925,9 +913,8 @@ export async function ownerSetPetStatusAction(
   token: string,
   status: PetStatus,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await verifyResourceOwner("pet", id, token))) {
-    return { ok: false, error: "Enlace de gestión no válido." };
-  }
+  const invalid = await ownerLinkError("pet", id, token);
+  if (invalid) return invalid;
   try {
     await setPetStatus(id, status);
     revalidatePath("/mascotas");
@@ -942,8 +929,8 @@ export async function ownerDeletePetAction(
   id: string,
   token: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await verifyResourceOwner("pet", id, token)))
-    return { ok: false, error: "Enlace de gestión no válido." };
+  const invalid = await ownerLinkError("pet", id, token);
+  if (invalid) return invalid;
   try {
     await deletePet(id);
     revalidatePath("/mascotas");
@@ -955,10 +942,8 @@ export async function ownerDeletePetAction(
 
 // ── Voluntarios ───────────────────────────────────────────────────────────────
 export async function registerVolunteerAction(form: FormData): Promise<ActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
 
   const parsed = volunteerSchema.safeParse({
     type: getField(form, "type"),
@@ -972,9 +957,7 @@ export async function registerVolunteerAction(form: FormData): Promise<ActionRes
     contactPhone: getField(form, "contactPhone"),
     contactEmail: getField(form, "contactEmail"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   const photoUrl = getPhotoUrl(form);
 
@@ -1008,9 +991,7 @@ export async function createManagerRequestAction(form: FormData): Promise<Action
     entityId: getField(form, "entityId"),
     message: getField(form, "message"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   const entity =
     parsed.data.entityType === "hospital"
@@ -1043,10 +1024,8 @@ export async function createManagerRequestAction(form: FormData): Promise<Action
 // hasta que un moderador le da el visto bueno; el admin puede eliminar lo falso.
 // Quien tenga sesión queda como autor; si no, "Comunidad".
 export async function registerHeroAction(form: FormData): Promise<ActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
 
   const parsed = heroSchema.safeParse({
     category: getField(form, "category"),
@@ -1057,9 +1036,7 @@ export async function registerHeroAction(form: FormData): Promise<ActionResult> 
     sourceName: getField(form, "sourceName"),
     sourceUrl: getField(form, "sourceUrl"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   const photoUrl = getPhotoUrl(form);
   const authorName = (await getCurrentUser())?.username ?? "Comunidad";
@@ -1123,9 +1100,7 @@ export async function createComplaintAction(form: FormData): Promise<ActionResul
     estado: getField(form, "estado") || undefined,
     locationText: getField(form, "locationText"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   const photoUrl = getPhotoUrl(form);
 
@@ -1164,9 +1139,8 @@ export async function supportComplaintAction(id: string): Promise<{ ok: boolean;
 export async function ownerUpdatePostAction(form: FormData): Promise<ActionResult> {
   const id = getField(form, "postId");
   const token = getField(form, "token");
-  if (!(await verifyResourceOwner("post", id, token))) {
-    return { ok: false, error: "Enlace de gestión no válido." };
-  }
+  const invalid = await ownerLinkError("post", id, token);
+  if (invalid) return invalid;
 
   const parsed = postSchema.safeParse({
     type: getField(form, "type"),
@@ -1178,9 +1152,7 @@ export async function ownerUpdatePostAction(form: FormData): Promise<ActionResul
     contactPhone: getField(form, "contactPhone"),
     aidPointId: getField(form, "aidPointId"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   try {
     await updatePostFields(id, parsed.data);
@@ -1195,8 +1167,8 @@ export async function ownerDeletePostAction(
   id: string,
   token: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await verifyResourceOwner("post", id, token)))
-    return { ok: false, error: "Enlace de gestión no válido." };
+  const invalid = await ownerLinkError("post", id, token);
+  if (invalid) return invalid;
   try {
     await deletePost(id);
     revalidatePath("/comunidad");
@@ -1243,7 +1215,7 @@ export async function ownerSetStatusAction(
   token: string,
   status: PersonStatus,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await verifyOwner(id, token))) return { ok: false, error: "Enlace de gestión no válido." };
+  if (!(await verifyOwner(id, token))) return { ok: false, error: INVALID_OWNER_LINK };
   try {
     await updatePersonStatus(id, status);
     revalidatePath(`/persona/${id}`);
@@ -1259,7 +1231,7 @@ export async function ownerUpdateAction(form: FormData): Promise<ActionResult> {
   const id = getField(form, "personId");
   const token = getField(form, "token");
   if (!(await verifyOwner(id, token))) {
-    return { ok: false, error: "Enlace de gestión no válido." };
+    return { ok: false, error: INVALID_OWNER_LINK };
   }
 
   const parsed = personSchema.safeParse({
@@ -1279,9 +1251,7 @@ export async function ownerUpdateAction(form: FormData): Promise<ActionResult> {
     contactPhone: getField(form, "contactPhone"),
     contactEmail: getField(form, "contactEmail"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   try {
     await updatePersonFields(id, parsed.data);
@@ -1296,7 +1266,7 @@ export async function ownerDeleteAction(
   id: string,
   token: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await verifyOwner(id, token))) return { ok: false, error: "Enlace de gestión no válido." };
+  if (!(await verifyOwner(id, token))) return { ok: false, error: INVALID_OWNER_LINK };
   try {
     await deletePerson(id);
     revalidatePath("/");
@@ -1312,9 +1282,8 @@ export async function ownerDeleteAction(
 export async function ownerUpdateAidPointAction(form: FormData): Promise<ActionResult> {
   const id = getField(form, "aidPointId");
   const token = getField(form, "token");
-  if (!(await verifyResourceOwner("aid_point", id, token))) {
-    return { ok: false, error: "Enlace de gestión no válido." };
-  }
+  const invalid = await ownerLinkError("aid_point", id, token);
+  if (invalid) return invalid;
 
   const opTypes = form.getAll("types").filter((v): v is string => typeof v === "string");
   const parsed = aidPointSchema.safeParse({
@@ -1330,9 +1299,7 @@ export async function ownerUpdateAidPointAction(form: FormData): Promise<ActionR
     contactName: getField(form, "contactName"),
     contactPhone: getField(form, "contactPhone"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   try {
     await updateAidPointFields(id, parsed.data);
@@ -1349,8 +1316,8 @@ export async function ownerDeleteAidPointAction(
   id: string,
   token: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await verifyResourceOwner("aid_point", id, token)))
-    return { ok: false, error: "Enlace de gestión no válido." };
+  const invalid = await ownerLinkError("aid_point", id, token);
+  if (invalid) return invalid;
   try {
     await deleteAidPoint(id);
     revalidatePath("/ayuda");
@@ -1364,9 +1331,8 @@ export async function ownerDeleteAidPointAction(
 export async function ownerUpdateMarchAction(form: FormData): Promise<ActionResult> {
   const id = getField(form, "marchId");
   const token = getField(form, "token");
-  if (!(await verifyResourceOwner("march", id, token))) {
-    return { ok: false, error: "Enlace de gestión no válido." };
-  }
+  const invalid = await ownerLinkError("march", id, token);
+  if (invalid) return invalid;
 
   const parsed = marchSchema.safeParse({
     title: getField(form, "title"),
@@ -1379,9 +1345,7 @@ export async function ownerUpdateMarchAction(form: FormData): Promise<ActionResu
     description: getField(form, "description"),
     aidPointId: getField(form, "aidPointId"),
   });
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   try {
     await updateMarchFields(id, parsed.data);
@@ -1398,8 +1362,8 @@ export async function ownerDeleteMarchAction(
   id: string,
   token: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await verifyResourceOwner("march", id, token)))
-    return { ok: false, error: "Enlace de gestión no válido." };
+  const invalid = await ownerLinkError("march", id, token);
+  if (invalid) return invalid;
   try {
     await deleteMarch(id);
     revalidatePath("/caravanas");
@@ -1436,9 +1400,8 @@ export async function ownerSetAidAvailabilityAction(
   token: string,
   available: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!(await verifyResourceOwner("aid_point", id, token))) {
-    return { ok: false, error: "Enlace de gestión no válido." };
-  }
+  const invalid = await ownerLinkError("aid_point", id, token);
+  if (invalid) return invalid;
   try {
     await setAidAvailability(id, available);
     revalidatePath("/ayuda");
@@ -1470,10 +1433,8 @@ export async function voteHospitalSuppliesAction(
 
 // ── Hospitales ───────────────────────────────────────────────────────────────
 export async function registerHospitalAction(form: FormData): Promise<ActionResult> {
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
 
   const parsed = hospitalSchema.safeParse({
     name: getField(form, "name"),
@@ -1488,9 +1449,7 @@ export async function registerHospitalAction(form: FormData): Promise<ActionResu
     contactPhone: getField(form, "contactPhone"),
   });
 
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   const photoUrl = getPhotoUrl(form);
 
@@ -1554,10 +1513,8 @@ export async function addHospitalPatientAction(form: FormData): Promise<ActionRe
     };
   }
 
-  const token = getField(form, "cf-turnstile-response") || null;
-  if (!(await verifyTurnstile(token))) {
-    return { ok: false, error: "No se pudo verificar que eres una persona. Intenta de nuevo." };
-  }
+  const captcha = await captchaError(form);
+  if (captcha) return captcha;
 
   const parsed = hospitalPatientSchema.safeParse({
     hospitalId: getField(form, "hospitalId"),
@@ -1568,9 +1525,7 @@ export async function addHospitalPatientAction(form: FormData): Promise<ActionRe
     note: getField(form, "note"),
   });
 
-  if (!parsed.success) {
-    return { ok: false, error: "Revisa los campos marcados.", fieldErrors: zodToFieldErrors(parsed.error) };
-  }
+  if (!parsed.success) return invalidFields(parsed.error);
 
   try {
     await addHospitalPatient(parsed.data);

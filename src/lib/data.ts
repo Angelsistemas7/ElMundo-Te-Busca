@@ -187,6 +187,23 @@ async function deleteStoragePhoto(url: string | null | undefined): Promise<void>
   }
 }
 
+// ── Piezas compartidas por los filtros de los listados ──────────────────────
+// Las mismas tres reglas se repetían en cada función paginada (personas,
+// puntos de ayuda, caravanas, comunidad, denuncias, mascotas, voluntarios,
+// hospitales). Aquí están una sola vez; el comportamiento es el de antes.
+
+/** Fin del día del filtro `dateTo`, para que ese día entre en el rango. */
+const endOfDay = (dateTo: string) => `${dateTo}T23:59:59.999Z`;
+
+/** Texto de búsqueda saneado para el operador `or(...ilike...)` de Supabase:
+ *  comas, paréntesis y `*` tienen significado propio en esa sintaxis. */
+const searchTerm = (search: string) => search.replace(/[,()*]/g, " ").trim();
+
+/** Búsqueda de texto libre en la rama en memoria: junta los campos de la
+ *  ficha y comprueba si contienen lo buscado, sin distinguir mayúsculas. */
+const matchesText = (fields: (string | null | undefined)[], search: string) =>
+  fields.filter(Boolean).join(" ").toLowerCase().includes(search);
+
 // ── Mapeo fila Supabase -> tipo de dominio ──────────────────────────────────
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function rowToPerson(r: any): Person {
@@ -256,17 +273,11 @@ function queryMemoryPersons(q: PersonQuery): PersonResult {
   if (typeof q.minAge === "number") items = items.filter((p) => p.age != null && p.age >= q.minAge!);
   if (typeof q.maxAge === "number") items = items.filter((p) => p.age != null && p.age <= q.maxAge!);
   if (q.dateFrom) items = items.filter((p) => p.createdAt >= q.dateFrom!);
-  if (q.dateTo) items = items.filter((p) => p.createdAt <= `${q.dateTo}T23:59:59.999Z`);
+  if (q.dateTo) items = items.filter((p) => p.createdAt <= endOfDay(q.dateTo!));
 
   if (q.search) {
     const s = q.search.toLowerCase().trim();
-    items = items.filter((p) =>
-      [p.firstName, p.lastName, p.cedula, p.estado, p.locationText]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(s),
-    );
+    items = items.filter((p) => matchesText([p.firstName, p.lastName, p.cedula, p.estado, p.locationText], s));
   }
 
   // "Cerca de un punto": solo quien tenga coordenada marcada puede evaluarse;
@@ -332,7 +343,7 @@ export async function getPersons(q: PersonQuery = {}): Promise<PersonResult> {
   if (typeof q.minAge === "number") query = query.gte("age", q.minAge);
   if (typeof q.maxAge === "number") query = query.lte("age", q.maxAge);
   if (q.dateFrom) query = query.gte("created_at", q.dateFrom);
-  if (q.dateTo) query = query.lte("created_at", `${q.dateTo}T23:59:59.999Z`);
+  if (q.dateTo) query = query.lte("created_at", endOfDay(q.dateTo));
   if (q.search) query = query.textSearch("search_doc", q.search, { type: "websearch", config: "spanish" });
 
   // "Cerca de un punto" (con radio opcional): no hay PostGIS, así que la
@@ -1614,7 +1625,7 @@ export async function getAidPointsPage(
     if (filter.availOnly) items = items.filter((p) => p.available);
     if (filter.estado && filter.estado !== "all") items = items.filter((p) => p.estado === filter.estado);
     if (filter.dateFrom) items = items.filter((p) => p.createdAt >= filter.dateFrom!);
-    if (filter.dateTo) items = items.filter((p) => p.createdAt <= `${filter.dateTo}T23:59:59.999Z`);
+    if (filter.dateTo) items = items.filter((p) => p.createdAt <= endOfDay(filter.dateTo!));
     items = [...items.filter((p) => p.available), ...items.filter((p) => !p.available)];
     const total = items.length;
     const start = (page - 1) * pageSize;
@@ -1629,7 +1640,7 @@ export async function getAidPointsPage(
   if (filter.availOnly) query = query.eq("available", true);
   if (filter.estado && filter.estado !== "all") query = query.eq("estado", filter.estado);
   if (filter.dateFrom) query = query.gte("created_at", filter.dateFrom);
-  if (filter.dateTo) query = query.lte("created_at", `${filter.dateTo}T23:59:59.999Z`);
+  if (filter.dateTo) query = query.lte("created_at", endOfDay(filter.dateTo));
   const start = (page - 1) * pageSize;
   const { data, error, count } = await query.range(start, start + pageSize - 1);
   if (error) throw error;
@@ -1912,7 +1923,7 @@ export async function getMarchesPage(
       items = all.slice().sort((a, b) => a.departAt.localeCompare(b.departAt));
     }
     if (dateFrom) items = items.filter((m) => m.departAt >= dateFrom);
-    if (dateTo) items = items.filter((m) => m.departAt <= `${dateTo}T23:59:59.999Z`);
+    if (dateTo) items = items.filter((m) => m.departAt <= endOfDay(dateTo));
     const total = items.length;
     const start = (page - 1) * pageSize;
     return { items: items.slice(start, start + pageSize), total, page, pageSize, upcomingCount, pastCount };
@@ -1923,7 +1934,7 @@ export async function getMarchesPage(
   else if (show === "past") query = query.lt("depart_at", nowIso).order("depart_at", { ascending: false });
   else query = query.order("depart_at", { ascending: true });
   if (dateFrom) query = query.gte("depart_at", dateFrom);
-  if (dateTo) query = query.lte("depart_at", `${dateTo}T23:59:59.999Z`);
+  if (dateTo) query = query.lte("depart_at", endOfDay(dateTo));
 
   const start = (page - 1) * pageSize;
   const [{ data, error, count }, upcomingRes, pastRes] = await Promise.all([
@@ -2578,13 +2589,7 @@ export async function getPosts(
     if (filter.aidPointId) items = items.filter((p) => p.aidPointId === filter.aidPointId);
     if (filter.search) {
       const s = filter.search.toLowerCase().trim();
-      items = items.filter((p) =>
-        [p.body, p.locationText, p.authorName, p.estado]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(s),
-      );
+      items = items.filter((p) => matchesText([p.body, p.locationText, p.authorName, p.estado], s));
     }
     return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
@@ -2601,7 +2606,7 @@ export async function getPosts(
   if (filter.aidPointId) query = query.eq("aid_point_id", filter.aidPointId);
   if (filter.search) {
     // Quita caracteres que rompen el filtro `or` de PostgREST.
-    const s = filter.search.replace(/[,()*]/g, " ").trim();
+    const s = searchTerm(filter.search);
     if (s) {
       query = query.or(
         `body.ilike.%${s}%,location_text.ilike.%${s}%,author_name.ilike.%${s}%`,
@@ -2657,12 +2662,10 @@ export async function getPostsPage(
     if (filter.type && filter.type !== "all") items = items.filter((p) => p.type === filter.type);
     if (filter.estado && filter.estado !== "all") items = items.filter((p) => p.estado === filter.estado);
     if (filter.dateFrom) items = items.filter((p) => p.createdAt >= filter.dateFrom!);
-    if (filter.dateTo) items = items.filter((p) => p.createdAt <= `${filter.dateTo}T23:59:59.999Z`);
+    if (filter.dateTo) items = items.filter((p) => p.createdAt <= endOfDay(filter.dateTo!));
     if (filter.search) {
       const s = filter.search.toLowerCase().trim();
-      items = items.filter((p) =>
-        [p.body, p.locationText, p.authorName, p.estado].filter(Boolean).join(" ").toLowerCase().includes(s),
-      );
+      items = items.filter((p) => matchesText([p.body, p.locationText, p.authorName, p.estado], s));
     }
     items =
       sort === "oldest"
@@ -2692,9 +2695,9 @@ export async function getPostsPage(
   if (filter.type && filter.type !== "all") query = query.eq("type", filter.type);
   if (filter.estado && filter.estado !== "all") query = query.eq("estado", filter.estado);
   if (filter.dateFrom) query = query.gte("created_at", filter.dateFrom);
-  if (filter.dateTo) query = query.lte("created_at", `${filter.dateTo}T23:59:59.999Z`);
+  if (filter.dateTo) query = query.lte("created_at", endOfDay(filter.dateTo));
   if (filter.search) {
-    const s = filter.search.replace(/[,()*]/g, " ").trim();
+    const s = searchTerm(filter.search);
     if (s) query = query.or(`body.ilike.%${s}%,location_text.ilike.%${s}%,author_name.ilike.%${s}%`);
   }
   const start = (page - 1) * pageSize;
@@ -3166,16 +3169,10 @@ export async function getComplaints(
       items = items.filter((c) => c.category === filter.category);
     if (filter.estado && filter.estado !== "all") items = items.filter((c) => c.estado === filter.estado);
     if (filter.dateFrom) items = items.filter((c) => c.createdAt >= filter.dateFrom!);
-    if (filter.dateTo) items = items.filter((c) => c.createdAt <= `${filter.dateTo}T23:59:59.999Z`);
+    if (filter.dateTo) items = items.filter((c) => c.createdAt <= endOfDay(filter.dateTo!));
     if (filter.search) {
       const s = filter.search.toLowerCase().trim();
-      items = items.filter((c) =>
-        [c.body, c.locationText, c.authorName, c.estado]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(s),
-      );
+      items = items.filter((c) => matchesText([c.body, c.locationText, c.authorName, c.estado], s));
     }
     items = items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     const total = items.length;
@@ -3190,9 +3187,9 @@ export async function getComplaints(
   if (filter.category && filter.category !== "all") query = query.eq("category", filter.category);
   if (filter.estado && filter.estado !== "all") query = query.eq("estado", filter.estado);
   if (filter.dateFrom) query = query.gte("created_at", filter.dateFrom);
-  if (filter.dateTo) query = query.lte("created_at", `${filter.dateTo}T23:59:59.999Z`);
+  if (filter.dateTo) query = query.lte("created_at", endOfDay(filter.dateTo));
   if (filter.search) {
-    const s = filter.search.replace(/[,()*]/g, " ").trim();
+    const s = searchTerm(filter.search);
     if (s) query = query.or(`body.ilike.%${s}%,location_text.ilike.%${s}%,author_name.ilike.%${s}%`);
   }
   const start = (page - 1) * pageSize;
@@ -3325,16 +3322,10 @@ export async function getPets(
     if (filter.status && filter.status !== "all") items = items.filter((p) => p.status === filter.status);
     if (filter.estado && filter.estado !== "all") items = items.filter((p) => p.estado === filter.estado);
     if (filter.dateFrom) items = items.filter((p) => p.createdAt >= filter.dateFrom!);
-    if (filter.dateTo) items = items.filter((p) => p.createdAt <= `${filter.dateTo}T23:59:59.999Z`);
+    if (filter.dateTo) items = items.filter((p) => p.createdAt <= endOfDay(filter.dateTo!));
     if (filter.search) {
       const s = filter.search.toLowerCase().trim();
-      items = items.filter((p) =>
-        [p.name, p.description, p.locationText, p.estado]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(s),
-      );
+      items = items.filter((p) => matchesText([p.name, p.description, p.locationText, p.estado], s));
     }
     items =
       sort === "oldest"
@@ -3352,9 +3343,9 @@ export async function getPets(
   if (filter.status && filter.status !== "all") query = query.eq("status", filter.status);
   if (filter.estado && filter.estado !== "all") query = query.eq("estado", filter.estado);
   if (filter.dateFrom) query = query.gte("created_at", filter.dateFrom);
-  if (filter.dateTo) query = query.lte("created_at", `${filter.dateTo}T23:59:59.999Z`);
+  if (filter.dateTo) query = query.lte("created_at", endOfDay(filter.dateTo));
   if (filter.search) {
-    const s = filter.search.replace(/[,()*]/g, " ").trim();
+    const s = searchTerm(filter.search);
     if (s) query = query.or(`name.ilike.%${s}%,description.ilike.%${s}%,location_text.ilike.%${s}%`);
   }
   const start = (page - 1) * pageSize;
@@ -3528,20 +3519,14 @@ async function getVolunteersImpl(
     if (filter.type && filter.type !== "all") items = items.filter((v) => v.type === filter.type);
     if (filter.search) {
       const s = filter.search.toLowerCase().trim();
-      items = items.filter((v) =>
-        [v.name, v.skillsText, v.locationText, v.estado]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(s),
-      );
+      items = items.filter((v) => matchesText([v.name, v.skillsText, v.locationText, v.estado], s));
     }
     return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
   let query = sb.from("volunteers").select("*").order("created_at", { ascending: false }).limit(300);
   if (filter.type && filter.type !== "all") query = query.eq("type", filter.type);
   if (filter.search) {
-    const s = filter.search.replace(/[,()*]/g, " ").trim();
+    const s = searchTerm(filter.search);
     if (s) query = query.or(`name.ilike.%${s}%,skills_text.ilike.%${s}%,location_text.ilike.%${s}%`);
   }
   const { data, error } = await query;
@@ -3585,12 +3570,10 @@ export async function getVolunteersPage(
     if (filter.type && filter.type !== "all") items = items.filter((v) => v.type === filter.type);
     if (filter.estado && filter.estado !== "all") items = items.filter((v) => v.estado === filter.estado);
     if (filter.dateFrom) items = items.filter((v) => v.createdAt >= filter.dateFrom!);
-    if (filter.dateTo) items = items.filter((v) => v.createdAt <= `${filter.dateTo}T23:59:59.999Z`);
+    if (filter.dateTo) items = items.filter((v) => v.createdAt <= endOfDay(filter.dateTo!));
     if (filter.search) {
       const s = filter.search.toLowerCase().trim();
-      items = items.filter((v) =>
-        [v.name, v.skillsText, v.locationText, v.estado].filter(Boolean).join(" ").toLowerCase().includes(s),
-      );
+      items = items.filter((v) => matchesText([v.name, v.skillsText, v.locationText, v.estado], s));
     }
     items =
       sort === "oldest"
@@ -3612,9 +3595,9 @@ export async function getVolunteersPage(
   if (filter.type && filter.type !== "all") query = query.eq("type", filter.type);
   if (filter.estado && filter.estado !== "all") query = query.eq("estado", filter.estado);
   if (filter.dateFrom) query = query.gte("created_at", filter.dateFrom);
-  if (filter.dateTo) query = query.lte("created_at", `${filter.dateTo}T23:59:59.999Z`);
+  if (filter.dateTo) query = query.lte("created_at", endOfDay(filter.dateTo));
   if (filter.search) {
-    const s = filter.search.replace(/[,()*]/g, " ").trim();
+    const s = searchTerm(filter.search);
     if (s) query = query.or(`name.ilike.%${s}%,skills_text.ilike.%${s}%,location_text.ilike.%${s}%`);
   }
   const start = (page - 1) * pageSize;
@@ -4038,7 +4021,7 @@ export async function getHospitalsPage(
     if (filter.status) items = items.filter((h) => h.status === filter.status);
     if (filter.estado && filter.estado !== "all") items = items.filter((h) => h.estado === filter.estado);
     if (filter.dateFrom) items = items.filter((h) => h.createdAt >= filter.dateFrom!);
-    if (filter.dateTo) items = items.filter((h) => h.createdAt <= `${filter.dateTo}T23:59:59.999Z`);
+    if (filter.dateTo) items = items.filter((h) => h.createdAt <= endOfDay(filter.dateTo!));
     items =
       sort === "recent"
         ? items.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -4059,7 +4042,7 @@ export async function getHospitalsPage(
   if (filter.status) query = query.eq("status", filter.status);
   if (filter.estado && filter.estado !== "all") query = query.eq("estado", filter.estado);
   if (filter.dateFrom) query = query.gte("created_at", filter.dateFrom);
-  if (filter.dateTo) query = query.lte("created_at", `${filter.dateTo}T23:59:59.999Z`);
+  if (filter.dateTo) query = query.lte("created_at", endOfDay(filter.dateTo));
   const start = (page - 1) * pageSize;
   const { data, error, count } = await query.range(start, start + pageSize - 1);
   if (error) throw error;

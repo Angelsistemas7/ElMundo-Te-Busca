@@ -51,3 +51,4 @@ Existen al menos 5 sitios paralelos más cubriendo el mismo terremoto (desaparec
 7. [Observabilidad y testing](07-observabilidad-testing.md)
 8. [Accesibilidad y performance](08-accesibilidad-performance.md)
 9. [App móvil (Flutter/Dart)](09-app-movil-flutter.md) — planeación de arquitectura, sin construir nada aún
+10. [Duplicación de código](DUPLICACION-CODIGO.md) — patrones repetidos en acciones, capa de datos, páginas y componentes; qué se unificó y qué queda propuesto

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PackageCheck, PackageX } from "lucide-react";
-import { getSessionUserAction, voteHospitalSuppliesAction } from "@/app/actions";
+import { voteHospitalSuppliesAction } from "@/app/actions";
+import { useLoggedIn } from "@/lib/useLoggedIn";
 import { cn } from "@/lib/utils";
 
 // Señal comunitaria (NO vinculante) sobre si el hospital tiene insumos. Requiere
@@ -23,18 +24,12 @@ export function HospitalSuppliesVote({
   const [vs, setVs] = useState(votesSupplies);
   const [vn, setVn] = useState(votesNoSupplies);
   const [voted, setVoted] = useState<"yes" | "no" | null>(null);
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const loggedIn = useLoggedIn();
 
   useEffect(() => {
     const v = localStorage.getItem(`vtb_hospvote_${id}`);
     if (v === "yes" || v === "no") setVoted(v);
   }, [id]);
-
-  useEffect(() => {
-    getSessionUserAction()
-      .then((u) => setLoggedIn(!!u))
-      .catch(() => setLoggedIn(false));
-  }, []);
 
   async function vote(kind: "yes" | "no") {
     if (voted || loggedIn !== true) return;

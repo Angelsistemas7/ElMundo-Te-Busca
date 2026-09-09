@@ -29,22 +29,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { clampPageSize } from "@/lib/utils";
 import { PersonGridSkeleton } from "@/components/ListSkeletons";
+import { type SearchParams, str, num } from "@/lib/searchParams";
 // El aviso de "modo demostración" (DevModeNotice) ya se muestra en el home
 // (/) — no se repite en cada página.
 
 export const dynamic = "force-dynamic";
-
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-function str(v: string | string[] | undefined): string | undefined {
-  return Array.isArray(v) ? v[0] : v;
-}
-function num(v: string | string[] | undefined): number | undefined {
-  const s = str(v);
-  if (!s) return undefined;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : undefined;
-}
 
 interface BaseQuery {
   country: string;

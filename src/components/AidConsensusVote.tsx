@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
-import { getSessionUserAction, voteAidAvailabilityAction } from "@/app/actions";
+import { voteAidAvailabilityAction } from "@/app/actions";
+import { useLoggedIn } from "@/lib/useLoggedIn";
 import { cn } from "@/lib/utils";
 
 // Señal comunitaria (NO vinculante) sobre la disponibilidad de un punto de ayuda.
@@ -22,18 +23,12 @@ export function AidConsensusVote({
   const [va, setVa] = useState(votesAvailable);
   const [vd, setVd] = useState(votesDepleted);
   const [voted, setVoted] = useState<"available" | "depleted" | null>(null);
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const loggedIn = useLoggedIn();
 
   useEffect(() => {
     const v = localStorage.getItem(`vtb_aidvote_${id}`);
     if (v === "available" || v === "depleted") setVoted(v);
   }, [id]);
-
-  useEffect(() => {
-    getSessionUserAction()
-      .then((u) => setLoggedIn(!!u))
-      .catch(() => setLoggedIn(false));
-  }, []);
 
   async function vote(kind: "available" | "depleted") {
     if (voted || loggedIn !== true) return;
